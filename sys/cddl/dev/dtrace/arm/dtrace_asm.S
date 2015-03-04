@@ -70,14 +70,11 @@ END(dtrace_interrupt_disable)
 void dtrace_interrupt_enable(dtrace_icookie_t cookie)
 */
 ENTRY(dtrace_interrupt_enable)
-	push	{ip, lr}
-	.save	{ip, lr}
 	and	r0, r0, #(PSR_I | PSR_F) 
 	mrs	r1, cpsr
 	bic	r1, r1, #(PSR_I | PSR_F)
 	orr	r1, r1, r0
 	msr	cpsr_c, r1
-	pop	{ip, lr}
 	RET
 END(dtrace_interrupt_enable)
 /*

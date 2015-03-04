@@ -57,6 +57,11 @@ __FBSDID("$FreeBSD$");
 #ifdef KDTRACE_HOOKS
 	.bss
 	.align 4
+	.global	_C_LABEL(dtrace_invop_jump_addr)
+_C_LABEL(dtrace_invop_jump_addr):
+	.word 0
+	.word 0
+
 	.global	_C_LABEL(dtrace_invop_calltrap_addr)
 _C_LABEL(dtrace_invop_calltrap_addr):
 	.word 0
@@ -195,7 +200,6 @@ _C_LABEL(dtrace_invop_calltrap_addr):
 	mov	r2, sp;			/* Save	SVC sp */		   \
 	bic	sp, sp, #7;		/* Align sp to an 8-byte addrress */  \
 	sub	sp, sp, #4;		/* Pad trapframe to keep alignment */ \
-	sub	sp, sp, #(4 * 16);					   \
 	str	r0, [sp, #-4]!;		/* Push return address */	   \
 	str	lr, [sp, #-4]!;		/* Push SVC lr */		   \
 	str	r2, [sp, #-4]!;		/* Push SVC sp */		   \
