@@ -328,8 +328,6 @@ arm_gic_next_irq(struct arm_gic_softc *sc, int last_irq)
 	active_irq &= 0x3FF;
 
 	if (active_irq == 0x3FF) {
-		if (last_irq == -1)
-			printf("Spurious interrupt detected\n");
 		return -1;
 	}
 
