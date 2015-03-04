@@ -28,7 +28,10 @@
 
 #define _ASM
 #define _LOCORE
+
+#ifndef LOCORE
 #define LOCORE
+#endif
 
 #include <sys/cpuvar_defs.h>
 #include <sys/dtrace.h>

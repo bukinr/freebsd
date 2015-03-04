@@ -142,12 +142,24 @@ NORMAL_FW= uudecode -o ${.TARGET} ${.ALLSRC}
 NORMAL_FWO= ${LD} -b binary --no-warn-mismatch -d -warn-common -r \
 	-o ${.TARGET} ${.ALLSRC:M*.fw}
 
+CDDL_CFLAGS=	${CFLAGS} -Wno-unknown-pragmas -Wno-missing-prototypes -Wno-undef -Wno-strict-prototypes -Wno-cast-qual -Wno-parentheses -Wno-redundant-decls -Wno-missing-braces -Wno-uninitialized -Wno-unused -Wno-inline -Wno-switch -Wno-pointer-arith -Wno-unknown-pragmas
+
 # Special flags for managing the compat compiles for ZFS
-ZFS_CFLAGS=	-DFREEBSD_NAMECACHE -DBUILDING_ZFS -nostdinc -I$S/cddl/compat/opensolaris -I$S/cddl/contrib/opensolaris/uts/common/fs/zfs -I$S/cddl/contrib/opensolaris/uts/common/zmod -I$S/cddl/contrib/opensolaris/uts/common -I$S -I$S/cddl/contrib/opensolaris/common/zfs -I$S/cddl/contrib/opensolaris/common ${CFLAGS} -Wno-unknown-pragmas -Wno-missing-prototypes -Wno-undef -Wno-strict-prototypes -Wno-cast-qual -Wno-parentheses -Wno-redundant-decls -Wno-missing-braces -Wno-uninitialized -Wno-unused -Wno-inline -Wno-switch -Wno-pointer-arith -Wno-unknown-pragmas
+ZFS_CFLAGS=	-DFREEBSD_NAMECACHE -DBUILDING_ZFS -nostdinc -I$S/cddl/compat/opensolaris -I$S/cddl/contrib/opensolaris/uts/common/fs/zfs -I$S/cddl/contrib/opensolaris/uts/common/zmod -I$S/cddl/contrib/opensolaris/uts/common -I$S -I$S/cddl/contrib/opensolaris/common/zfs -I$S/cddl/contrib/opensolaris/common ${CDDL_CFLAGS}
 ZFS_CFLAGS+=	-include $S/cddl/compat/opensolaris/sys/debug_compat.h
 ZFS_ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${ZFS_CFLAGS}
 ZFS_C=		${CC} -c ${ZFS_CFLAGS} ${WERROR} ${PROF} ${.IMPSRC}
 ZFS_S=		${CC} -c ${ZFS_ASM_CFLAGS} ${WERROR} ${.IMPSRC}
+
+DTRACE_CMN_CFLAGS=	-nostdinc -I$S/cddl/compat/opensolaris -I$S/cddl/contrib/opensolaris/uts/common -I$S ${CDDL_CFLAGS}
+DTRACE_CFLAGS=		-nostdinc -I$S/cddl/compat/opensolaris -I$S/cddl/dev/dtrace -I$S/cddl/dev/dtrace/${MACHINE_CPUARCH} -I$S/cddl/contrib/opensolaris/uts/common -I$S/cddl/contrib/opensolaris/common/util -I$S -DDIS_MEM -DSMP ${CDDL_CFLAGS}
+FBT_CFLAGS=		-nostdinc -I$S/cddl/dev/fbt/${MACHINE_CPUARCH} -I$S/cddl/dev/fbt -I$S/cddl/compat/opensolaris -I$S/cddl/contrib/opensolaris/uts/common -I$S ${CDDL_CFLAGS}
+DTRACE_ASM_CFLAGS=	-x assembler-with-cpp -DLOCORE ${DTRACE_CFLAGS}
+
+DTRACE_CMN_C=	${CC} -c ${DTRACE_CMN_CFLAGS} ${CDDL_CFLAGS}	${WERROR} ${PROF} ${.IMPSRC}
+DTRACE_C=		${CC} -c ${DTRACE_CFLAGS} ${CDDL_CFLAGS}	${WERROR} ${PROF} ${.IMPSRC}
+DTRACE_S=		${CC} -c ${DTRACE_ASM_CFLAGS} ${CDDL_CFLAGS}	${WERROR} ${.IMPSRC}
+FBT_C=			${CC} -c ${FBT_CFLAGS} ${CDDL_CFLAGS}		${WERROR} ${PROF} ${.IMPSRC}
 
 .if ${MK_CTF} != "no"
 NORMAL_CTFCONVERT=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}
