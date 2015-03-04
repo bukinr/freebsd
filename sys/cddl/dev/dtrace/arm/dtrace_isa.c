@@ -90,7 +90,7 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 	while (depth < pcstack_limit) {
 		int done;
 
-		done = unwind_stack_one(&state, 1);
+		done = unwind_stack_one(&state, 0);
 
 		if (aframes > 0) {
 			aframes--;
@@ -156,7 +156,7 @@ dtrace_getstackdepth(int aframes)
 	state.registers[PC] = (uint32_t)dtrace_getstackdepth;
 
 	do {
-		done = unwind_stack_one(&state, 1);
+		done = unwind_stack_one(&state, 0);
 		depth++;
 	} while (!done);
 
