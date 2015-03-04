@@ -112,6 +112,8 @@ static void	usb_cdev_free(struct usb_device *);
 
 /* This variable is global to allow easy access to it: */
 
+#define	USB_TEMPLATE USB_TEMP_SERIALNET
+
 #ifdef	USB_TEMPLATE
 int	usb_template = USB_TEMPLATE;
 #else
