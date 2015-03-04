@@ -231,16 +231,64 @@ dtrace_probe_error(dtrace_state_t *state, dtrace_epid_t epid, int which,
 static int
 dtrace_invop_start(struct trapframe *frame)
 {
-	printf("IMPLEMENT ME: %s\n", __func__);
-	switch (dtrace_invop(frame->tf_pc, (uintptr_t *)frame, frame->tf_pc)) {
+	register_t *r0, *sp;
+	int invop, reg, update_sp;
+
+	invop = dtrace_invop(frame->tf_pc, (uintptr_t *)frame, frame->tf_pc);
+	switch (invop & 0xff) {
 	case DTRACE_INVOP_PUSHM:
-		// TODO:
+		sp = (register_t *)frame->tf_svc_sp;
+		r0 = &frame->tf_r0;
+
+		invop >>= 8;
+		if (invop & (1 << 14)) {
+			sp--;
+			*sp = frame->tf_svc_lr;
+		}
+		if (invop & (1 << 13)) {
+			sp--;
+			*sp = frame->tf_svc_sp;
+		}
+		for (reg = 12; reg >= 0; reg--) {
+			if (invop & (1 << reg)) {
+				sp--;
+				*sp = r0[reg];
+			}
+		}
+		frame->tf_svc_sp = (register_t)sp;
+		frame->tf_pc += 4;
 		break;
 	case DTRACE_INVOP_POPM:
-		// TODO:
+		sp = (register_t *)frame->tf_svc_sp;
+		r0 = &frame->tf_r0;
+
+		invop >>= 8;
+		for (reg = 0; reg < 12; reg++) {
+			if (invop & (1 << reg)) {
+				r0[reg] = *sp;
+				sp++;
+			}
+		}
+		update_sp = 1;
+		if (invop & (1 << 13)) {
+			frame->tf_svc_sp = *sp;
+			*sp++;
+			update_sp = 0;
+		}
+		if (invop & (1 << 14)) {
+			frame->tf_svc_lr = *sp;
+			*sp++;
+		}
+		if (invop & (1 << 15)) {
+			frame->tf_pc = *sp;
+			*sp++;
+		} else
+			frame->tf_pc += 4;
+		if (update_sp)
+			frame->tf_svc_sp = (register_t)sp;
 		break;
 	case DTRACE_INVOP_B:
-		// TODO
+		panic("DTRACE_INVOP_B");
 		break;
 	default:
 		return (-1);
