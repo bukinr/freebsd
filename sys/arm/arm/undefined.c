@@ -86,10 +86,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/db_machdep.h>
 #endif
 
-#ifdef KDTRACE_HOOKS
-int (*dtrace_invop_jump_addr)(struct trapframe *);
-#endif
-
 static int gdb_trapper(u_int, u_int, struct trapframe *, int);
 
 LIST_HEAD(, undefined_handler) undefined_handlers[MAX_COPROCS];
@@ -290,14 +286,7 @@ undefinedinstruction(struct trapframe *frame)
 			printf("No debugger in kernel.\n");
 #endif
 			return;
-		}
-#ifdef KDTRACE_HOOKS
-		else if (dtrace_invop_jump_addr != 0) {
-			dtrace_invop_jump_addr(frame);
-			return;
-		}
-#endif
-		else
+		} else
 			panic("Undefined instruction in kernel.\n");
 	}
 
