@@ -29,4 +29,6 @@
 #ifndef	_MACHINE_CLOCK_H_
 #define	_MACHINE_CLOCK_H_
 
+extern uint64_t		ccnt_freq;
+
 #endif /* !_MACHINE_CLOCK_H_ */

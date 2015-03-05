@@ -14,12 +14,25 @@ void	swi_vm(void *);
 #ifdef _KERNEL
 #if __ARM_ARCH >= 6
 #include <machine/cpu-v6.h>
+#include <sys/pcpu.h>
+extern uint32_t	ccnt_hi[MAXCPU];
 #endif
 static __inline uint64_t
 get_cyclecount(void)
 {
 #if __ARM_ARCH >= 6
-	return cp15_pmccntr_get();
+	u_int cpu;
+	uint64_t h, h2;
+	uint32_t l;
+
+	cpu = PCPU_GET(cpuid);
+	h = (uint64_t)atomic_load_acq_32(&ccnt_hi[cpu]);
+	l = cp15_pmccntr_get();
+	/* Make sure there was no wrap-around while we read the lo half. */
+	h2 = (uint64_t)atomic_load_acq_32(&ccnt_hi[cpu]);
+	if (h != h2)
+		l = cp15_pmccntr_get();
+	return (h2 << 32 | l);
 #else /* No performance counters, so use binuptime(9). This is slooooow */
 	struct bintime bt;
 

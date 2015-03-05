@@ -85,16 +85,38 @@ static struct resource_spec pmu_spec[] = {
 	{ -1, 0 }
 };
 
+/* CCNT */
+uint64_t ccnt_freq;
+uint32_t ccnt_hi[MAXCPU];
+
+#define	PMU_OVSR_C		0x80000000	/* Cycle Counter */
+#define	PMU_IESR_C		0x80000000	/* Cycle Counter */
+
 static int
 pmu_intr(void *arg)
 {
+#ifdef HWPMC_HOOKS
 	struct trapframe *tf;
+#endif
+	uint32_t r;
+	u_int cpu;
 
-	tf = arg;
+	cpu = PCPU_GET(cpuid);
+
+	r = cp15_pmovsr_get();
+	if (r & PMU_OVSR_C) {
+		atomic_add_32(&ccnt_hi[cpu], 1);
+		/* Clear the event. */
+		r &= ~PMU_OVSR_C;
+		cp15_pmovsr_set(PMU_OVSR_C);
+	}
 
 #ifdef HWPMC_HOOKS
-	if (pmc_intr)
+	/* Only call into the HWPMC framework if we know there is work. */
+	if (r != 0 && pmc_intr) {
+		tf = arg;
 		(*pmc_intr)(PCPU_GET(cpuid), tf);
+	}
 #endif
 
 	return (FILTER_HANDLED);
@@ -119,6 +141,7 @@ static int
 pmu_attach(device_t dev)
 {
 	struct pmu_softc *sc;
+	uint32_t iesr;
 	int err;
 
 	sc = device_get_softc(dev);
@@ -136,6 +159,15 @@ pmu_attach(device_t dev)
 		device_printf(dev, "Unable to setup interrupt handler.\n");
 		return (ENXIO);
 	}
+
+	/* Initialize to 0. */
+	for (err = 0; err < MAXCPU; err++)
+		ccnt_hi[err] = 0;
+
+	/* Enable the interrupt to fire on overflow. */
+	iesr = cp15_pminten_get();
+	iesr |= PMU_IESR_C;
+	cp15_pminten_set(iesr);	
 
 	return (0);
 }
@@ -155,3 +187,27 @@ static driver_t pmu_driver = {
 static devclass_t pmu_devclass;
 
 DRIVER_MODULE(pmu, simplebus, pmu_driver, pmu_devclass, 0, 0);
+
+
+static void
+_calibrate_ccnt_freq(void *arg __unused)
+{
+	uint64_t ccnt1, ccnt2;
+
+	/*
+	 *"Calibrate" here and provide ccnt_freq.  We have a ~4.2s window
+	 * before the counter wraps around (we do not have interrupts to
+	 * catch that yet, so make sure 2 > 1 :-).
+	 */
+	ccnt1 = cp15_pmccntr_get();
+	DELAY(1000000);
+	ccnt2 = cp15_pmccntr_get();
+	if (ccnt2 < ccnt1)
+		ccnt2 += 0x100000000;
+	ccnt_freq = ccnt2 - ccnt1;
+	if (bootverbose)
+		printf("CCNT clock: %ju Hz\n", (intmax_t)ccnt_freq);
+}
+/* SI_SUB_FIRST so it runs before DTrace skew measure. */
+SYSINIT(_calibrate_ccnt_freq, SI_SUB_SMP, SI_ORDER_FIRST, _calibrate_ccnt_freq, NULL);
+
