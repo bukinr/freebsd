@@ -116,7 +116,7 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	 * In absence of DTrace kernel-module support on ARM, we need to
 	 * manually exclude FBT functions from instrumentation.
 	 */
-	if (strncmp(name, "fbt_") == 0)
+	if (strncmp(name, "fbt_", 4) == 0)
 		return (0);
 
 	instr = (uint32_t *)symval->value;
