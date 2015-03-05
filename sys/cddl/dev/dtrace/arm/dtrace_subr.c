@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/dtrace_bsd.h>
 #include <machine/armreg.h>
 #include <machine/clock.h>
+#include <machine/cpu.h>
 #include <machine/frame.h>
 #include <machine/trap.h>
 #include <vm/pmap.h>
@@ -159,15 +160,108 @@ dtrace_sync(void)
  *
  * Returns nanoseconds since boot.
  */
+static int64_t	tgt_cpu_ccnt;
+static int64_t	hst_cpu_ccnt;
+static int64_t	ccnt_skew[MAXCPU];
+static uint64_t	nsec_scale;
+
+/* See below for the explanation of this macro. */
+#define SCALE_SHIFT	28
+
+static void
+dtrace_gethrtime_init_cpu(void *arg)
+{
+	uintptr_t cpu = (uintptr_t) arg;
+
+	if (cpu == curcpu)
+		tgt_cpu_ccnt = get_cyclecount();
+	else
+		hst_cpu_ccnt = get_cyclecount();
+}
+
+static void
+dtrace_gethrtime_init(void *arg)
+{
+	struct pcpu *pc;
+	uint64_t ccnt_f;
+	cpuset_t map;
+	int i;
+
+	/*
+	 * Get CCNT frequency known at this moment.
+	 * This should be constant if CCNT is invariant.
+	 * Otherwise tick->time conversion will be inaccurate, but
+	 * will preserve monotonic property of CCNT.
+	 */
+	ccnt_f = atomic_load_acq_64(&ccnt_freq);
+
+	/*
+	 * The following line checks that nsec_scale calculated below
+	 * doesn't overflow 32-bit unsigned integer, so that it can multiply
+	 * another 32-bit integer without overflowing 64-bit.
+	 * Thus minimum supported CCNT frequency is 62.5MHz.
+	 */
+	KASSERT(ccnt_f > (NANOSEC >> (32 - SCALE_SHIFT)),
+	    ("CCNT frequency is too low"));
+
+	/*
+	 * We scale up NANOSEC/ccnt_f ratio to preserve as much precision
+	 * as possible.
+	 * 2^28 factor was chosen quite arbitrarily from practical
+	 * considerations:
+	 * - it supports CCNT frequencies as low as 62.5MHz (see above);
+	 * - it provides quite good precision (e < 0.01%) up to THz
+	 *   (terahertz) values;
+	 */
+	nsec_scale = ((uint64_t)NANOSEC << SCALE_SHIFT) / ccnt_f;
+
+	/* The current CPU is the reference one. */
+	sched_pin();
+	ccnt_skew[curcpu] = 0;
+	CPU_FOREACH(i) {
+		if (i == curcpu)
+			continue;
+
+		pc = pcpu_find(i);
+		CPU_SETOF(PCPU_GET(cpuid), &map);
+		CPU_SET(pc->pc_cpuid, &map);
+
+		smp_rendezvous_cpus(map, NULL,
+		    dtrace_gethrtime_init_cpu,
+		    smp_no_rendevous_barrier, (void *)(uintptr_t) i);
+
+		ccnt_skew[i] = tgt_cpu_ccnt - hst_cpu_ccnt;
+	}
+	sched_unpin();
+}
+
+SYSINIT(dtrace_gethrtime_init, SI_SUB_SMP, SI_ORDER_ANY, dtrace_gethrtime_init, NULL);
+
+/*
+ * DTrace needs a high resolution time function which can
+ * be called from a probe context and guaranteed not to have
+ * instrumented with probes itself.
+ *
+ * Returns nanoseconds since boot.
+ */
 uint64_t
 dtrace_gethrtime()
 {
-	struct	timespec curtime;
+	uint64_t ccnt;
+	uint32_t lo;
+	uint32_t hi;
 
-	nanouptime(&curtime);
-
-	return (curtime.tv_sec * 1000000000UL + curtime.tv_nsec);
-
+	/*
+	 * We split CCNT value into lower and higher 32-bit halves and separately
+	 * scale them with nsec_scale, then we scale them down by 2^28
+	 * (see nsec_scale calculations) taking into account 32-bit shift of
+	 * the higher half and finally add.
+	 */
+	ccnt = get_cyclecount() - ccnt_skew[curcpu];
+	lo = ccnt;
+	hi = ccnt >> 32;
+	return (((lo * nsec_scale) >> SCALE_SHIFT) +
+	    ((hi * nsec_scale) << (32 - SCALE_SHIFT)));
 }
 
 uint64_t
