@@ -80,7 +80,6 @@ const struct armv7_event_code_map armv7_event_codes[] = {
 	{ PMC_EV_ARMV7_INSTR_SPEC,		0x1B },
 	{ PMC_EV_ARMV7_TTBR_WRITE,		0x1C },
 	{ PMC_EV_ARMV7_BUS_CYCLES,		0x1D },
-	{ PMC_EV_ARMV7_CPU_CYCLES,		0xFF },
 };
 
 const int armv7_event_codes_size =
@@ -104,6 +103,10 @@ armv7_interrupt_enable(uint32_t pmc)
 {
 	uint32_t reg;
 
+	/* Safety belt to avoid toggling the CCNT. */
+	if (pmc == 31)
+		return;
+
 	reg = (1 << pmc);
 	cp15_pminten_set(reg);
 }
@@ -115,6 +118,10 @@ static __inline void
 armv7_interrupt_disable(uint32_t pmc)
 {
 	uint32_t reg;
+
+	/* Safety belt to avoid toggling the CCNT. */
+	if (pmc == 31)
+		return;
 
 	reg = (1 << pmc);
 	cp15_pminten_clr(reg);
@@ -128,6 +135,10 @@ armv7_counter_enable(unsigned int pmc)
 {
 	uint32_t reg;
 
+	/* Safety belt to avoid toggling the CCNT. */
+	if (pmc == 31)
+		return;
+
 	reg = (1 << pmc);
 	cp15_pmcnten_set(reg);
 }
@@ -139,6 +150,10 @@ static __inline void
 armv7_counter_disable(unsigned int pmc)
 {
 	uint32_t reg;
+
+	/* Safety belt to avoid toggling the CCNT. */
+	if (pmc == 31)
+		return;
 
 	reg = (1 << pmc);
 	cp15_pmcnten_clr(reg);
@@ -220,10 +235,7 @@ armv7_read_pmc(int cpu, int ri, pmc_value_t *v)
 
 	pm  = armv7_pcpu[cpu]->pc_armv7pmcs[ri].phw_pmc;
 
-	if (pm->pm_md.pm_armv7.pm_armv7_evsel == 0xFF)
-		tmp = cp15_pmccntr_get();
-	else
-		tmp = armv7_pmcn_read(ri);
+	tmp = armv7_pmcn_read(ri);
 
 	PMCDBG(MDP,REA,2,"armv7-read id=%d -> %jd", ri, tmp);
 	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
@@ -252,10 +264,7 @@ armv7_write_pmc(int cpu, int ri, pmc_value_t v)
 	
 	PMCDBG(MDP,WRI,1,"armv7-write cpu=%d ri=%d v=%jx", cpu, ri, v);
 
-	if (pm->pm_md.pm_armv7.pm_armv7_evsel == 0xFF)
-		cp15_pmccntr_set(v);
-	else
-		armv7_pmcn_write(ri, v);
+	armv7_pmcn_write(ri, v);
 
 	return 0;
 }
@@ -367,10 +376,7 @@ armv7_intr(int cpu, struct trapframe *tf)
 			continue;
 
 		/* Check if counter has overflowed */
-		if (pm->pm_md.pm_armv7.pm_armv7_evsel == 0xFF)
-			reg = (1 << 31);
-		else
-			reg = (1 << ri);
+		reg = (1 << ri);
 
 		if ((cp15_pmovsr_get() & reg) == 0) {
 			continue;
@@ -485,7 +491,7 @@ armv7_pcpu_init(struct pmc_mdep *md, int cpu)
 		pc->pc_hwpmcs[i + first_ri] = phw;
 	}
 
-	/* Enable unit */
+	/* Enable unit; cpu_scc_setup_ccnt() has done that already. */
 	pmnc = cp15_pmcr_get();
 	pmnc |= ARMV7_PMNC_ENABLE;
 	cp15_pmcr_set(pmnc);
@@ -496,11 +502,8 @@ armv7_pcpu_init(struct pmc_mdep *md, int cpu)
 static int
 armv7_pcpu_fini(struct pmc_mdep *md, int cpu)
 {
-	uint32_t pmnc;
 
-	pmnc = cp15_pmcr_get();
-	pmnc &= ~ARMV7_PMNC_ENABLE;
-	cp15_pmcr_set(pmnc);
+	/* We must not disable the counters as we rely on the CCNT running. */
 
 	return 0;
 }
