@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/linker.h>
 
 #include <machine/stack.h>
+#include <machine/vmparam.h>
 
 #include "linker_if.h"
 
@@ -222,6 +223,13 @@ unwind_exec_insn(struct unwind_state *state)
 	/* This should never happen */
 	if (state->entries == 0)
 		return 1;
+
+	/* Detect a bad stack pointer */
+	if (!INKERNEL(vsp) || (vm_offset_t)vsp >= 0xffffff00) {
+		printf("%s: vsp %x %x\n", __func__, state->registers[LR],
+		    state->registers[PC]);
+			return 1;
+	}
 
 	/* Read the next instruction */
 	insn = unwind_exec_read_byte(state);
