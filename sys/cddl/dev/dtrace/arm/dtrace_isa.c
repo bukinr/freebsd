@@ -70,7 +70,7 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
     uint32_t *intrpc)
 {
 	struct unwind_state state;
-	register_t sp, lastsp;
+	register_t sp;
 	int scp_offset;
 	int depth = 0;
 	pc_t caller = (pc_t) solaris_cpu[curcpu].cpu_dtrace_caller;
@@ -81,7 +81,6 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 	aframes++;
 
 	__asm __volatile("mov %0, sp" : "=&r" (sp));
-	lastsp = -1;
 
 	state.registers[FP] = (uint32_t)__builtin_frame_address(0);
 	state.registers[SP] = sp;
@@ -93,6 +92,11 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 
 		done = unwind_stack_one(&state, 0);
 
+		if (state.update_mask == 0)
+			break;
+		if (!INKERNEL(state.registers[PC]))
+			break;
+
 		if (aframes > 0) {
 			aframes--;
 			if ((aframes == 0) && (caller != 0)) {
@@ -102,13 +106,6 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 		else {
 			pcstack[depth++] = state.registers[PC];
 		}
-
-		/*
-		 * If we discover we are looping on the stack frame, give up.
-		 */
-		if (state.registers[SP] == lastsp)
-			break;
-		lastsp = state.registers[SP];
 
 		if (done)
 			break;
