@@ -1,5 +1,6 @@
-/*-
- * Copyright (c) 2011-2012 Stefan Bethke.
+#!/usr/sbin/dtrace -s
+/*
+ * Copyright (c) 2015 George V. Neville-Neil
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,14 +25,22 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD$
+ *
+ * The tcpstate D script shows TCP sockets transitioning between states.
+ *
+ * Usage: tcpstate
  */
-#ifndef	__ARSWITCH_PHY_H__
-#define	__ARSWITCH_PHY_H__
 
-extern	int arswitch_readphy_external(device_t dev, int phy, int reg);
-extern	int arswitch_writephy_external(device_t dev, int phy, int reg, int data);
+#pragma D option quiet
+BEGIN
+{
+	printf("Old State\t\tNew State\n");
+}
 
-extern	int arswitch_readphy_internal(device_t dev, int phy, int reg);
-extern	int arswitch_writephy_internal(device_t dev, int phy, int reg, int data);
-
-#endif	/* __ARSWITCH_PHY_H__ */
+tcp:kernel::state-change
+{
+	newstate = args[3]->tcps_state;
+	oldstate = args[5]->tcps_state;
+	printf("%s\t\t%s\n", tcp_state_string[oldstate],
+			     tcp_state_string[newstate]);
+}

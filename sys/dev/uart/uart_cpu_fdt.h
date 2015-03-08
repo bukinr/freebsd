@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011-2012 Stefan Bethke.
+ * Copyright 2015 Michal Meloun
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,13 +25,30 @@
  *
  * $FreeBSD$
  */
-#ifndef	__ARSWITCH_PHY_H__
-#define	__ARSWITCH_PHY_H__
 
-extern	int arswitch_readphy_external(device_t dev, int phy, int reg);
-extern	int arswitch_writephy_external(device_t dev, int phy, int reg, int data);
+#ifndef _DEV_UART_CPU_FDT_H_
+#define _DEV_UART_CPU_FDT_H_
 
-extern	int arswitch_readphy_internal(device_t dev, int phy, int reg);
-extern	int arswitch_writephy_internal(device_t dev, int phy, int reg, int data);
+#include <sys/linker_set.h>
 
-#endif	/* __ARSWITCH_PHY_H__ */
+#include <dev/ofw/ofw_bus_subr.h>
+
+/*
+ * If your UART driver implements only uart_class and uses uart_cpu_fdt.c
+ * for device instantiation, then use UART_FDT_CLASS_AND_DEVICE for its
+ * declaration
+ */
+SET_DECLARE(uart_fdt_class_and_device_set, struct ofw_compat_data );
+#define UART_FDT_CLASS_AND_DEVICE(data)				\
+	DATA_SET(uart_fdt_class_and_device_set, data)
+
+/*
+ * If your UART driver implements uart_class and custom device layer,
+ * then use UART_FDT_CLASS for its declaration
+ */
+SET_DECLARE(uart_fdt_class_set, struct ofw_compat_data );
+#define UART_FDT_CLASS(data)				\
+	DATA_SET(uart_fdt_class_set, data)
+
+
+#endif /* _DEV_UART_CPU_FDT_H_ */

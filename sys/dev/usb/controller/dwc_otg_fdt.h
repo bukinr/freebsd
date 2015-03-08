@@ -1,6 +1,5 @@
 /*-
- * Copyright (c) 2011-2012 Stefan Bethke.
- * All rights reserved.
+ * Copyright (c) 2012 Hans Petter Selasky. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,13 +24,16 @@
  *
  * $FreeBSD$
  */
-#ifndef	__ARSWITCH_PHY_H__
-#define	__ARSWITCH_PHY_H__
 
-extern	int arswitch_readphy_external(device_t dev, int phy, int reg);
-extern	int arswitch_writephy_external(device_t dev, int phy, int reg, int data);
+#ifndef _DWC_OTG_FDT_H_
+#define	_DWC_OTG_FDT_H_
 
-extern	int arswitch_readphy_internal(device_t dev, int phy, int reg);
-extern	int arswitch_writephy_internal(device_t dev, int phy, int reg, int data);
+struct dwc_otg_fdt_softc {
+	struct dwc_otg_softc sc_otg;	/* must be first */
+};
 
-#endif	/* __ARSWITCH_PHY_H__ */
+extern driver_t dwc_otg_driver;
+
+device_attach_t dwc_otg_attach;
+
+#endif
