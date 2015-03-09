@@ -71,7 +71,6 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 {
 	struct unwind_state state;
 	register_t sp;
-	int scp_offset;
 	int depth = 0;
 	pc_t caller = (pc_t) solaris_cpu[curcpu].cpu_dtrace_caller;
 
@@ -149,7 +148,6 @@ dtrace_getstackdepth(int aframes)
 {
 	struct unwind_state state;
 	register_t sp;
-	int scp_offset;
 	int done = 0;
 	int depth = 1;
 
