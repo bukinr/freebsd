@@ -89,8 +89,8 @@
 
 #define	_LEENTRY(x) 	.type x,_ASM_TYPE_FUNCTION; x:
 #define	_LEEND(x)	/* nothing */
-#define	_EENTRY(x) 	GLOBAL(x); x:
-#define	_EEND(x)	/* nothing */
+#define	_EENTRY(x) 	GLOBAL(x); _LEENTRY(x)
+#define	_EEND(x)	_LEEND(x)
 
 #define	_LENTRY(x)	.text; _ALIGN_TEXT; _LEENTRY(x); _FNSTART
 #define	_LEND(x)	.size x, . - x; _FNEND
