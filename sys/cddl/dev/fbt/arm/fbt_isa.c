@@ -113,8 +113,7 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	 * runs too late in undefinedinstruction().  We will remove it again
 	 * once undefinedinstruction() is cleaned up.
 	 */
-	if (strcmp(name, "undefinedinstruction") == 0 ||
-	    strcmp(name, "gdb_trapper") == 0)
+	if (strcmp(name, "undefinedinstruction") == 0)
 		return (0);
 
 	/*

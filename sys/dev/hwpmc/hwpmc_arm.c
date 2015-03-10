@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/md_var.h>
 #include <machine/pmc_mdep.h>
+#include <machine/stack.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -75,49 +76,40 @@ int
 pmc_save_kernel_callchain(uintptr_t *cc, int maxsamples,
     struct trapframe *tf)
 {
-	uintptr_t pc, r, stackstart, stackend, fp;
-	struct thread *td;
-	int count;
+	struct unwind_state state;
+	int depth, n;
 
-	KASSERT(TRAPF_USERMODE(tf) == 0,("[arm,%d] not a kernel backtrace",
-	    __LINE__));
+	*cc++ = PMC_TRAPFRAME_TO_PC(tf);
 
-	td = curthread;
-	pc = PMC_TRAPFRAME_TO_PC(tf);
-	*cc++ = pc;
+	state.registers[FP] = PMC_TRAPFRAME_TO_FP(tf);
+	state.registers[SP] = PMC_TRAPFRAME_TO_SVC_SP(tf);
+	state.registers[LR] = PMC_TRAPFRAME_TO_SVC_LR(tf);
+	state.registers[PC] = PMC_TRAPFRAME_TO_PC(tf);
 
-	if (maxsamples <= 1)
-		return (1);
+	depth = 1;
+	while (depth < maxsamples) {
+		int done;
 
-	stackstart = (uintptr_t) td->td_kstack;
-	stackend = (uintptr_t) td->td_kstack + td->td_kstack_pages * PAGE_SIZE;
-	fp = PMC_TRAPFRAME_TO_FP(tf);
+		done = unwind_stack_one(&state, 0);
 
-	if (!PMC_IN_KERNEL(pc) ||
-	    !PMC_IN_KERNEL_STACK(fp, stackstart, stackend))
-		return (1);
-
-	for (count = 1; count < maxsamples; count++) {
-		/* Use saved lr as pc. */
-		r = fp - sizeof(uintptr_t);
-		if (!PMC_IN_KERNEL_STACK(r, stackstart, stackend))
+		if (state.update_mask == 0)
 			break;
-		pc = *(uintptr_t *)r;
-		if (!PMC_IN_KERNEL(pc))
+		if (!PMC_IN_KERNEL(state.registers[PC]))
 			break;
 
-		*cc++ = pc;
+		*cc++ = state.registers[PC];
+		depth++;
 
-		/* Switch to next frame up */
-		r = fp - 3 * sizeof(uintptr_t);
-		if (!PMC_IN_KERNEL_STACK(r, stackstart, stackend))
-			break;
-		fp = *(uintptr_t *)r;
-		if (!PMC_IN_KERNEL_STACK(fp, stackstart, stackend))
+		if (done)
 			break;
 	}
+	n = depth;
 
-	return (count);
+	/* Just sanitize. */
+	for (; depth < maxsamples; depth++)
+		*cc++ = 0;
+
+	return (n);
 }
 
 int

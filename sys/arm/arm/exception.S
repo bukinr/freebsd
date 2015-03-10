@@ -57,6 +57,10 @@ __FBSDID("$FreeBSD$");
 #ifdef KDTRACE_HOOKS
 	.bss
 	.align 4
+	.global	_C_LABEL(dtrace_invop_jump_addr)
+_C_LABEL(dtrace_invop_jump_addr):
+	.word 0
+	.word 0
 	.global	_C_LABEL(dtrace_invop_calltrap_addr)
 _C_LABEL(dtrace_invop_calltrap_addr):
 	.word 0
@@ -368,6 +372,23 @@ ASENTRY_NP(undefined_entry)
 	PUSHFRAMEINSVC			/* mode stack, build trapframe there. */
 	adr	lr, exception_exit      /* Return from handler via standard */
 	mov	r0, sp			/* exception exit routine.  Pass the */
+
+#ifdef KDTRACE_HOOKS
+	ldr	r1, [r0, #TF_SPSR]	/* Load spsr to get the mode */
+	and	r1, r1, #(PSR_MODE)	/* Mask out unneeded bits */
+	cmp	r1, #(PSR_USR32_MODE)	/* Check if we came from usermode */
+	beq	1f			/* Skip if we did */
+
+	ldr	r1, =_C_LABEL(dtrace_invop_jump_addr) /* Load the pointer to */
+					/* the dtrace handler */
+	ldr	r2, [r1]		/* Load the address of the handler */
+	cmp	r2, #0			/* Check if it is set */
+	beq	1f			/* If not use the normal handler */
+
+	bx	r2			/* Branch to the handler */
+1:
+#endif
+
 	b	undefinedinstruction	/* trapframe to the handler. */
 END(undefined_entry)
 
