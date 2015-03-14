@@ -74,6 +74,7 @@ ENTRY(copyin)
 	cmp	r2, r3
 	blt	.Lnormal
 	stmfd	sp!, {r0-r2, r4, lr}
+	_SAVE({r0-r2, r4, lr})
 	mov     r3, r0
 	mov     r0, r1
 	mov     r1, r3
@@ -88,6 +89,7 @@ ENTRY(copyin)
 					
 .Lnormal:
 	stmfd	sp!, {r10-r11, lr}
+	_SAVE({r10-r11, lr})
 
 	GET_PCB(r10)
 	ldr	r10, [r10]
@@ -143,6 +145,7 @@ ENTRY(copyin)
 	strne	ip, [r1], #0x04
 	subne	r2, r2, #0x04
 	stmfd	sp!, {r4-r9}		/* Free up some registers */
+	_SAVE({r4-r9})
 	mov	r3, #-1			/* Signal restore r4-r9 */
 
 	/* Destination buffer quad aligned, source is word aligned */
@@ -287,6 +290,7 @@ ENTRY(copyin)
  */
 .Lcopyin_bad_align:
 	stmfd	sp!, {r4-r7}
+	_SAVE({r4-r7})
 	mov	r3, #0x01
 	bic	r0, r0, #0x03
 	cmp	ip, #2
@@ -516,6 +520,7 @@ ENTRY(copyout)
 	cmp	r2, r3
 	blt	.Lnormale
 	stmfd	sp!, {r0-r2, r4, lr}
+	_SAVE({r0-r2, r4, lr})
 	mov     r3, r0
 	mov     r0, r1
 	mov     r1, r3
@@ -530,6 +535,7 @@ ENTRY(copyout)
 	
 .Lnormale:									
 	stmfd	sp!, {r10-r11, lr}
+	_SAVE({r10-r11, lr})
 
 	GET_PCB(r10)
 	ldr	r10, [r10]
@@ -586,6 +592,7 @@ ENTRY(copyout)
 	strtne	ip, [r1], #0x04
 	
 	stmfd	sp!, {r4-r9}		/* Free up some registers */
+	_SAVE({r4-r9})
 	mov	r3, #-1			/* Signal restore r4-r9 */
 
 	/* Destination buffer word aligned, source is quad aligned */
@@ -730,6 +737,7 @@ ENTRY(copyout)
  */
 .Lcopyout_bad_align:
 	stmfd	sp!, {r4-r7}
+	_SAVE({r4-r7})
 	mov	r3, #0x01
 	bic	r0, r0, #0x03
 	cmp	ip, #2
