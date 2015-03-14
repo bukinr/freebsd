@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 
-#define SAVE_REGS	stmfd	sp!, {r4-r11}; SAVE({r4-r11})
+#define SAVE_REGS	stmfd	sp!, {r4-r11}; _SAVE({r4-r11})
 #define RESTORE_REGS	ldmfd	sp!, {r4-r11}
 		
 #if defined(_ARM_ARCH_5E)
