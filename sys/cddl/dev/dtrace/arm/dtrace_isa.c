@@ -72,7 +72,6 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 	struct unwind_state state;
 	register_t sp;
 	int depth = 0;
-	pc_t caller = (pc_t) solaris_cpu[curcpu].cpu_dtrace_caller;
 
 	if (intrpc != 0)
 		pcstack[depth++] = (pc_t) intrpc;
@@ -96,13 +95,14 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 		if (!INKERNEL(state.registers[PC]))
 			break;
 
+		/*
+		 * NB: Unlike some other architectures, we don't need to
+		 * explicitly insert cpu_dtrace_caller as it appears in the
+		 * normal kernel stack trace rather than a special trap frame.
+		 */
 		if (aframes > 0) {
 			aframes--;
-			if ((aframes == 0) && (caller != 0)) {
-				pcstack[depth++] = caller;
-			}
-		}
-		else {
+		} else {
 			pcstack[depth++] = state.registers[PC];
 		}
 
