@@ -108,10 +108,6 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	/*
 	 * Architecture-specific exclusion list, largely to do with FBT trap
 	 * processing, to prevent reentrance.
-	 *
-	 * NB: gdb_trapper is excluded temporarily as the DTrace probe code
-	 * runs too late in undefinedinstruction().  We will remove it again
-	 * once undefinedinstruction() is cleaned up.
 	 */
 	if (strcmp(name, "undefinedinstruction") == 0)
 		return (0);
