@@ -78,7 +78,7 @@ __FBSDID("$FreeBSD$");
 #define	FAULTBUF_R1	1
 #define	FAULTBUF_R2	2
 #define	FAULTBUF_CR	3
-#define	FAULTBUF_R13	6
+#define	FAULTBUF_R13	4
 
 static void	trap_fatal(struct trapframe *frame);
 static void	printtrap(u_int vector, struct trapframe *frame, int isfatal,
@@ -407,19 +407,25 @@ printtrap(u_int vector, struct trapframe *frame, int isfatal, int user)
 	printf("\n");
 	printf("   exception       = 0x%x (%s)\n", vector, trapname(vector));
 	switch (vector) {
-	case EXC_DTMISS:
 	case EXC_DSE:
 	case EXC_DSI:
+	case EXC_DTMISS:
 		printf("   virtual address = 0x%" PRIxPTR "\n", frame->dar);
+#ifdef AIM
 		printf("   dsisr           = 0x%" PRIxPTR "\n",
 		    frame->cpu.aim.dsisr);
+#endif
 		break;
-	case EXC_ITMISS:
 	case EXC_ISE:
 	case EXC_ISI:
+	case EXC_ITMISS:
 		printf("   virtual address = 0x%" PRIxPTR "\n", frame->srr0);
 		break;
 	}
+#ifdef BOOKE
+	printf("   esr             = 0x%" PRIxPTR "\n",
+	    frame->cpu.booke.esr);
+#endif
 	printf("   srr0            = 0x%" PRIxPTR "\n", frame->srr0);
 	printf("   srr1            = 0x%" PRIxPTR "\n", frame->srr1);
 	printf("   lr              = 0x%" PRIxPTR "\n", frame->lr);
@@ -796,8 +802,12 @@ db_trap_glue(struct trapframe *frame)
 {
 	if (!(frame->srr1 & PSL_PR)
 	    && (frame->exc == EXC_TRC || frame->exc == EXC_RUNMODETRC
+#ifdef AIM
 		|| (frame->exc == EXC_PGM
 		    && (frame->srr1 & 0x20000))
+#else
+		|| (frame->exc == EXC_DEBUG)
+#endif
 		|| frame->exc == EXC_BPT
 		|| frame->exc == EXC_DSI)) {
 		int type = frame->exc;
@@ -805,7 +815,11 @@ db_trap_glue(struct trapframe *frame)
 		/* Ignore DTrace traps. */
 		if (*(uint32_t *)frame->srr0 == EXC_DTRACE)
 			return (0);
+#ifdef AIM
 		if (type == EXC_PGM && (frame->srr1 & 0x20000)) {
+#else
+		if (frame->cpu.booke.esr & ESR_PTR) {
+#endif
 			type = T_BREAKPOINT;
 		}
 		return (kdb_trap(type, 0, frame));
