@@ -88,12 +88,33 @@ __FBSDID("$FreeBSD$");
  * r4-r11 are scratch
  */
 ENTRY(copyin)
-.Lnormal:
-	/* Quick exit if length is zero */
+	/* Quick exit if length is zero */	
 	teq	r2, #0
 	moveq	r0, #0
 	RETeq
 
+	ldr	r3, .L_arm_memcpy
+	ldr	r3, [r3]
+	cmp	r3, #0
+	beq	.Lnormal
+	ldr	r3, .L_min_memcpy_size
+	ldr	r3, [r3]
+	cmp	r2, r3
+	blt	.Lnormal
+	stmfd	sp!, {r0-r2, r4, lr}
+	mov     r3, r0
+	mov     r0, r1
+	mov     r1, r3
+	mov     r3, #2 /* SRC_IS_USER */
+	ldr	r4, .L_arm_memcpy
+	mov	lr, pc
+	ldr	pc, [r4]
+	cmp     r0, #0
+	ldmfd   sp!, {r0-r2, r4, lr}
+	moveq	r0, #0
+	RETeq
+
+.Lnormal:
 	SAVE_REGS
 	GET_PCB(r4)
 	ldr	r4, [r4]
