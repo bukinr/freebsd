@@ -73,10 +73,10 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 	register_t sp;
 	int depth = 0;
 
-	if (intrpc != 0)
+	if (intrpc != 0) {
 		pcstack[depth++] = (pc_t) intrpc;
-
-	aframes++;
+		aframes++;
+	}
 
 	__asm __volatile("mov %0, sp" : "=&r" (sp));
 
