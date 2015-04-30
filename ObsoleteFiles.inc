@@ -38,6 +38,13 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20150429:
+OLD_FILES+=usr/share/docs/papers/hwpmc.ascii.gz
+# 20150427: test/sys/kern/mmap_test moved to test/sys/vm/mmap_test
+OLD_FILES+=usr/tests/sys/kern/mmap_test
+# 20150418
+OLD_FILES+=sbin/mount_oldnfs
+OLD_FILES+=usr/share/man/man8/mount_oldnfs.8.gz
 # 20150416: ALTQ moved to net/altq
 OLD_FILES+=usr/include/altq/altq_rmclass_debug.h
 OLD_FILES+=usr/include/altq/altq.h
@@ -53,18 +60,6 @@ OLD_FILES+=usr/include/altq/altq_rmclass.h
 OLD_FILES+=usr/include/altq/altq_cbq.h
 OLD_FILES+=usr/include/altq/altq_rio.h
 OLD_DIRS+=usr/include/altq
-# 20150410
-OLD_FILES+=usr/share/doc/usd/10.exref/paper.ascii.gz
-OLD_FILES+=usr/share/doc/usd/10.exref/summary.ascii.gz
-OLD_DIRS+=usr/share/doc/usd/10.exref
-OLD_FILES+=usr/share/doc/usd/11.edit/paper.ascii.gz
-OLD_DIRS+=usr/share/doc/usd/11.edit
-OLD_FILES+=usr/share/doc/usd/12.vi/paper.ascii.gz
-OLD_FILES+=usr/share/doc/usd/12.vi/summary.ascii.gz
-OLD_FILES+=usr/share/doc/usd/12.vi/viapwh.ascii.gz
-OLD_DIRS+=usr/share/doc/usd/12.vi
-OLD_FILES+=usr/share/doc/usd/13.viref/paper.ascii.gz
-OLD_DIRS+=usr/share/doc/usd/13.viref
 # 20150329
 .if ${TARGET_ARCH} == "arm"
 OLD_FILES+=usr/include/bootconfig.h
@@ -350,6 +345,10 @@ OLD_FILES+=usr/lib/debug/usr/lib32/i18n
 OLD_FILES+=usr/lib/debug/usr/lib32/private
 # 20141015: OpenSSL 1.0.1j import
 OLD_FILES+=usr/share/openssl/man/man3/CMS_sign_add1_signer.3.gz
+.if ${MK_GCC} == "no"
+# 20141009: gperf disabled by default
+OLD_FILES+=usr/bin/gperf
+.endif
 # 20140922: sleepq_calc_signal_retval.9 and sleepq_catch_signals.9 removed
 OLD_FILES+=usr/share/man/man9/sleepq_calc_signal_retval.9.gz
 OLD_FILES+=usr/share/man/man9/sleepq_catch_signals.9.gz

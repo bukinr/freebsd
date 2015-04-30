@@ -181,6 +181,25 @@ IDTVEC(xen_intr_upcall)
 	jmp	doreti
 #endif
 
+#ifdef HYPERV
+/*
+ * This is the Hyper-V vmbus channel direct callback interrupt.
+ * Only used when it is running on Hyper-V.
+ */
+	.text
+	SUPERALIGN_TEXT
+IDTVEC(hv_vmbus_callback)
+	PUSH_FRAME
+	SET_KERNEL_SREGS
+	cld
+	FAKE_MCOUNT(TF_EIP(%esp))
+	pushl	%esp
+	call	hv_vector_handler
+	add	$4, %esp
+	MEXITCOUNT
+	jmp	doreti
+#endif
+
 #ifdef SMP
 /*
  * Global address space TLB shootdown.
@@ -320,19 +339,4 @@ IDTVEC(rendezvous)
 	POP_FRAME
 	iret
 	
-/*
- * Clean up when we lose out on the lazy context switch optimization.
- * ie: when we are about to release a PTD but a cpu is still borrowing it.
- */
-	SUPERALIGN_TEXT
-IDTVEC(lazypmap)
-	PUSH_FRAME
-	SET_KERNEL_SREGS
-	cld
-
-	call	pmap_lazyfix_action
-
-	call	as_lapic_eoi
-	POP_FRAME
-	iret
 #endif /* SMP */

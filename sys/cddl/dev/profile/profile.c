@@ -134,7 +134,9 @@ struct profile_probe_percpu;
 #endif
 
 #ifdef __arm__
-/* bogus */
+/*
+ * At least on ARMv7, this appears to work quite well.
+ */
 #define	PROF_ARTIFICIAL_FRAMES	10
 #endif
 
