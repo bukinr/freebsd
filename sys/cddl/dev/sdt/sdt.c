@@ -177,7 +177,7 @@ sdt_create_probe(struct sdt_probe *probe)
 	if (dtrace_probe_lookup(prov->id, mod, func, name) != DTRACE_IDNONE)
 		return;
 
-	(void)dtrace_probe_create(prov->id, mod, func, name, 1, probe);
+	(void)dtrace_probe_create(prov->id, mod, func, name, 0, probe);
 }
 
 /*
