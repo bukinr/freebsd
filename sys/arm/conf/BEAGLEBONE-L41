@@ -22,6 +22,9 @@ options 	IPFIREWALL
 options 	IPFIREWALL_DEFAULT_TO_ACCEPT
 options 	DUMMYNET
 
+options 	ALQ
+options 	SIFTR
+
 options 	HZ=100
 options 	SCHED_4BSD		# 4BSD scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
