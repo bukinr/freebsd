@@ -1334,6 +1334,7 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 		    CTF_TYPE_TO_INDEX(dtd->dtd_type) > dst_fp->ctf_dtoldid;
 		    dtd = ctf_list_prev(dtd)) {
 			if (CTF_INFO_KIND(dtd->dtd_data.ctt_info) == kind &&
+			    kind != CTF_K_INTEGER &&
 			    dtd->dtd_name != NULL &&
 			    strcmp(dtd->dtd_name, name) == 0)
 				return (dtd->dtd_type);
