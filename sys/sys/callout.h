@@ -43,7 +43,7 @@
 #define	CALLOUT_LOCAL_ALLOC	0x0001 /* was allocated from callfree */
 #define	CALLOUT_ACTIVE		0x0002 /* callout is currently active */
 #define	CALLOUT_PENDING		0x0004 /* callout is waiting for timeout */
-#define	CALLOUT_MPSAFE		0x0008 /* callout handler is mp safe */
+#define	CALLOUT_MPSAFE		0x0008 /* deprecated */
 #define	CALLOUT_RETURNUNLOCKED	0x0010 /* handler returns with mtx unlocked */
 #define	CALLOUT_SHAREDLOCK	0x0020 /* callout lock held in shared mode */
 #define	CALLOUT_DFRMIGRATION	0x0040 /* callout in deferred migration mode */
@@ -82,6 +82,7 @@ struct callout_handle {
 #define	callout_active(c)	((c)->c_flags & CALLOUT_ACTIVE)
 #define	callout_deactivate(c)	((c)->c_flags &= ~CALLOUT_ACTIVE)
 #define	callout_drain(c)	_callout_stop_safe(c, 1)
+int	callout_drain_async(struct callout *, callout_func_t *, void *);
 void	callout_init(struct callout *, int);
 void	_callout_init_lock(struct callout *, struct lock_object *, int);
 #define	callout_init_mtx(c, mtx, flags)					\

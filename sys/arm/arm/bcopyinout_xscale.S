@@ -38,11 +38,13 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
+#include <machine/acle-compat.h>
+
 	.syntax	unified
 	.text
 	.align	2
 
-#ifdef _ARM_ARCH_6
+#if __ARM_ARCH >= 6
 #define GET_PCB(tmp) \
 	mrc p15, 0, tmp, c13, c0, 4; \
 	add	tmp, tmp, #(TD_PCB)
@@ -86,7 +88,7 @@ ENTRY(copyin)
 	ldmfd   sp!, {r0-r2, r4, lr}
 	moveq	r0, #0
 	RETeq
-					
+
 .Lnormal:
 	stmfd	sp!, {r10-r11, lr}
 	_SAVE({r10-r11, lr})
@@ -532,8 +534,8 @@ ENTRY(copyout)
 	ldmfd   sp!, {r0-r2, r4, lr}
 	moveq	r0, #0
 	RETeq
-	
-.Lnormale:									
+
+.Lnormale:
 	stmfd	sp!, {r10-r11, lr}
 	_SAVE({r10-r11, lr})
 
@@ -590,7 +592,7 @@ ENTRY(copyout)
 	ldrne	ip, [r0], #0x04
 	subne	r2, r2, #0x04
 	strtne	ip, [r1], #0x04
-	
+
 	stmfd	sp!, {r4-r9}		/* Free up some registers */
 	_SAVE({r4-r9})
 	mov	r3, #-1			/* Signal restore r4-r9 */

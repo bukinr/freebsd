@@ -1687,11 +1687,17 @@ ahci_handle_cmd(struct ahci_port *p, int slot, uint8_t *cfis)
 		ahci_write_fis_d2h(p, slot, cfis,
 		    (ATA_E_ABORT << 8) | ATA_S_READY | ATA_S_ERROR);
 		break;
+	case ATA_CHECK_POWER_MODE:
+		cfis[12] = 0xff;	/* always on */
+		ahci_write_fis_d2h(p, slot, cfis, ATA_S_READY | ATA_S_DSC);
+		break;
 	case ATA_STANDBY_CMD:
 	case ATA_STANDBY_IMMEDIATE:
 	case ATA_IDLE_CMD:
 	case ATA_IDLE_IMMEDIATE:
 	case ATA_SLEEP:
+	case ATA_READ_VERIFY:
+	case ATA_READ_VERIFY48:
 		ahci_write_fis_d2h(p, slot, cfis, ATA_S_READY | ATA_S_DSC);
 		break;
 	case ATA_ATAPI_IDENTIFY:
@@ -2093,7 +2099,7 @@ pci_ahci_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	struct pci_ahci_softc *sc = pi->pi_arg;
 
 	assert(baridx == 5);
-	assert(size == 4);
+	assert((offset % 4) == 0 && size == 4);
 
 	pthread_mutex_lock(&sc->mtx);
 
@@ -2182,24 +2188,29 @@ pci_ahci_port_read(struct pci_ahci_softc *sc, uint64_t offset)
 
 static uint64_t
 pci_ahci_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
-    uint64_t offset, int size)
+    uint64_t regoff, int size)
 {
 	struct pci_ahci_softc *sc = pi->pi_arg;
+	uint64_t offset;
 	uint32_t value;
 
 	assert(baridx == 5);
-	assert(size == 4);
+	assert(size == 1 || size == 2 || size == 4);
+	assert((regoff & (size - 1)) == 0);
 
 	pthread_mutex_lock(&sc->mtx);
 
+	offset = regoff & ~0x3;	    /* round down to a multiple of 4 bytes */
 	if (offset < AHCI_OFFSET)
 		value = pci_ahci_host_read(sc, offset);
 	else if (offset < AHCI_OFFSET + sc->ports * AHCI_STEP)
 		value = pci_ahci_port_read(sc, offset);
 	else {
 		value = 0;
-		WPRINTF("pci_ahci: unknown i/o read offset 0x%"PRIx64"\n", offset);
+		WPRINTF("pci_ahci: unknown i/o read offset 0x%"PRIx64"\n",
+		    regoff);
 	}
+	value >>= 8 * (regoff & 0x3);
 
 	pthread_mutex_unlock(&sc->mtx);
 

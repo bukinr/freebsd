@@ -161,6 +161,9 @@ device		usfs
 device		cdce
 device		umodem
 
+# Pinmux
+device		fdt_pinctrl
+
 # Flattened Device Tree
 options 	FDT			# Configure using FDT/DTB data
 options 	FDT_DTB_STATIC

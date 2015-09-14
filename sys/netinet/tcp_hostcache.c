@@ -118,6 +118,7 @@ static struct hc_metrics *tcp_hc_lookup(struct in_conninfo *);
 static struct hc_metrics *tcp_hc_insert(struct in_conninfo *);
 static int sysctl_tcp_hc_flush(SYSCTL_HANDLER_ARGS);
 static int sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS);
+static int sysctl_tcp_hc_purgenow(SYSCTL_HANDLER_ARGS);
 static void tcp_hc_purge_internal(int);
 static void tcp_hc_purge(void *);
 
@@ -160,6 +161,9 @@ SYSCTL_PROC(_net_inet_tcp_hostcache, OID_AUTO, list,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_SKIP, 0, 0,
     sysctl_tcp_hc_list, "A", "List of all hostcache entries");
 
+SYSCTL_PROC(_net_inet_tcp_hostcache, OID_AUTO, purgenow,
+    CTLTYPE_INT | CTLFLAG_RW, NULL, 0,
+    sysctl_tcp_hc_purgenow, "I", "Immediately purge all entries");
 
 static MALLOC_DEFINE(M_HOSTCACHE, "hostcache", "TCP hostcache");
 
@@ -239,7 +243,7 @@ tcp_hc_init(void)
 	/*
 	 * Set up periodic cache cleanup.
 	 */
-	callout_init(&V_tcp_hc_callout, CALLOUT_MPSAFE);
+	callout_init(&V_tcp_hc_callout, 1);
 	callout_reset(&V_tcp_hc_callout, V_tcp_hostcache.prune * hz,
 	    tcp_hc_purge, curvnet);
 }
@@ -712,5 +716,26 @@ sysctl_tcp_hc_flush(SYSCTL_HANDLER_ARGS)
 	if (error || !req->newptr)
 		return (error);
 	tcp_hc_purge_internal(1);
+	return (0);
+}
+
+/*
+ * Expire and purge all entries in hostcache immediately.
+ */
+static int
+sysctl_tcp_hc_purgenow(SYSCTL_HANDLER_ARGS)
+{
+	int error, val;
+
+	val = 0;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	tcp_hc_purge_internal(1);
+
+	callout_reset(&V_tcp_hc_callout, V_tcp_hostcache.prune * hz,
+	    tcp_hc_purge, curvnet);
+
 	return (0);
 }
