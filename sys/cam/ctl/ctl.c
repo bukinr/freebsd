@@ -978,6 +978,8 @@ ctl_isc_event_handler(ctl_ha_channel channel, ctl_ha_event event, int param)
 			 * when the datamove is complete.
 			 */
 			io->io_hdr.serializing_sc = msg->hdr.serializing_sc;
+			if (msg->hdr.status == CTL_SUCCESS)
+				io->io_hdr.status = msg->hdr.status;
 
 			if (msg->dt.sg_sequence == 0) {
 				i = msg->dt.kern_sg_entries +
@@ -1060,6 +1062,8 @@ ctl_isc_event_handler(ctl_ha_channel channel, ctl_ha_event event, int param)
 				memcpy(&io->scsiio.sense_data,
 				    &msg->scsi.sense_data,
 				    msg->scsi.sense_len);
+				if (msg->hdr.status == CTL_SUCCESS)
+					io->io_hdr.flags |= CTL_FLAG_STATUS_SENT;
 			}
 			ctl_enqueue_isc(io);
 			break;
@@ -10946,6 +10950,7 @@ ctl_failover_lun(struct ctl_lun *lun)
 			if (io->flags & CTL_FLAG_FROM_OTHER_SC) {
 				if (io->flags & CTL_FLAG_IO_ACTIVE) {
 					io->flags |= CTL_FLAG_ABORT;
+					io->flags |= CTL_FLAG_FAILOVER;
 				} else { /* This can be only due to DATAMOVE */
 					io->msg_type = CTL_MSG_DATAMOVE_DONE;
 					io->flags |= CTL_FLAG_IO_ACTIVE;
@@ -12098,12 +12103,14 @@ ctl_datamove_timer_wakeup(void *arg)
 void
 ctl_datamove(union ctl_io *io)
 {
+	struct ctl_lun *lun;
 	void (*fe_datamove)(union ctl_io *io);
 
 	mtx_assert(&control_softc->ctl_lock, MA_NOTOWNED);
 
 	CTL_DEBUG_PRINT(("ctl_datamove\n"));
 
+	lun = (struct ctl_lun *)io->io_hdr.ctl_private[CTL_PRIV_LUN].ptr;
 #ifdef CTL_TIME_IO
 	if ((time_uptime - io->io_hdr.start_time) > ctl_time_io_secs) {
 		char str[256];
@@ -12144,9 +12151,6 @@ ctl_datamove(union ctl_io *io)
 	if (io->io_hdr.flags & CTL_FLAG_DELAY_DONE) {
 		io->io_hdr.flags &= ~CTL_FLAG_DELAY_DONE;
 	} else {
-		struct ctl_lun *lun;
-
-		lun =(struct ctl_lun *)io->io_hdr.ctl_private[CTL_PRIV_LUN].ptr;
 		if ((lun != NULL)
 		 && (lun->delay_info.datamove_delay > 0)) {
 
@@ -12207,6 +12211,7 @@ ctl_datamove(union ctl_io *io)
 		msg.hdr.original_sc = io->io_hdr.original_sc;
 		msg.hdr.serializing_sc = io;
 		msg.hdr.nexus = io->io_hdr.nexus;
+		msg.hdr.status = io->io_hdr.status;
 		msg.dt.flags = io->io_hdr.flags;
 		/*
 		 * We convert everything into a S/G list here.  We can't
@@ -12321,7 +12326,24 @@ ctl_datamove(union ctl_io *io)
 
 			msg.dt.sent_sg_entries = sg_entries_sent;
 		}
+
+		/*
+		 * Officially handover the request from us to peer.
+		 * If failover has just happened, then we must return error.
+		 * If failover happen just after, then it is not our problem.
+		 */
+		if (lun)
+			mtx_lock(&lun->lun_lock);
+		if (io->io_hdr.flags & CTL_FLAG_FAILOVER) {
+			if (lun)
+				mtx_unlock(&lun->lun_lock);
+			io->io_hdr.port_status = 31342;
+			io->scsiio.be_move_done(io);
+			return;
+		}
 		io->io_hdr.flags &= ~CTL_FLAG_IO_ACTIVE;
+		if (lun)
+			mtx_unlock(&lun->lun_lock);
 	} else {
 
 		/*
@@ -12590,10 +12612,12 @@ ctl_datamove_remote_xfer(union ctl_io *io, unsigned command,
 	 * failure.
 	 */
 	if ((rq == NULL)
-	 && ((io->io_hdr.status & CTL_STATUS_MASK) != CTL_STATUS_NONE))
+	 && ((io->io_hdr.status & CTL_STATUS_MASK) != CTL_STATUS_NONE &&
+	     (io->io_hdr.status & CTL_STATUS_MASK) != CTL_SUCCESS))
 		ctl_set_busy(&io->scsiio);
 
-	if ((io->io_hdr.status & CTL_STATUS_MASK) != CTL_STATUS_NONE) {
+	if ((io->io_hdr.status & CTL_STATUS_MASK) != CTL_STATUS_NONE &&
+	    (io->io_hdr.status & CTL_STATUS_MASK) != CTL_SUCCESS) {
 
 		if (rq != NULL)
 			ctl_dt_req_free(rq);
