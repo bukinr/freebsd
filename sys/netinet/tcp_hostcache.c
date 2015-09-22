@@ -116,7 +116,6 @@ static VNET_DEFINE(struct callout, tcp_hc_callout);
 
 static struct hc_metrics *tcp_hc_lookup(struct in_conninfo *);
 static struct hc_metrics *tcp_hc_insert(struct in_conninfo *);
-static int sysctl_tcp_hc_flush(SYSCTL_HANDLER_ARGS);
 static int sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS);
 static int sysctl_tcp_hc_purgenow(SYSCTL_HANDLER_ARGS);
 static void tcp_hc_purge_internal(int);
@@ -152,10 +151,6 @@ SYSCTL_INT(_net_inet_tcp_hostcache, OID_AUTO, prune, CTLFLAG_VNET | CTLFLAG_RW,
 SYSCTL_INT(_net_inet_tcp_hostcache, OID_AUTO, purge, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_hostcache.purgeall), 0,
     "Expire all entires on next purge run");
-
-SYSCTL_PROC(_net_inet_tcp_hostcache, OID_AUTO, flush, CTLTYPE_INT | CTLFLAG_RW,
-    0, 0, sysctl_tcp_hc_flush, "I",
-    "Immediately flush all entries");
 
 SYSCTL_PROC(_net_inet_tcp_hostcache, OID_AUTO, list,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_SKIP, 0, 0,
@@ -704,19 +699,6 @@ tcp_hc_purge(void *arg)
 	callout_reset(&V_tcp_hc_callout, V_tcp_hostcache.prune * hz,
 	    tcp_hc_purge, arg);
 	CURVNET_RESTORE();
-}
-
-static int
-sysctl_tcp_hc_flush(SYSCTL_HANDLER_ARGS)
-{
-	int error, val;
-
-	val = 0;
-	error = sysctl_handle_int(oidp, &val, 0, req);
-	if (error || !req->newptr)
-		return (error);
-	tcp_hc_purge_internal(1);
-	return (0);
 }
 
 /*
