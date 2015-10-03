@@ -1,6 +1,9 @@
 #
-# BEAGLEBONE-L41 -- special configuration for L41 teaching course:
-# http://www.cl.cam.ac.uk/teaching/1415/L41/
+# BEAGLEBONE-L41 -- special configuration for Cambridge L41 teaching course in
+# Advanced Operating Systems:
+#
+# 2014-2015 - http://www.cl.cam.ac.uk/teaching/1415/L41/
+# 2015-2016 - http://www.cl.cam.ac.uk/teaching/1516/L41/
 #
 # $FreeBSD$
 
