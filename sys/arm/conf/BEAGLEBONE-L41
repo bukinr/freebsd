@@ -20,6 +20,7 @@ makeoptions	WITH_CTF=1
 makeoptions	MODULES_OVERRIDE=""
 
 device		dtrace
+device		dtraceall
 
 options 	IPFIREWALL
 options 	IPFIREWALL_DEFAULT_TO_ACCEPT
