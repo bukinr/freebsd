@@ -333,6 +333,9 @@ dtrace_invop_start(struct trapframe *frame)
 	register_t *r0, *sp;
 	int data, invop, reg, update_sp;
 
+	/* pc points to the instruction after the one we simulating */
+	frame->tf_pc -= INSN_SIZE;
+
 	invop = dtrace_invop(frame->tf_pc, (uintptr_t *)frame, frame->tf_pc);
 	switch (invop & DTRACE_INVOP_MASK) {
 	case DTRACE_INVOP_PUSHM:
