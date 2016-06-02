@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <net/bpf.h>
 #include <net/bpf_jitter.h>
 
-#include <amd64/amd64/bpf_jit_machdep.h>
+#include <arm64/arm64/bpf_jit_machdep.h>
 
 bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 
@@ -63,6 +63,8 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 static void
 emit_length(bpf_bin_stream *stream, __unused u_int value, u_int len)
 {
+
+	printf("%s\n", __func__);
 
 	if (stream->refs != NULL)
 		(stream->refs)[stream->bpf_pc] += len;
@@ -75,6 +77,8 @@ emit_length(bpf_bin_stream *stream, __unused u_int value, u_int len)
 static void
 emit_code(bpf_bin_stream *stream, u_int value, u_int len)
 {
+
+	printf("%s\n", __func__);
 
 	switch (len) {
 	case 1:
@@ -104,6 +108,8 @@ bpf_jit_optimize(struct bpf_insn *prog, u_int nins)
 {
 	int flags;
 	u_int i;
+
+	printf("%s\n", __func__);
 
 	/* Do we return immediately? */
 	if (BPF_CLASS(prog[0].code) == BPF_RET)
@@ -160,6 +166,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	int flags, fret, fpkt, fmem, fjmp, flen;
 	u_int i, pass;
 
+	printf("%s: nins %d\n", __func__, nins);
+
 	/*
 	 * NOTE: Do not modify the name of this variable, as it's used by
 	 * the macros to emit code.
@@ -215,6 +223,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		for (i = 0; i < nins; i++) {
 			stream.bpf_pc++;
 
+			printf("ins code %d\n", ins->code);
 			switch (ins->code) {
 			default:
 #ifdef _KERNEL
@@ -650,5 +659,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	}
 #endif
 
+	if (stream.ibuf != NULL)
+		printf("compilation success\n");
+	else
+		printf("compilation failed\n");
 	return ((bpf_filter_func)stream.ibuf);
 }

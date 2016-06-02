@@ -10,3 +10,6 @@ VFP				opt_global.h
 # SoC Support
 SOC_CAVM_THUNDERX		opt_soc.h
 SOC_HISI_HI6220			opt_soc.h
+
+# BPF just-in-time compiler
+BPF_JITTER			opt_bpf.h

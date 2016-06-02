@@ -88,6 +88,10 @@ options 	MALLOC_DEBUG_MAXZONES=8	# Separate malloc(9) zones
 options 	SOC_CAVM_THUNDERX
 options 	SOC_HISI_HI6220
 
+options 	BPF_JITTER
+
+device		bpf_jitter
+
 # VirtIO support
 device		virtio
 device		virtio_mmio
