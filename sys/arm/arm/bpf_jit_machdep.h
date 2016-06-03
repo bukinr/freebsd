@@ -37,6 +37,50 @@
 /*
  * Registers
  */
+#define	ARM_R0	0
+#define	ARM_R1	1
+#define	ARM_R2	2
+#define	ARM_R3	3
+#define	ARM_R4	4
+#define	ARM_R5	5
+#define	ARM_R6	6
+#define	ARM_R7	7
+#define	ARM_R8	8
+#define	ARM_R9	9
+#define	ARM_R10	10
+#define	ARM_FP	11
+#define	ARM_IP	12
+#define	ARM_SP	13
+#define	ARM_LR	14
+#define	ARM_PC	15
+
+#define rol32(i32, n) ((i32) << (n) | (i32) >> (32 - (n)))
+#define ror32(i32, n) ((i32) >> (n) | (i32) << (32 - (n)))
+
+/* ---- MOV Instruction Format ---- */
+/* IMM_OP == 0 */
+#define	RM_S		0		/* 2nd operand register */
+#define	RM_SHIFT_S	4		/* shift applied to Rm */
+
+/* IMM_OP == 1 */
+#define	IMM_S		0		/* Unsigned 8 bit immediate value */
+#define	ROTATE_S	8		/* shift applied to Imm */
+
+#define	RD_S		12		/* Destination register */
+#define	RN_S		16		/* 1st operand register */
+#define	COND_SET	(1 << 20)	/* Set condition codes */
+#define	OPCODE_S	21		/* Operation Code */
+#define	IMM_OP		(1 << 25)	/* Immediate Operand */
+#define	COND_S		28		/* Condition field */
+/* ------- */
+
+#define	OPCODE_MOV	0b1101
+#define	COND_AL		0b1110	/* Always */
+
+#define	ARM_MOV_I_TEST(rd, imm) do {						\
+	emitm(&stream, (COND_AL << CONS_S) | (rd << RD_S) | (imm << IMM_S), 4);					\
+} while (0)
+
 #define RAX	0
 #define RCX	1
 #define RDX	2
