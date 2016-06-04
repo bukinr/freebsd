@@ -112,14 +112,15 @@ imm8m(uint32_t x)
         return (-1);
 }
 
-static int
+static uint32_t
 mov_i(uint32_t rd, uint32_t imm)
 {
 	uint32_t instr;
+
 	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S) | (rd << RD_S) | (imm << IMM_S);
 	//emitm(&stream, instr, 4);
 
-	return (0);
+	return (instr);
 }
 
 /*
@@ -226,6 +227,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	 */
 	emitm = emit_length;
 
+	uint32_t instr;
+	int imm12;
+
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
 
@@ -257,13 +261,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_RET|BPF_K:
 				printf("BPF_RET|BPF_K, ins->k 0x%x\n", ins->k);
 
-				int imm12;
-
 				imm12 = imm8m(ins->k);
 				if (imm12 >= 0) {
-					mov_i(ARM_R0, ins->k);
-					uint32_t instr;
-					instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S) | (ARM_R0 << RD_S) | (ins->k << IMM_S);
+					instr = mov_i(ARM_R0, ins->k);
 					emitm(&stream, instr, 4);
 				} else {
 					printf("implement me 1\n");
@@ -309,7 +309,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_LD|BPF_H|BPF_ABS:
-				printf("BPF_LD|BPF_H|BPF_ABS: k 0x%x\n", ins->k);
+				printf("BPF_LD|BPF_H|BPF_ABS: ins->k 0x%x\n", ins->k);
+
+				instr = mov_i(ARM_R1, ins->k);
+				emitm(&stream, instr, 4);
 
 				ZEROrd(EAX);
 				MOVid(ins->k, ESI);
