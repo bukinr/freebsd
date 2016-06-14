@@ -107,9 +107,21 @@ imm8m(uint32_t x)
 
 	for (rot = 0; rot < 16; rot++)
 		if ((x & ~ror32(0xff, 2 * rot)) == 0)
-			return rol32(x, 2 * rot) | (rot << 8);
+			return (rol32(x, 2 * rot) | (rot << 8));
 
-        return (-1);
+	return (-1);
+}
+
+static uint32_t
+branch(uint32_t offs)
+{
+	uint32_t instr;
+
+	instr = (1 << 25) | (1 << 27);
+	instr |= (COND_AL << COND_S);
+	instr |= (offs >> 2);
+
+	return (instr);
 }
 
 static uint32_t
@@ -117,8 +129,107 @@ mov_i(uint32_t rd, uint32_t imm)
 {
 	uint32_t instr;
 
-	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S) | (rd << RD_S) | (imm << IMM_S);
-	//emitm(&stream, instr, 4);
+	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (imm << IMM_S);
+	instr |= IMM_OP;	/* operand 2 is an immediate value */
+
+	return (instr);
+}
+
+static uint32_t
+mov_r(uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	return (instr);
+}
+
+static uint32_t
+cmp_r(uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_CMP << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rm << RM_S);
+	instr |= COND_SET;
+
+	return (instr);
+}
+
+static uint32_t
+add_r(uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_ADD << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rn << RN_S) | (rm << RM_S);
+
+	return (instr);
+}
+
+#if 0
+#define	POST_INDEX	(0 << 24)	/* add offset after transfer */
+#define	PRE_INDEX	(1 << 24)	/* add offset before transfer */
+#define	DOWN_BIT	(0 << 23)	/* subtract offset from base */
+#define	UP_BIT		(1 << 23)	/* add offset to base */
+#define	WORD_BIT	(0 << 22)	/* transfer word quantity */
+#define	BYTE_BIT	(1 << 22)	/* transfer byte quantity */
+#define	NO_WRITE_BACK	(0 << 21)	/* no write-back */
+#define	WRITE_BACK	(1 << 21)	/* write address into base */
+#define	OP_STORE	(0 << 20)	/* Store to memory */
+#define	OP_LOAD		(1 << 20)	/* Load from memory */
+#endif
+
+static uint32_t
+ldrb(uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 26);
+	instr |= (COND_AL << COND_S) | BYTE_BIT | OP_LOAD;
+	instr |= (rd << RD_S) | (rm << RM_S);
+	instr |= IMM_OP;	/* 1 = offset is a register */
+
+	return (instr);
+}
+
+#define	SH_S		5
+#define	SH_SWP		0	/* SWP instruction */
+#define	SH_UH		1	/* Unsigned halfwords */
+#define	SH_SB		2	/* Signed byte */
+#define	SH_SH		3	/* Signed halfwords */
+
+static uint32_t
+ldrh(uint32_t rd, uint32_t rn)
+{
+	uint32_t instr;
+
+	instr = (1 << 4) | (1 << 7);
+	instr |= (COND_AL << COND_S) | OP_LOAD;
+	instr |= (BYTE_BIT | UP_BIT | PRE_INDEX);
+	instr |= (SH_UH << SH_S);
+	instr |= (rd << RD_S) | (rn << RN_S);
+
+	return (instr);
+}
+
+static uint32_t
+rev16(uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 23) | (1 << 25) | (1 << 26);
+	instr |= (1 << 20) | (1 << 21);
+	instr |= (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19);
+	instr |= (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11);
+	instr |= (1 << 7);
+	instr |= (1 << 4) | (1 << 5);
+
+	instr |= (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rm << RM_S);
 
 	return (instr);
 }
@@ -230,21 +341,33 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	uint32_t instr;
 	int imm12;
 
+#define	REG_A		ARM_R4
+#define	REG_X		ARM_R5
+#define	REG_MBUF	ARM_R6
+
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
 
 		/* Create the procedure header. */
-		//if (fmem) {
+		if (fmem) {
+			printf("fmem\n");
 		//	PUSH(RBP);
 		//	MOVrq(RSP, RBP);
 		//	SUBib(BPF_MEMWORDS * sizeof(uint32_t), RSP);
-		//}
-		//if (flen)
+		}
+		if (flen) {
+			printf("flen\n");
 		//	MOVrd2(ESI, R9D);
-		//if (fpkt) {
+		}
+		if (fpkt) {
+			printf("fpkt\n");
+
+			instr = mov_r(REG_MBUF, ARM_R0);
+			emitm(&stream, instr, 4);
+
 		//	MOVrq2(RDI, R8);
 		//	MOVrd(EDX, EDI);
-		//}
+		}
 
 		for (i = 0; i < nins; i++) {
 			stream.bpf_pc++;
@@ -263,11 +386,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 				imm12 = imm8m(ins->k);
 				if (imm12 >= 0) {
-					instr = mov_i(ARM_R0, ins->k);
+					instr = mov_i(ARM_R0, imm12);
 					emitm(&stream, instr, 4);
 				} else {
-					printf("implement me 1\n");
+					panic("implement me 1\n");
 				}
+
+				if (fmem)
+					panic("implement fmem");
 
 				//MOVid(ins->k, EAX);
 				//if (fmem)
@@ -311,25 +437,38 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LD|BPF_H|BPF_ABS:
 				printf("BPF_LD|BPF_H|BPF_ABS: ins->k 0x%x\n", ins->k);
 
+				/* Copy K value to R1 */
 				instr = mov_i(ARM_R1, ins->k);
 				emitm(&stream, instr, 4);
 
-				ZEROrd(EAX);
-				MOVid(ins->k, ESI);
-				CMPrd(EDI, ESI);
-				JAb(12);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int16_t), ECX);
-				if (fmem) {
-					JAEb(2);
-					LEAVE();
-				} else
-					JAEb(1);
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobw(RCX, RSI, AX);
-				SWAP_AX();
+				/* Get offset */
+				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
+				emitm(&stream, instr, 4);
+
+				/* Load half word from offset */
+				instr = ldrh(ARM_R0, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				/* Reverse as network packets are big-endian */
+				instr = rev16(REG_A, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				//ZEROrd(EAX);
+				//MOVid(ins->k, ESI);
+				//CMPrd(EDI, ESI);
+				//JAb(12);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int16_t), ECX);
+				//if (fmem) {
+				//	JAEb(2);
+				//	LEAVE();
+				//} else
+				//	JAEb(1);
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobw(RCX, RSI, AX);
+				//SWAP_AX();
 				break;
 
 			case BPF_LD|BPF_B|BPF_ABS:
@@ -514,14 +653,23 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_JMP|BPF_JEQ|BPF_K:
-				printf("BPF_JMP|BPF_JEQ|BPF_K ins->k 0x%x 0x%x\n",
-				    ins->jt, ins->jf);
+				printf("BPF_JMP|BPF_JEQ|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					panic("implement jump\n");
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPid(ins->k, EAX);
-				JCC(JE, JNE);
+
+				//cmp_i(REG_A, ins->k);
+				mov_i(ARM_R1, ins->k);
+				cmp_r(REG_A, ARM_R1);
+
+				instr = branch(stream.refs[stream.bpf_pc + ins->jf] - stream.refs[stream.bpf_pc]);
+				emitm(&stream, instr, 4);
+
+				//CMPid(ins->k, EAX);
+				//JCC(JE, JNE);
 				break;
 
 			case BPF_JMP|BPF_JSET|BPF_K:
@@ -749,7 +897,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 #endif
 
 	if (stream.ibuf != NULL)
-		printf("compilation success\n");
+		printf("compilation success: inst buf 0x%08x\n", (uint32_t)stream.ibuf);
 	else
 		printf("compilation failed\n");
 	return ((bpf_filter_func)stream.ibuf);

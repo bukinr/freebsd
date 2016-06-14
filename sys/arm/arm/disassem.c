@@ -110,6 +110,9 @@ struct arm32_insn {
 };
 
 static const struct arm32_insn arm32_i[] = {
+#if __ARM_ARCH >= 6
+    { 0x0fff0ff0, 0x06bf0fb0, "rev16",  "dm" },
+#endif
     { 0x0fffffff, 0x0ff00000, "imb",	"c" },		/* Before swi */
     { 0x0fffffff, 0x0ff00001, "imbrange",	"c" },	/* Before swi */
     { 0x0f000000, 0x0f000000, "swi",	"c" },

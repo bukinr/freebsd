@@ -57,7 +57,7 @@
 #define rol32(i32, n) ((i32) << (n) | (i32) >> (32 - (n)))
 #define ror32(i32, n) ((i32) >> (n) | (i32) << (32 - (n)))
 
-/* ---- MOV Instruction Format ---- */
+/* ---- MOV, ADD, CMP Instruction Format ---- */
 /* IMM_OP == 0 */
 #define	RM_S		0		/* 2nd operand register */
 #define	RM_SHIFT_S	4		/* shift applied to Rm */
@@ -74,7 +74,32 @@
 #define	COND_S		28		/* Condition field */
 /* ------- */
 
+/* ---- LDR,STR (Single Data Transfer) Instruction Format ---- */
+//#define	COND_S		28		/* Condition field */
+//#define	IMM_OP		(1 << 25)	/* Immediate offset */
+#define	POST_INDEX	(0 << 24)	/* add offset after transfer */
+#define	PRE_INDEX	(1 << 24)	/* add offset before transfer */
+#define	DOWN_BIT	(0 << 23)	/* subtract offset from base */
+#define	UP_BIT		(1 << 23)	/* add offset to base */
+#define	WORD_BIT	(0 << 22)	/* transfer word quantity */
+#define	BYTE_BIT	(1 << 22)	/* transfer byte quantity */
+#define	NO_WRITE_BACK	(0 << 21)	/* no write-back */
+#define	WRITE_BACK	(1 << 21)	/* write address into base */
+#define	OP_STORE	(0 << 20)	/* Store to memory */
+#define	OP_LOAD		(1 << 20)	/* Load from memory */
+/* ------- */
+
+/* ---- Halfword and Signed Data Transfer ---- */
+#define	SH_S	5
+#define	SH_SWP	0	/* SWP instruction */
+#define	SH_UH	1	/* Unsigned halfwords */
+#define	SH_SB	2	/* Signed byte */
+#define	SH_SH	3	/* Signed halfwords */
+/* ------- */
+
+#define	OPCODE_ADD	0b0100
 #define	OPCODE_MOV	0b1101
+#define	OPCODE_CMP	0b1010
 #define	COND_AL		0b1110	/* Always */
 
 #define	ARM_MOV_I_TEST(rd, imm) do {						\
