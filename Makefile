@@ -151,8 +151,8 @@ TGTS+=	${BITGTS}
 META_TGT_WHITELIST+= \
 	_* build32 buildfiles buildincludes buildkernel buildsoft \
 	buildworld everything kernel-toolchains kernels libraries \
-	native-xtools tinderbox toolchain toolchains universe worlds \
-	xdev xdev-build
+	native-xtools showconfig tinderbox toolchain toolchains universe \
+	worlds xdev xdev-build
 
 .ORDER: buildworld installworld
 .ORDER: buildworld distributeworld
@@ -219,7 +219,7 @@ _CAN_USE_META_MODE?= yes
 .if !defined(_CAN_USE_META_MODE)
 _MAKE+=	MK_META_MODE=no
 .unexport META_MODE
-.elif ${MK_META_MODE} == "yes"
+.elif defined(MK_META_MODE) && ${MK_META_MODE} == "yes"
 .if !exists(/dev/filemon) && !defined(NO_FILEMON) && !make(showconfig)
 # Require filemon be loaded to provide a working incremental build
 .error ${.newline}ERROR: The filemon module (/dev/filemon) is not loaded. \
