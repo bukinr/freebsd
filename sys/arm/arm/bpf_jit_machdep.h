@@ -100,6 +100,8 @@
 #define	OPCODE_ADD	0b0100
 #define	OPCODE_MOV	0b1101
 #define	OPCODE_CMP	0b1010
+#define	COND_EQ		0b0000
+#define	COND_NE		0b0001
 #define	COND_AL		0b1110	/* Always */
 
 #define	ARM_MOV_I_TEST(rd, imm) do {						\

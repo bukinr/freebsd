@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <net/bpf_jitter.h>
 
 #include <arm/arm/bpf_jit_machdep.h>
+#include <arm/include/trap.h>
 
 bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 
@@ -113,12 +114,40 @@ imm8m(uint32_t x)
 }
 
 static uint32_t
-branch(uint32_t offs)
+push(uint32_t reg_list)
+{
+	uint32_t instr;
+
+	instr = (1 << 27);
+	instr |= (ARM_SP << RN_S);
+	instr |= (COND_AL << COND_S);
+	instr |= (WRITE_BACK | PRE_INDEX);
+	instr |= (reg_list);
+
+	return (instr);
+}
+
+static uint32_t
+pop(uint32_t reg_list)
+{
+	uint32_t instr;
+
+	instr = (1 << 27);
+	instr |= (ARM_SP << RN_S);
+	instr |= (COND_AL << COND_S);
+	instr |= (WRITE_BACK | POST_INDEX | UP_BIT | OP_LOAD);
+	instr |= (reg_list);
+
+	return (instr);
+}
+
+static uint32_t
+branch(uint32_t cond, uint32_t offs)
 {
 	uint32_t instr;
 
 	instr = (1 << 25) | (1 << 27);
-	instr |= (COND_AL << COND_S);
+	instr |= (cond << COND_S);
 	instr |= (offs >> 2);
 
 	return (instr);
@@ -148,12 +177,13 @@ mov_r(uint32_t rd, uint32_t rm)
 }
 
 static uint32_t
-cmp_r(uint32_t rd, uint32_t rm)
+cmp_r(uint32_t rn, uint32_t rm)
 {
 	uint32_t instr;
 
 	instr = (OPCODE_CMP << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rm << RM_S);
+	//instr |= (rd << RD_S) | (rm << RM_S);
+	instr |= (rn << RN_S) | (rm << RM_S);
 	instr |= COND_SET;
 
 	return (instr);
@@ -338,6 +368,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	 */
 	emitm = emit_length;
 
+	uint32_t reg_list;
 	uint32_t instr;
 	int imm12;
 
@@ -345,12 +376,20 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 #define	REG_X		ARM_R5
 #define	REG_MBUF	ARM_R6
 
+	reg_list = (1 << 0 | 1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6);
+
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
+
+		if (fpkt || fmem) {
+			instr = push(reg_list);
+			emitm(&stream, instr, 4);
+		}
 
 		/* Create the procedure header. */
 		if (fmem) {
 			printf("fmem\n");
+
 		//	PUSH(RBP);
 		//	MOVrq(RSP, RBP);
 		//	SUBib(BPF_MEMWORDS * sizeof(uint32_t), RSP);
@@ -382,7 +421,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 #endif
 
 			case BPF_RET|BPF_K:
-				printf("BPF_RET|BPF_K, ins->k 0x%x\n", ins->k);
+				printf("BPF_RET|BPF_K, ins->k 0x%08x\n", ins->k);
 
 				imm12 = imm8m(ins->k);
 				if (imm12 >= 0) {
@@ -662,11 +701,30 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				}
 
 				//cmp_i(REG_A, ins->k);
-				mov_i(ARM_R1, ins->k);
-				cmp_r(REG_A, ARM_R1);
-
-				instr = branch(stream.refs[stream.bpf_pc + ins->jf] - stream.refs[stream.bpf_pc]);
+				imm12 = imm8m(ins->k);
+				if (imm12 >= 0)
+					instr = mov_i(ARM_R1, imm12);
+				else
+					panic("here");
 				emitm(&stream, instr, 4);
+
+				instr = cmp_r(REG_A, ARM_R1);
+				emitm(&stream, instr, 4);
+
+				//emitm(&stream, KERNEL_BREAKPOINT, 4);
+
+				instr = pop(reg_list);
+				emitm(&stream, instr, 4);
+
+				uint32_t offs;
+				offs = stream.refs[stream.bpf_pc + ins->jf] - stream.refs[stream.bpf_pc] - 4;
+				printf("offs 0x%08x\n", offs);
+
+				//instr = mov_i(ARM_R0, 0);
+				instr = branch(COND_NE, offs);
+				emitm(&stream, instr, 4);
+				//BX LR
+				//emitm(&stream, 0xe12fff1e, 4);
 
 				//CMPid(ins->k, EAX);
 				//JCC(JE, JNE);
@@ -896,9 +954,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	}
 #endif
 
-	if (stream.ibuf != NULL)
+	if (stream.ibuf != NULL) {
 		printf("compilation success: inst buf 0x%08x\n", (uint32_t)stream.ibuf);
-	else
+		breakpoint();
+	} else {
 		printf("compilation failed\n");
+	}
 	return ((bpf_filter_func)stream.ibuf);
 }
