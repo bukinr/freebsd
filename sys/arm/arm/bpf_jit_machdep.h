@@ -57,6 +57,14 @@
 #define rol32(i32, n) ((i32) << (n) | (i32) >> (32 - (n)))
 #define ror32(i32, n) ((i32) >> (n) | (i32) << (32 - (n)))
 
+#define	ARM_INST_MOVW	0x03000000
+#define	ARM_INST_MOVT	0x03400000
+
+#define	ARM_MOVW(rd, imm)	\
+    (ARM_INST_MOVW | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0x0fff))
+#define	ARM_MOVT(rd, imm)	\
+    (ARM_INST_MOVT | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0x0fff))
+
 /* ---- MOV, ADD, CMP Instruction Format ---- */
 /* IMM_OP == 0 */
 #define	RM_S		0		/* 2nd operand register */
