@@ -61,6 +61,11 @@ __FBSDID("$FreeBSD$");
 
 bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 
+#define	REG_A		ARM_R4
+#define	REG_X		ARM_R5
+#define	REG_MBUF	ARM_R6
+
+
 /*
  * Emit routine to update the jump table.
  */
@@ -82,7 +87,7 @@ static void
 emit_code(bpf_bin_stream *stream, u_int value, u_int len)
 {
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	switch (len) {
 	case 1:
@@ -96,6 +101,7 @@ emit_code(bpf_bin_stream *stream, u_int value, u_int len)
 		break;
 
 	case 4:
+		printf("emitting 0x%08x\n", value);
 		*((u_int *)(stream->ibuf + stream->cur_ip)) = value;
 		stream->cur_ip += 4;
 		break;
@@ -168,6 +174,55 @@ mov_i(uint32_t rd, uint32_t imm)
 	return (instr);
 }
 
+static int
+mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		instr = mov_i(rd, imm12);
+		emitm(stream, instr, 4);
+	} else {
+		printf("to emit MOVW\n");
+		instr = ARM_MOVW(rd, val & 0xffff);
+		instr |= (COND_AL << COND_S);
+		emitm(stream, instr, 4);
+
+		if (val > 0xffff) {
+			printf("to emit MOVT\n");
+			instr = ARM_MOVT(rd, (val >> 16));
+			instr |= (COND_AL << COND_S);
+			emitm(stream, instr, 4);
+		}
+	}
+
+	return (0);
+}
+
+static int
+and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t imm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (REG_A << RN_S);
+
+	if (imm > 0xfff) {
+		mov(emitm, stream, ARM_R1, imm);
+		instr |= (rd << RD_S) | (ARM_R1 << RM_S);
+	} else {
+		instr |= (rd << RD_S) | (imm << IMM_S);
+		instr |= IMM_OP;	/* operand 2 is an immediate value */
+	}
+
+	emitm(stream, instr, 4);
+	return (0);
+}
+
 static uint32_t
 mov_r(uint32_t rd, uint32_t rm)
 {
@@ -202,6 +257,44 @@ add_r(uint32_t rd, uint32_t rn, uint32_t rm)
 
 	return (instr);
 }
+
+static int
+jump(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
+    uint8_t cond1, uint8_t cond2)
+{
+	uint32_t instr;
+	uint32_t offs;
+
+	if (ins->jt != 0 && ins->jf != 0) {
+		//panic("implement me 12\n");
+
+		offs = stream->refs[stream->bpf_pc + ins->jt] -	\
+		    stream->refs[stream->bpf_pc] - 4;
+		printf("offs 0x%08x\n", offs);
+
+		instr = branch(cond1, offs);
+		emitm(stream, instr, 4);
+
+	} else if (ins->jt != 0) {
+		offs = stream->refs[stream->bpf_pc + ins->jt] - \
+		    stream->refs[stream->bpf_pc] - 4;
+		printf("offs 0x%08x\n", offs);
+
+		instr = branch(cond1, offs);
+		emitm(stream, instr, 4);
+
+	} else if (ins->jf != 0) {
+		offs = stream->refs[stream->bpf_pc + ins->jf] - \
+		    stream->refs[stream->bpf_pc] - 4;
+		printf("offs 0x%08x\n", offs);
+
+		instr = branch(cond2, offs);
+		emitm(stream, instr, 4);
+	}
+
+	return (0);
+}
+
 
 #if 0
 #define	POST_INDEX	(0 << 24)	/* add offset after transfer */
@@ -403,12 +496,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 	uint32_t reg_list;
 	uint32_t instr;
-	uint32_t offs;
-	int imm12;
-
-#define	REG_A		ARM_R4
-#define	REG_X		ARM_R5
-#define	REG_MBUF	ARM_R6
 
 	reg_list = (1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6);
 
@@ -457,13 +544,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_RET|BPF_K:
 				printf("BPF_RET|BPF_K, ins->k 0x%08x\n", ins->k);
 
-				imm12 = imm8m(ins->k);
-				if (imm12 >= 0) {
-					instr = mov_i(ARM_R0, imm12);
-					emitm(&stream, instr, 4);
-				} else {
-					panic("implement me 1\n");
-				}
+				mov(emitm, &stream, ARM_R0, ins->k);
+				//imm12 = imm8m(ins->k);
+				//if (imm12 >= 0) {
+				//	instr = mov_i(ARM_R0, imm12);
+				//	emitm(&stream, instr, 4);
+				//} else {
+				//	panic("implement me 1\n");
+				//}
 
 				if (fmem)
 					panic("implement fmem");
@@ -751,13 +839,23 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_JMP|BPF_JGT|BPF_K:
-				printf("BPF_JMP|BPF_JGT|BPF_K\n");
+				printf("BPF_JMP|BPF_JGT|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
+					panic("implement me: 11");
 					JUMP(ins->jt);
 					break;
 				}
-				CMPid(ins->k, EAX);
-				JCC(JA, JBE);
+
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				instr = cmp_r(REG_A, ARM_R1);
+				emitm(&stream, instr, 4);
+
+				jump(emitm, &stream, ins, COND_GT, COND_LE);
+
+				//CMPid(ins->k, EAX);
+				//JCC(JA, JBE);
 				break;
 
 			case BPF_JMP|BPF_JGE|BPF_K:
@@ -780,49 +878,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				}
 
 				//cmp_i(REG_A, ins->k);
-				imm12 = imm8m(ins->k);
-				if (imm12 >= 0) {
-					instr = mov_i(ARM_R1, imm12);
-					emitm(&stream, instr, 4);
-				} else {
-					//instr = ARM_MOVW(ARM_R1, ins->k);
-					//emitm(&stream, instr, 4);
 
-					if (ins->k > 0xffff) {
-						instr = ARM_MOVT(ARM_R1, (ins->k >> 16));
-						emitm(&stream, instr, 4);
-					}
-				}
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				instr = cmp_r(REG_A, ARM_R1);
 				emitm(&stream, instr, 4);
 
 				//emitm(&stream, KERNEL_BREAKPOINT, 4);
-
-				//instr = pop(reg_list);
-				//emitm(&stream, instr, 4);
-
-				if (ins->jt != 0 && ins->jf != 0) {
-					offs = stream.refs[stream.bpf_pc + ins->jt] - stream.refs[stream.bpf_pc] - 4;
-					printf("offs 0x%08x\n", offs);
-
-					instr = branch(COND_EQ, offs);
-					emitm(&stream, instr, 4);
-
-				} else if (ins->jt != 0) {
-					offs = stream.refs[stream.bpf_pc + ins->jt] - stream.refs[stream.bpf_pc] - 4;
-					printf("offs 0x%08x\n", offs);
-
-					instr = branch(COND_EQ, offs);
-					emitm(&stream, instr, 4);
-
-				} else if (ins->jf != 0) {
-					offs = stream.refs[stream.bpf_pc + ins->jf] - stream.refs[stream.bpf_pc] - 4;
-					printf("offs 0x%08x\n", offs);
-
-					instr = branch(COND_NE, offs);
-					emitm(&stream, instr, 4);
-				}
+				jump(emitm, &stream, ins, COND_EQ, COND_NE);
 
 				//CMPid(ins->k, EAX);
 				//JCC(JE, JNE);
@@ -963,8 +1026,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_ALU|BPF_AND|BPF_K:
-				printf("BPF_ALU|BPF_AND|BPF_K\n");
-				ANDid(ins->k, EAX);
+				printf("BPF_ALU|BPF_AND|BPF_K ins->k 0x%x\n", ins->k);
+				and(emitm, &stream, REG_A, ins->k);
+				//ANDid(ins->k, EAX);
 				break;
 
 			case BPF_ALU|BPF_OR|BPF_K:

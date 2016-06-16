@@ -108,11 +108,17 @@
 #define	SH_SH	3	/* Signed halfwords */
 /* ------- */
 
+#define	OPCODE_AND	0b0000
 #define	OPCODE_ADD	0b0100
 #define	OPCODE_MOV	0b1101
 #define	OPCODE_CMP	0b1010
+
 #define	COND_EQ		0b0000
 #define	COND_NE		0b0001
+#define	COND_GT		0b1100
+#define	COND_GE		0b1010
+#define	COND_LE		0b1101
+#define	COND_LT		0b1011
 #define	COND_AL		0b1110	/* Always */
 
 #define	ARM_MOV_I_TEST(rd, imm) do {						\
