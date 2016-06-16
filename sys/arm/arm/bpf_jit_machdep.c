@@ -217,6 +217,19 @@ add_r(uint32_t rd, uint32_t rn, uint32_t rm)
 #endif
 
 static uint32_t
+ldr(uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 26);
+	instr |= (COND_AL << COND_S) | WORD_BIT | OP_LOAD;
+	instr |= UP_BIT | PRE_INDEX;
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	return (instr);
+}
+
+static uint32_t
 ldrb(uint32_t rd, uint32_t rm)
 {
 	uint32_t instr;
@@ -225,7 +238,6 @@ ldrb(uint32_t rd, uint32_t rm)
 	instr |= (COND_AL << COND_S) | BYTE_BIT | OP_LOAD;
 	instr |= UP_BIT | PRE_INDEX;
 	instr |= (rd << RD_S) | (rm << RM_S);
-	//instr |= IMM_OP;	/* 1 = offset is a register */
 
 	return (instr);
 }
@@ -251,6 +263,23 @@ ldrh(uint32_t rd, uint32_t rn)
 }
 
 static uint32_t
+rev(uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 23) | (1 << 25) | (1 << 26);
+	instr |= (1 << 20) | (1 << 21);
+	instr |= (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19);
+	instr |= (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11);
+	instr |= (1 << 4) | (1 << 5);
+
+	instr |= (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	return (instr);
+}
+
+static uint32_t
 rev16(uint32_t rd, uint32_t rm)
 {
 	uint32_t instr;
@@ -259,8 +288,8 @@ rev16(uint32_t rd, uint32_t rm)
 	instr |= (1 << 20) | (1 << 21);
 	instr |= (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19);
 	instr |= (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11);
-	instr |= (1 << 7);
 	instr |= (1 << 4) | (1 << 5);
+	instr |= (1 << 7);
 
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
@@ -464,24 +493,42 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_LD|BPF_W|BPF_ABS:
 				printf("BPF_LD|BPF_W|BPF_ABS\n");
-				MOVid(ins->k, ESI);
-				CMPrd(EDI, ESI);
-				JAb(12);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int32_t), ECX);
-				if (fmem) {
-					JAEb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JAEb(3);
-					ZEROrd(EAX);
-				}
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobd(RCX, RSI, EAX);
-				BSWAP(EAX);
+
+				/* Copy K value to R1 */
+				instr = mov_i(ARM_R1, ins->k);
+				emitm(&stream, instr, 4);
+
+				/* Get offset */
+				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
+				emitm(&stream, instr, 4);
+
+				/* Load word from offset */
+				instr = ldr(ARM_R0, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				/* Reverse as network packets are big-endian */
+				instr = rev(REG_A, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				//MOVid(ins->k, ESI);
+				//CMPrd(EDI, ESI);
+				//JAb(12);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int32_t), ECX);
+				//if (fmem) {
+				//	JAEb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JAEb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobd(RCX, RSI, EAX);
+				//BSWAP(EAX);
+
 				break;
 
 			case BPF_LD|BPF_H|BPF_ABS:
