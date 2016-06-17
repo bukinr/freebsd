@@ -110,6 +110,7 @@
 
 #define	OPCODE_AND	0b0000
 #define	OPCODE_ADD	0b0100
+#define	OPCODE_TST	0b1000
 #define	OPCODE_MOV	0b1101
 #define	OPCODE_CMP	0b1010
 

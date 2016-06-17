@@ -115,9 +115,11 @@ imm8m(uint32_t x)
 {
 	uint32_t rot;
 
-	for (rot = 0; rot < 16; rot++)
-		if ((x & ~ror32(0xff, 2 * rot)) == 0)
+	for (rot = 0; rot < 16; rot++) {
+		if ((x & ~ror32(0xff, 2 * rot)) == 0) {
 			return (rol32(x, 2 * rot) | (rot << 8));
+		}
+	}
 
 	return (-1);
 }
@@ -203,21 +205,74 @@ mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
-and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t imm)
+tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
+    uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_TST << OPCODE_S) | (COND_AL << COND_S);
+	instr |= COND_SET;
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		printf("%s, imm12 >= 0\n", __func__);
+		instr |= (imm12 << IMM_S);
+		instr |= IMM_OP;	/* operand 2 is an immediate value */
+	} else {
+		printf("%s, imm12 < 0\n", __func__);
+		mov(emitm, stream, ARM_R0, val);
+		instr |= (ARM_R0 << RM_S);
+	}
+
+	emitm(stream, instr, 4);
+	return (0);
+}
+
+static int
+lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t imm)
 {
 	uint32_t instr;
 
-	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (REG_A << RN_S);
+#define	ARM_LSL_I	0x01a00000
+#define	ARM_LSL_R	0x01a00010
 
-	if (imm > 0xfff) {
-		mov(emitm, stream, ARM_R1, imm);
-		instr |= (rd << RD_S) | (ARM_R1 << RM_S);
-	} else {
-		instr |= (rd << RD_S) | (imm << IMM_S);
+	if (imm > 31)
+		panic("lsl");
+
+	instr = ARM_LSL_I | (COND_AL << COND_S);
+	instr |= (imm << 7);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr, 4);
+	return (0);
+}
+
+static int
+and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	//int imm12;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S | rn << RN_S);
+
+	//imm12 = imm8m(val);
+	//if (imm12 >= 0) {
+		//printf("%s imm12 0x%08x\n", __func__, imm12);
+		instr |= (val << IMM_S);
 		instr |= IMM_OP;	/* operand 2 is an immediate value */
-	}
+	//} else {
+	//	mov(emitm, stream, ARM_R1, val);
+	//	instr |= (ARM_R1 << RM_S);
+	//}
 
 	emitm(stream, instr, 4);
 	return (0);
@@ -253,6 +308,7 @@ add_r(uint32_t rd, uint32_t rn, uint32_t rm)
 	uint32_t instr;
 
 	instr = (OPCODE_ADD << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
 	instr |= (rn << RN_S) | (rm << RM_S);
 
 	return (instr);
@@ -730,28 +786,52 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_LD|BPF_H|BPF_IND:
+				/* A <- P[X+k:2] */
+
 				printf("BPF_LD|BPF_H|BPF_IND\n");
-				ZEROrd(EAX);
-				CMPrd(EDI, EDX);
-				JAb(27);
-				MOVid(ins->k, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(EDX, ECX);
-				CMPrd(ESI, ECX);
-				JBb(14);
-				ADDrd(EDX, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int16_t), ECX);
-				if (fmem) {
-					JAEb(2);
-					LEAVE();
-				} else
-					JAEb(1);
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobw(RCX, RSI, AX);
-				SWAP_AX();
+
+				/* Copy K value to R1 */
+				instr = mov_i(ARM_R1, ins->k);
+				emitm(&stream, instr, 4);
+
+				/* Add X */
+				instr = add_r(ARM_R1, ARM_R1, REG_X);
+				emitm(&stream, instr, 4);
+
+				/* Get offset */
+				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
+				emitm(&stream, instr, 4);
+
+				/* Load half word from offset */
+				instr = ldrh(ARM_R0, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				/* Reverse as network packets are big-endian */
+				instr = rev16(REG_A, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				//ZEROrd(EAX);
+				//CMPrd(EDI, EDX);
+				//JAb(27);
+				//MOVid(ins->k, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(EDX, ECX);
+				//CMPrd(ESI, ECX);
+				//JBb(14);
+				//ADDrd(EDX, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int16_t), ECX);
+				//if (fmem) {
+				//	JAEb(2);
+				//	LEAVE();
+				//} else
+				//	JAEb(1);
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobw(RCX, RSI, AX);
+				//SWAP_AX();
+
 				break;
 
 			case BPF_LD|BPF_B|BPF_IND:
@@ -774,24 +854,42 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				MOVobb(RCX, RSI, AL);
 				break;
 
-			case BPF_LDX|BPF_MSH|BPF_B:
-				printf("BPF_LDX|BPF_MSH|BPF_B\n");
-				MOVid(ins->k, ESI);
-				CMPrd(EDI, ESI);
-				if (fmem) {
-					JBb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JBb(3);
-					ZEROrd(EAX);
-				}
-				RET();
-				ZEROrd(EDX);
-				MOVrq3(R8, RCX);
-				MOVobb(RCX, RSI, DL);
-				ANDib(0x0f, DL);
-				SHLib(2, EDX);
+			case BPF_LDX|BPF_MSH|BPF_B: //implement me for dst port 22
+				/* X <- 4*(P[k:1]&0xf) */
+				printf("BPF_LDX|BPF_MSH|BPF_B ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
+
+				/* Copy K value to R1 */
+				instr = mov_i(ARM_R1, ins->k);
+				emitm(&stream, instr, 4);
+
+				/* Get offset */
+				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
+				emitm(&stream, instr, 4);
+
+				/* Load byte from offset */
+				instr = ldrb(ARM_R1, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				and_i(emitm, &stream, ARM_R1, ARM_R1, 0xf);
+				lsl(emitm, &stream, REG_X, ARM_R1, 2);
+
+				//MOVid(ins->k, ESI);
+				//CMPrd(EDI, ESI);
+				//if (fmem) {
+				//	JBb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JBb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//ZEROrd(EDX);
+				//MOVrq3(R8, RCX);
+				//MOVobb(RCX, RSI, DL);
+				//ANDib(0x0f, DL);
+				//SHLib(2, EDX);
 				break;
 
 			case BPF_LD|BPF_IMM:
@@ -869,6 +967,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_JMP|BPF_JEQ|BPF_K:
+				/* pc += (A == k) ? jt : jf */
 				printf("BPF_JMP|BPF_JEQ|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
 				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
@@ -891,14 +990,22 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//JCC(JE, JNE);
 				break;
 
-			case BPF_JMP|BPF_JSET|BPF_K:
-				printf("BPF_JMP|BPF_JSET|BPF_K\n");
+			case BPF_JMP|BPF_JSET|BPF_K: //implement me for dst port 22
+				/* pc += (A & k) ? jt : jf */
+				printf("BPF_JMP|BPF_JSET|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
+
 				if (ins->jt == ins->jf) {
+					panic("implement jump 1\n");
+					//JUMP(ins->jt);
 					JUMP(ins->jt);
 					break;
 				}
-				TESTid(ins->k, EAX);
-				JCC(JNE, JE);
+				//and(emitm, &stream, ARM_R1, REG_A, ins->k);
+				tst(emitm, &stream, REG_A, ins->k);
+				jump(emitm, &stream, ins, COND_NE, COND_EQ);
+				//TESTid(ins->k, EAX);
+				//JCC(JNE, JE);
 				break;
 
 			case BPF_JMP|BPF_JGT|BPF_X:
@@ -1027,7 +1134,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_AND|BPF_K:
 				printf("BPF_ALU|BPF_AND|BPF_K ins->k 0x%x\n", ins->k);
-				and(emitm, &stream, REG_A, ins->k);
+				and_i(emitm, &stream, REG_A, REG_A, ins->k);
 				//ANDid(ins->k, EAX);
 				break;
 
