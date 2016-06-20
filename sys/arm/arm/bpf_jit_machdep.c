@@ -183,6 +183,8 @@ mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	uint32_t instr;
 	int imm12;
 
+	printf("%s\n", __func__);
+
 	imm12 = imm8m(val);
 	if (imm12 >= 0) {
 		instr = mov_i(rd, imm12);
@@ -275,6 +277,29 @@ and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	//}
 
 	emitm(stream, instr, 4);
+	return (0);
+}
+
+static int
+and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	printf("%s\n", __func__);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		and_i(emitm, stream, REG_A, REG_A, val);
+	} else {
+		instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+		instr |= (rd << RD_S | rn << RN_S);
+		mov(emitm, stream, ARM_R1, val);
+		instr |= (ARM_R1 << RM_S);
+		emitm(stream, instr, 4);
+	}
+
 	return (0);
 }
 
@@ -1134,7 +1159,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_AND|BPF_K:
 				printf("BPF_ALU|BPF_AND|BPF_K ins->k 0x%x\n", ins->k);
-				and_i(emitm, &stream, REG_A, REG_A, ins->k);
+				and(emitm, &stream, REG_A, REG_A, ins->k);
 				//ANDid(ins->k, EAX);
 				break;
 
