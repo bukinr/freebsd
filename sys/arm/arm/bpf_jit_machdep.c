@@ -860,23 +860,41 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_LD|BPF_B|BPF_IND:
+				/* A <- P[X+k:1] */
 				printf("BPF_LD|BPF_B|BPF_IND\n");
-				ZEROrd(EAX);
-				CMPrd(EDI, EDX);
-				JAEb(13);
-				MOVid(ins->k, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(EDX, ECX);
-				CMPrd(ESI, ECX);
-				if (fmem) {
-					JAb(2);
-					LEAVE();
-				} else
-					JAb(1);
-				RET();
-				MOVrq3(R8, RCX);
-				ADDrd(EDX, ESI);
-				MOVobb(RCX, RSI, AL);
+
+				/* Copy K value to R1 */
+				instr = mov_i(ARM_R1, ins->k);
+				emitm(&stream, instr, 4);
+
+				/* Add X */
+				instr = add_r(ARM_R1, ARM_R1, REG_X);
+				emitm(&stream, instr, 4);
+
+				/* Get offset */
+				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
+				emitm(&stream, instr, 4);
+
+				/* Load byte from offset */
+				instr = ldrb(REG_A, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				//ZEROrd(EAX);
+				//CMPrd(EDI, EDX);
+				//JAEb(13);
+				//MOVid(ins->k, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(EDX, ECX);
+				//CMPrd(ESI, ECX);
+				//if (fmem) {
+				//	JAb(2);
+				//	LEAVE();
+				//} else
+				//	JAb(1);
+				//RET();
+				//MOVrq3(R8, RCX);
+				//ADDrd(EDX, ESI);
+				//MOVobb(RCX, RSI, AL);
 				break;
 
 			case BPF_LDX|BPF_MSH|BPF_B: //implement me for dst port 22
