@@ -368,6 +368,30 @@ rsb_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
+rsb(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	printf("%s\n", __func__);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		rsb_i(emitm, stream, rd, rn, val);
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+
+		instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
+		instr |= (rd << RD_S | rn << RN_S);
+		instr |= (ARM_R1 << RM_S);
+		emitm(stream, instr, 4);
+	}
+
+	return (0);
+}
+
+static int
 and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -437,6 +461,20 @@ orr_r(emit_func emitm, bpf_bin_stream *stream,
 	uint32_t instr;
 
 	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr, 4);
+
+	return (0);
+}
+
+static uint32_t
+rsb_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
 
 	emitm(stream, instr, 4);
@@ -1268,9 +1306,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_SUB|BPF_X:
 				/* A <- A - X */
-				printf("BPF_ALU|BPF_SUB|BPF_X\n");
-				panic("implement me");
-				SUBrd(EDX, EAX);
+				printf("BPF_ALU|BPF_SUB|BPF_X not tested: checkme\n");
+				rsb_r(emitm, &stream, REG_A, REG_X, REG_A);
+				//SUBrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_MUL|BPF_X:
@@ -1349,8 +1387,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_SUB|BPF_K:
 				/* A <- A - k */
 				printf("BPF_ALU|BPF_SUB|BPF_K\n");
-				panic("implement me");
-				SUB_EAXi(ins->k);
+				rsb(emitm, &stream, REG_A, REG_A, ins->k);
+				//SUB_EAXi(ins->k);
 				break;
 
 			case BPF_ALU|BPF_MUL|BPF_K:
@@ -1406,7 +1444,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- -A */
 				printf("BPF_ALU|BPF_NEG\n");
 				/* substruct from zero */
-				rsb_i(emitm, &stream, REG_A, REG_A, 0);
+				rsb(emitm, &stream, REG_A, REG_A, 0);
 				//NEGd(EAX);
 				break;
 
