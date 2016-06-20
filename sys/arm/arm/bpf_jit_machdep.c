@@ -255,6 +255,51 @@ lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
+lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t imm)
+{
+	uint32_t instr;
+
+#define	ARM_LSR_I	0x01a00020
+#define	ARM_LSR_R	0x01a00030
+
+	if (imm > 31)
+		panic("lsr");
+
+	instr = ARM_LSR_I | (COND_AL << COND_S);
+	instr |= (imm << 7);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr, 4);
+	return (0);
+}
+
+static int
+add_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	instr = (OPCODE_ADD << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		instr |= (val << IMM_S);
+		instr |= IMM_OP;
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+		instr |= (ARM_R1 << RM_S);
+	}
+
+	emitm(stream, instr, 4);
+
+	return (0);
+}
+
+static int
 and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -291,11 +336,12 @@ and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 
 	imm12 = imm8m(val);
 	if (imm12 >= 0) {
-		and_i(emitm, stream, REG_A, REG_A, val);
+		and_i(emitm, stream, rd, rn, val);
 	} else {
+		mov(emitm, stream, ARM_R1, val);
+
 		instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
 		instr |= (rd << RD_S | rn << RN_S);
-		mov(emitm, stream, ARM_R1, val);
 		instr |= (ARM_R1 << RM_S);
 		emitm(stream, instr, 4);
 	}
@@ -654,6 +700,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_RET|BPF_A:
 				printf("BPF_RET|BPF_A\n");
+				panic("implement me");
 				if (fmem) {
 					LEAVE();
 				}
@@ -775,11 +822,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_LD|BPF_W|BPF_LEN:
 				printf("BPF_LD|BPF_W|BPF_LEN\n");
+				panic("implement me");
 				MOVrd3(R9D, EAX);
 				break;
 
 			case BPF_LDX|BPF_W|BPF_LEN:
 				printf("BPF_LDX|BPF_W|BPF_LEN\n");
+				panic("implement me");
 				MOVrd3(R9D, EDX);
 				break;
 
@@ -959,28 +1008,33 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_LD|BPF_IMM:
 				printf("BPF_LD|BPF_IMM\n");
+				panic("implement me");
 				MOVid(ins->k, EAX);
 				break;
 
 			case BPF_LDX|BPF_IMM:
 				printf("BPF_LDX|BPF_IMM\n");
+				panic("implement me");
 				MOVid(ins->k, EDX);
 				break;
 
 			case BPF_LD|BPF_MEM:
 				printf("BPF_LD|BPF_MEM\n");
+				panic("implement me");
 				MOVid(ins->k * sizeof(uint32_t), ESI);
 				MOVobd(RSP, RSI, EAX);
 				break;
 
 			case BPF_LDX|BPF_MEM:
 				printf("BPF_LDX|BPF_MEM\n");
+				panic("implement me");
 				MOVid(ins->k * sizeof(uint32_t), ESI);
 				MOVobd(RSP, RSI, EDX);
 				break;
 
 			case BPF_ST:
 				printf("BPF_ST\n");
+				panic("implement me");
 				/*
 				 * XXX this command and the following could
 				 * be optimized if the previous instruction
@@ -992,12 +1046,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_STX:
 				printf("BPF_STX\n");
+				panic("implement me");
 				MOVid(ins->k * sizeof(uint32_t), ESI);
 				MOVomd(EDX, RSP, RSI);
 				break;
 
 			case BPF_JMP|BPF_JA:
 				printf("BPF_JMP|BPF_JA\n");
+				panic("implement me");
 				JUMP(ins->k);
 				break;
 
@@ -1023,6 +1079,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_JMP|BPF_JGE|BPF_K:
 				printf("BPF_JMP|BPF_JGE|BPF_K\n");
+				panic("implement me");
 				if (ins->jt == ins->jf) {
 					JUMP(ins->jt);
 					break;
@@ -1075,6 +1132,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_JMP|BPF_JGT|BPF_X:
 				printf("BPF_JMP|BPF_JGT|BPF_X\n");
+				panic("implement me");
 				if (ins->jt == ins->jf) {
 					JUMP(ins->jt);
 					break;
@@ -1085,6 +1143,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_JMP|BPF_JGE|BPF_X:
 				printf("BPF_JMP|BPF_JGE|BPF_X\n");
+				panic("implement me");
 				if (ins->jt == ins->jf) {
 					JUMP(ins->jt);
 					break;
@@ -1095,6 +1154,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_JMP|BPF_JEQ|BPF_X:
 				printf("BPF_JMP|BPF_JEQ|BPF_X\n");
+				panic("implement me");
 				if (ins->jt == ins->jf) {
 					JUMP(ins->jt);
 					break;
@@ -1105,6 +1165,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_JMP|BPF_JSET|BPF_X:
 				printf("BPF_JMP|BPF_JSET|BPF_X\n");
+				panic("implement me");
 				if (ins->jt == ins->jf) {
 					JUMP(ins->jt);
 					break;
@@ -1114,17 +1175,24 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_ALU|BPF_ADD|BPF_X:
+				/* A <- A + X */
 				printf("BPF_ALU|BPF_ADD|BPF_X\n");
-				ADDrd(EDX, EAX);
+
+				instr = add_r(REG_A, REG_A, REG_X);
+				emitm(&stream, instr, 4);
+
+				//ADDrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_SUB|BPF_X:
 				printf("BPF_ALU|BPF_SUB|BPF_X\n");
+				panic("implement me");
 				SUBrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_MUL|BPF_X:
 				printf("BPF_ALU|BPF_MUL|BPF_X\n");
+				panic("implement me");
 				MOVrd(EDX, ECX);
 				MULrd(EDX);
 				MOVrd(ECX, EDX);
@@ -1132,6 +1200,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_DIV|BPF_X:
 				printf("BPF_ALU|BPF_DIV|BPF_X\n");
+				panic("implement me");
 				TESTrd(EDX, EDX);
 				if (fmem) {
 					JNEb(4);
@@ -1150,38 +1219,49 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_AND|BPF_X:
 				printf("BPF_ALU|BPF_AND|BPF_X\n");
+				panic("implement me");
 				ANDrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_OR|BPF_X:
 				printf("BPF_ALU|BPF_OR|BPF_X\n");
+				panic("implement me");
 				ORrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_LSH|BPF_X:
 				printf("BPF_ALU|BPF_LSH|BPF_X\n");
+				panic("implement me");
 				MOVrd(EDX, ECX);
 				SHL_CLrb(EAX);
 				break;
 
 			case BPF_ALU|BPF_RSH|BPF_X:
 				printf("BPF_ALU|BPF_RSH|BPF_X\n");
+				panic("implement me");
 				MOVrd(EDX, ECX);
 				SHR_CLrb(EAX);
 				break;
 
 			case BPF_ALU|BPF_ADD|BPF_K:
-				printf("BPF_ALU|BPF_ADD|BPF_K\n");
-				ADD_EAXi(ins->k);
+				/* A <- A + k */
+				//printf("BPF_ALU|BPF_ADD|BPF_K\n");
+				//panic("implement me");
+
+				add_i(emitm, &stream, REG_A, REG_A, ins->k);
+
+				//ADD_EAXi(ins->k);
 				break;
 
 			case BPF_ALU|BPF_SUB|BPF_K:
 				printf("BPF_ALU|BPF_SUB|BPF_K\n");
+				panic("implement me");
 				SUB_EAXi(ins->k);
 				break;
 
 			case BPF_ALU|BPF_MUL|BPF_K:
 				printf("BPF_ALU|BPF_MUL|BPF_K\n");
+				panic("implement me");
 				MOVrd(EDX, ECX);
 				MOVid(ins->k, EDX);
 				MULrd(EDX);
@@ -1190,6 +1270,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_DIV|BPF_K:
 				printf("BPF_ALU|BPF_DIV|BPF_K\n");
+				panic("implement me");
 				MOVrd(EDX, ECX);
 				ZEROrd(EDX);
 				MOVid(ins->k, ESI);
@@ -1205,32 +1286,48 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_OR|BPF_K:
 				printf("BPF_ALU|BPF_OR|BPF_K\n");
+				panic("implement me");
 				ORid(ins->k, EAX);
 				break;
 
 			case BPF_ALU|BPF_LSH|BPF_K:
 				printf("BPF_ALU|BPF_LSH|BPF_K\n");
+				panic("implement me");
 				SHLib((ins->k) & 0xff, EAX);
 				break;
 
 			case BPF_ALU|BPF_RSH|BPF_K:
-				printf("BPF_ALU|BPF_RSH|BPF_K\n");
-				SHRib((ins->k) & 0xff, EAX);
+				printf("BPF_ALU|BPF_RSH|BPF_K ins->k %d\n", ins->k);
+				//panic("implement me");
+				lsr(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
+				//SHRib((ins->k) & 0xff, EAX);
 				break;
 
 			case BPF_ALU|BPF_NEG:
 				printf("BPF_ALU|BPF_NEG\n");
+				panic("implement me");
 				NEGd(EAX);
 				break;
 
 			case BPF_MISC|BPF_TAX:
+				/* X <- A */
 				printf("BPF_MISC|BPF_TAX\n");
-				MOVrd(EAX, EDX);
+
+				instr = mov_r(REG_X, REG_A);
+				emitm(&stream, instr, 4);
+
+				//MOVrd(EAX, EDX);
 				break;
 
 			case BPF_MISC|BPF_TXA:
+				/* A <- X */
 				printf("BPF_MISC|BPF_TXA\n");
-				MOVrd(EDX, EAX);
+
+				instr = mov_r(REG_A, REG_X);
+				emitm(&stream, instr, 4);
+
+				//panic("implement me");
+				//MOVrd(EDX, EAX);
 				break;
 			}
 			ins++;
