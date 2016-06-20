@@ -113,6 +113,8 @@
 #define	OPCODE_TST	0b1000
 #define	OPCODE_MOV	0b1101
 #define	OPCODE_CMP	0b1010
+#define	OPCODE_RSB	0b0011
+#define	OPCODE_ORR	0b1100
 
 #define	COND_EQ		0b0000
 #define	COND_NE		0b0001

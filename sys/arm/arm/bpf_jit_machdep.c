@@ -65,7 +65,6 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 #define	REG_X		ARM_R5
 #define	REG_MBUF	ARM_R6
 
-
 /*
  * Emit routine to update the jump table.
  */
@@ -300,6 +299,31 @@ add_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
+orr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		instr |= (val << IMM_S);
+		instr |= IMM_OP;
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+		instr |= (ARM_R1 << RM_S);
+	}
+
+	emitm(stream, instr, 4);
+
+	return (0);
+}
+
+static int
 and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -320,6 +344,24 @@ and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	//	mov(emitm, stream, ARM_R1, val);
 	//	instr |= (ARM_R1 << RM_S);
 	//}
+
+	emitm(stream, instr, 4);
+	return (0);
+}
+
+static int
+rsb_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S | rn << RN_S);
+
+	instr |= (val << IMM_S);
+	instr |= IMM_OP;	/* operand 2 is an immediate value */
 
 	emitm(stream, instr, 4);
 	return (0);
@@ -374,7 +416,8 @@ cmp_r(uint32_t rn, uint32_t rm)
 }
 
 static uint32_t
-add_r(uint32_t rd, uint32_t rn, uint32_t rm)
+add_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
 {
 	uint32_t instr;
 
@@ -382,7 +425,37 @@ add_r(uint32_t rd, uint32_t rn, uint32_t rm)
 	instr |= (rd << RD_S);
 	instr |= (rn << RN_S) | (rm << RM_S);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
+}
+
+static uint32_t
+orr_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr, 4);
+
+	return (0);
+}
+
+static uint32_t
+and_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 static int
@@ -718,8 +791,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				emitm(&stream, instr, 4);
 
 				/* Get offset */
-				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
 				instr = ldr(ARM_R0, ARM_R0);
@@ -759,8 +831,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				emitm(&stream, instr, 4);
 
 				/* Get offset */
-				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load half word from offset */
 				instr = ldrh(ARM_R0, ARM_R0);
@@ -801,8 +872,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				emitm(&stream, instr, 4);
 
 				/* Get offset */
-				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
 				instr = ldrb(REG_A, ARM_R0);
@@ -848,12 +918,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				emitm(&stream, instr, 4);
 
 				/* Add X */
-				instr = add_r(ARM_R1, ARM_R1, REG_X);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
 
 				/* Get offset */
-				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
 				instr = ldr(ARM_R0, ARM_R0);
@@ -898,12 +966,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				emitm(&stream, instr, 4);
 
 				/* Add X */
-				instr = add_r(ARM_R1, ARM_R1, REG_X);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
 
 				/* Get offset */
-				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load half word from offset */
 				instr = ldrh(ARM_R0, ARM_R0);
@@ -946,12 +1012,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				emitm(&stream, instr, 4);
 
 				/* Add X */
-				instr = add_r(ARM_R1, ARM_R1, REG_X);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
 
 				/* Get offset */
-				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
 				instr = ldrb(REG_A, ARM_R0);
@@ -985,8 +1049,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				emitm(&stream, instr, 4);
 
 				/* Get offset */
-				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
 				instr = ldrb(ARM_R1, ARM_R0);
@@ -1198,8 +1261,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A + X */
 				printf("BPF_ALU|BPF_ADD|BPF_X\n");
 
-				instr = add_r(REG_A, REG_A, REG_X);
-				emitm(&stream, instr, 4);
+				add_r(emitm, &stream, REG_A, REG_A, REG_X);
 
 				//ADDrd(EDX, EAX);
 				break;
@@ -1243,15 +1305,19 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_AND|BPF_X:
 				/* A <- A & X */
 				printf("BPF_ALU|BPF_AND|BPF_X\n");
-				panic("implement me");
-				ANDrd(EDX, EAX);
+
+				and_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//ANDrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_OR|BPF_X:
 				/* A <- A | X */
 				printf("BPF_ALU|BPF_OR|BPF_X\n");
-				panic("implement me");
-				ORrd(EDX, EAX);
+
+				orr_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//ORrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_LSH|BPF_X:
@@ -1318,14 +1384,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_OR|BPF_K:
 				/* A <- A | k */
 				printf("BPF_ALU|BPF_OR|BPF_K\n");
-				panic("implement me");
-				ORid(ins->k, EAX);
+				orr_i(emitm, &stream, REG_A, REG_A, ins->k);
+				//ORid(ins->k, EAX);
 				break;
 
 			case BPF_ALU|BPF_LSH|BPF_K:
 				/* A <- A << k */
 				printf("BPF_ALU|BPF_LSH|BPF_K\n");
-				//panic("implement me");
 				lsl(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
 				//SHLib((ins->k) & 0xff, EAX);
 				break;
@@ -1333,7 +1398,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_RSH|BPF_K:
 				/* A <- A >> k */
 				printf("BPF_ALU|BPF_RSH|BPF_K ins->k %d\n", ins->k);
-				//panic("implement me");
 				lsr(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
 				//SHRib((ins->k) & 0xff, EAX);
 				break;
@@ -1341,8 +1405,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_NEG:
 				/* A <- -A */
 				printf("BPF_ALU|BPF_NEG\n");
-				panic("implement me");
-				NEGd(EAX);
+				/* substruct from zero */
+				rsb_i(emitm, &stream, REG_A, REG_A, 0);
+				//NEGd(EAX);
 				break;
 
 			case BPF_MISC|BPF_TAX:
