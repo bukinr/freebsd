@@ -784,30 +784,52 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				break;
 
 			case BPF_LD|BPF_W|BPF_IND:
+				/* A <- P[X+k:4] */
 				printf("BPF_LD|BPF_W|BPF_IND\n");
-				CMPrd(EDI, EDX);
-				JAb(27);
-				MOVid(ins->k, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(EDX, ECX);
-				CMPrd(ESI, ECX);
-				JBb(14);
-				ADDrd(EDX, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int32_t), ECX);
-				if (fmem) {
-					JAEb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JAEb(3);
-					ZEROrd(EAX);
-				}
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobd(RCX, RSI, EAX);
-				BSWAP(EAX);
+
+				/* Copy K value to R1 */
+				instr = mov_i(ARM_R1, ins->k);
+				emitm(&stream, instr, 4);
+
+				/* Add X */
+				instr = add_r(ARM_R1, ARM_R1, REG_X);
+				emitm(&stream, instr, 4);
+
+				/* Get offset */
+				instr = add_r(ARM_R0, ARM_R1, REG_MBUF);
+				emitm(&stream, instr, 4);
+
+				/* Load word from offset */
+				instr = ldr(ARM_R0, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				/* Change byte order as network packets are big-endian */
+				instr = rev(REG_A, ARM_R0);
+				emitm(&stream, instr, 4);
+
+				//CMPrd(EDI, EDX);
+				//JAb(27);
+				//MOVid(ins->k, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(EDX, ECX);
+				//CMPrd(ESI, ECX);
+				//JBb(14);
+				//ADDrd(EDX, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int32_t), ECX);
+				//if (fmem) {
+				//	JAEb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JAEb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobd(RCX, RSI, EAX);
+				//BSWAP(EAX);
 				break;
 
 			case BPF_LD|BPF_H|BPF_IND:
