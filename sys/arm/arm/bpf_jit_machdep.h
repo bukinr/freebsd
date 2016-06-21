@@ -215,7 +215,7 @@ typedef struct bpf_bin_stream {
  * The third one is the length, that can be 1, 2, or 4 since it is possible
  * to emit a byte, a short, or a word at a time.
  */
-typedef void (*emit_func)(bpf_bin_stream *stream, u_int value, u_int n);
+typedef void (*emit_func)(bpf_bin_stream *stream, u_int value);
 
 /*
  * Native instruction macros

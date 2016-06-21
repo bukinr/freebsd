@@ -69,44 +69,27 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
  * Emit routine to update the jump table.
  */
 static void
-emit_length(bpf_bin_stream *stream, __unused u_int value, u_int len)
+emit_length(bpf_bin_stream *stream, __unused u_int value)
 {
 
 	printf("%s\n", __func__);
 
 	if (stream->refs != NULL)
-		(stream->refs)[stream->bpf_pc] += len;
-	stream->cur_ip += len;
+		(stream->refs)[stream->bpf_pc] += 4;
+	stream->cur_ip += 4;
 }
 
 /*
  * Emit routine to output the actual binary code.
  */
 static void
-emit_code(bpf_bin_stream *stream, u_int value, u_int len)
+emit_code(bpf_bin_stream *stream, u_int value)
 {
 
-	//printf("%s\n", __func__);
+	printf("emitting 0x%08x\n", value);
 
-	switch (len) {
-	case 1:
-		stream->ibuf[stream->cur_ip] = (u_char)value;
-		stream->cur_ip++;
-		break;
-
-	case 2:
-		*((u_short *)(stream->ibuf + stream->cur_ip)) = (u_short)value;
-		stream->cur_ip += 2;
-		break;
-
-	case 4:
-		printf("emitting 0x%08x\n", value);
-		*((u_int *)(stream->ibuf + stream->cur_ip)) = value;
-		stream->cur_ip += 4;
-		break;
-	}
-
-	return;
+	*((u_int *)(stream->ibuf + stream->cur_ip)) = value;
+	stream->cur_ip += 4;
 }
 
 static int16_t
@@ -135,7 +118,7 @@ push(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (WRITE_BACK | PRE_INDEX);
 	instr |= (reg_list);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -152,7 +135,7 @@ pop(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (WRITE_BACK | POST_INDEX | UP_BIT | OP_LOAD);
 	instr |= (reg_list);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -167,7 +150,7 @@ branch(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (cond << COND_S);
 	instr |= (offs >> 2);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -182,7 +165,7 @@ mov_i(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (imm << IMM_S);
 	instr |= IMM_OP;	/* operand 2 is an immediate value */
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -203,13 +186,13 @@ mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		printf("to emit MOVW\n");
 		instr = ARM_MOVW(rd, val & 0xffff);
 		instr |= (COND_AL << COND_S);
-		emitm(stream, instr, 4);
+		emitm(stream, instr);
 
 		if (val > 0xffff) {
 			printf("to emit MOVT\n");
 			instr = ARM_MOVT(rd, (val >> 16));
 			instr |= (COND_AL << COND_S);
-			emitm(stream, instr, 4);
+			emitm(stream, instr);
 		}
 	}
 
@@ -237,7 +220,7 @@ mul(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr |= (rn << RN_S);
 	}
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -266,7 +249,7 @@ tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 		instr |= (ARM_R0 << RM_S);
 	}
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 	return (0);
 }
 
@@ -286,7 +269,7 @@ lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (imm << 7);
 	instr |= (rd << RD_S | rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 	return (0);
 }
 
@@ -306,7 +289,7 @@ lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (imm << 7);
 	instr |= (rd << RD_S | rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 	return (0);
 }
 
@@ -330,7 +313,7 @@ add_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr |= (ARM_R1 << RM_S);
 	}
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -355,7 +338,7 @@ orr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr |= (ARM_R1 << RM_S);
 	}
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -382,7 +365,7 @@ and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	//	instr |= (ARM_R1 << RM_S);
 	//}
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 	return (0);
 }
 
@@ -400,7 +383,7 @@ rsb_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (val << IMM_S);
 	instr |= IMM_OP;	/* operand 2 is an immediate value */
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 	return (0);
 }
 
@@ -422,7 +405,7 @@ rsb(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
 		instr |= (rd << RD_S | rn << RN_S);
 		instr |= (ARM_R1 << RM_S);
-		emitm(stream, instr, 4);
+		emitm(stream, instr);
 	}
 
 	return (0);
@@ -446,7 +429,7 @@ and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
 		instr |= (rd << RD_S | rn << RN_S);
 		instr |= (ARM_R1 << RM_S);
-		emitm(stream, instr, 4);
+		emitm(stream, instr);
 	}
 
 	return (0);
@@ -461,7 +444,7 @@ mov_r(emit_func emitm, bpf_bin_stream *stream,
 	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -477,7 +460,7 @@ cmp_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rn << RN_S) | (rm << RM_S);
 	instr |= COND_SET;
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -492,7 +475,7 @@ add_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S);
 	instr |= (rn << RN_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -506,7 +489,7 @@ orr_r(emit_func emitm, bpf_bin_stream *stream,
 	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -520,7 +503,7 @@ rsb_r(emit_func emitm, bpf_bin_stream *stream,
 	instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -534,7 +517,7 @@ and_r(emit_func emitm, bpf_bin_stream *stream,
 	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -597,7 +580,7 @@ ldr(emit_func emitm, bpf_bin_stream *stream,
 	instr |= UP_BIT | PRE_INDEX;
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -613,7 +596,7 @@ ldrb(emit_func emitm, bpf_bin_stream *stream,
 	instr |= UP_BIT | PRE_INDEX;
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -636,7 +619,7 @@ ldrh(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (SH_UH << SH_S);
 	instr |= (rd << RD_S) | (rn << RN_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -656,7 +639,7 @@ rev(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -677,7 +660,7 @@ rev16(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	emitm(stream, instr, 4);
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -855,7 +838,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//}
 
 				// BX LR
-				emitm(&stream, 0xe12fff1e, 4);
+				emitm(&stream, 0xe12fff1e);
 
 				break;
 
@@ -864,9 +847,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_RET|BPF_A\n");
 				panic("implement me");
 				if (fmem) {
-					LEAVE();
+					//LEAVE();
 				}
-				RET();
+				//RET();
 				break;
 
 			case BPF_LD|BPF_W|BPF_ABS:
@@ -978,14 +961,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- len */
 				printf("BPF_LD|BPF_W|BPF_LEN\n");
 				panic("implement me");
-				MOVrd3(R9D, EAX);
+				//MOVrd3(R9D, EAX);
 				break;
 
 			case BPF_LDX|BPF_W|BPF_LEN:
 				/* X <- len */
 				printf("BPF_LDX|BPF_W|BPF_LEN\n");
 				panic("implement me");
-				MOVrd3(R9D, EDX);
+				//MOVrd3(R9D, EDX);
 				break;
 
 			case BPF_LD|BPF_W|BPF_IND:
@@ -1149,30 +1132,30 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- k */
 				printf("BPF_LD|BPF_IMM\n");
 				panic("implement me");
-				MOVid(ins->k, EAX);
+				//MOVid(ins->k, EAX);
 				break;
 
 			case BPF_LDX|BPF_IMM:
 				/* X <- k */
 				printf("BPF_LDX|BPF_IMM\n");
 				panic("implement me");
-				MOVid(ins->k, EDX);
+				//MOVid(ins->k, EDX);
 				break;
 
 			case BPF_LD|BPF_MEM:
 				/* A <- M[k] */
 				printf("BPF_LD|BPF_MEM\n");
 				panic("implement me");
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVobd(RSP, RSI, EAX);
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVobd(RSP, RSI, EAX);
 				break;
 
 			case BPF_LDX|BPF_MEM:
 				/* X <- M[k] */
 				printf("BPF_LDX|BPF_MEM\n");
 				panic("implement me");
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVobd(RSP, RSI, EDX);
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVobd(RSP, RSI, EDX);
 				break;
 
 			case BPF_ST:
@@ -1184,23 +1167,23 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				 * be optimized if the previous instruction
 				 * was already of this type
 				 */
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVomd(EAX, RSP, RSI);
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVomd(EAX, RSP, RSI);
 				break;
 
 			case BPF_STX:
 				/* M[k] <- X */
 				printf("BPF_STX\n");
 				panic("implement me");
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVomd(EDX, RSP, RSI);
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVomd(EDX, RSP, RSI);
 				break;
 
 			case BPF_JMP|BPF_JA:
 				/* pc += k */
 				printf("BPF_JMP|BPF_JA\n");
 				panic("implement me");
-				JUMP(ins->k);
+				//JUMP(ins->k);
 				break;
 
 			case BPF_JMP|BPF_JGT|BPF_K:
@@ -1209,7 +1192,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
 					panic("implement me: 11");
-					JUMP(ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
 
@@ -1228,11 +1211,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JGE|BPF_K\n");
 				panic("implement me");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPid(ins->k, EAX);
-				JCC(JAE, JB);
+				//CMPid(ins->k, EAX);
+				//JCC(JAE, JB);
 				break;
 
 			case BPF_JMP|BPF_JEQ|BPF_K:
@@ -1266,7 +1249,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				if (ins->jt == ins->jf) {
 					panic("implement jump 1\n");
 					//JUMP(ins->jt);
-					JUMP(ins->jt);
 					break;
 				}
 				//and(emitm, &stream, ARM_R1, REG_A, ins->k);
@@ -1281,11 +1263,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JGT|BPF_X\n");
 				panic("implement me");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPrd(EDX, EAX);
-				JCC(JA, JBE);
+				//CMPrd(EDX, EAX);
+				//JCC(JA, JBE);
 				break;
 
 			case BPF_JMP|BPF_JGE|BPF_X:
@@ -1293,11 +1275,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JGE|BPF_X\n");
 				panic("implement me");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPrd(EDX, EAX);
-				JCC(JAE, JB);
+				//CMPrd(EDX, EAX);
+				//JCC(JAE, JB);
 				break;
 
 			case BPF_JMP|BPF_JEQ|BPF_X:
@@ -1305,11 +1287,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JEQ|BPF_X\n");
 				panic("implement me");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPrd(EDX, EAX);
-				JCC(JE, JNE);
+				//CMPrd(EDX, EAX);
+				//JCC(JE, JNE);
 				break;
 
 			case BPF_JMP|BPF_JSET|BPF_X:
@@ -1317,11 +1299,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JSET|BPF_X\n");
 				panic("implement me");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				TESTrd(EDX, EAX);
-				JCC(JNE, JE);
+				//TESTrd(EDX, EAX);
+				//JCC(JNE, JE);
 				break;
 
 			case BPF_ALU|BPF_ADD|BPF_X:
@@ -1396,16 +1378,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A << X */
 				printf("BPF_ALU|BPF_LSH|BPF_X\n");
 				panic("implement me");
-				MOVrd(EDX, ECX);
-				SHL_CLrb(EAX);
+				//MOVrd(EDX, ECX);
+				//SHL_CLrb(EAX);
 				break;
 
 			case BPF_ALU|BPF_RSH|BPF_X:
 				/* A <- A >> X */
 				printf("BPF_ALU|BPF_RSH|BPF_X\n");
 				panic("implement me");
-				MOVrd(EDX, ECX);
-				SHR_CLrb(EAX);
+				//MOVrd(EDX, ECX);
+				//SHR_CLrb(EAX);
 				break;
 
 			case BPF_ALU|BPF_ADD|BPF_K:
