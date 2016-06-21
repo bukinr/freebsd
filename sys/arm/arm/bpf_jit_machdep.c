@@ -64,6 +64,9 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 #define	REG_A		ARM_R4
 #define	REG_X		ARM_R5
 #define	REG_MBUF	ARM_R6
+#define	REG_MBUFLEN	ARM_R7
+
+#define	RET		0xe12fff1e	/* bx lr */
 
 /*
  * Emit routine to update the jump table.
@@ -793,7 +796,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 	uint32_t reg_list;
 
-	reg_list = (1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6);
+	//reg_list = (1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6);
+	reg_list = (1 << REG_A) | (1 << REG_X) | (1 << REG_MBUF) | (1 << REG_MBUFLEN);
 
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
@@ -812,6 +816,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		}
 		if (flen) {
 			printf("flen\n");
+			mov_r(emitm, &stream, REG_MBUFLEN, ARM_R1);
 		//	MOVrd2(ESI, R9D);
 		}
 		if (fpkt) {
@@ -859,19 +864,19 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 					pop(emitm, &stream, reg_list);
 				//}
 
-				// BX LR
-				emitm(&stream, 0xe12fff1e);
+				emitm(&stream, RET);
 
 				break;
 
 			case BPF_RET|BPF_A:
 				/* accept A bytes */
 				printf("BPF_RET|BPF_A\n");
-				panic("implement me");
+				mov_r(emitm, &stream, ARM_R0, REG_A);
 				if (fmem) {
 					//LEAVE();
 				}
 				//RET();
+				emitm(&stream, RET);
 				break;
 
 			case BPF_LD|BPF_W|BPF_ABS:
@@ -982,14 +987,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LD|BPF_W|BPF_LEN:
 				/* A <- len */
 				printf("BPF_LD|BPF_W|BPF_LEN\n");
-				panic("implement me");
+
+				mov_r(emitm, &stream, REG_A, REG_MBUFLEN);
+
 				//MOVrd3(R9D, EAX);
 				break;
 
 			case BPF_LDX|BPF_W|BPF_LEN:
 				/* X <- len */
 				printf("BPF_LDX|BPF_W|BPF_LEN\n");
-				panic("implement me");
+				mov_r(emitm, &stream, REG_X, REG_MBUFLEN);
 				//MOVrd3(R9D, EDX);
 				break;
 
@@ -1153,14 +1160,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LD|BPF_IMM:
 				/* A <- k */
 				printf("BPF_LD|BPF_IMM\n");
-				panic("implement me");
+				mov(emitm, &stream, REG_A, ins->k);
 				//MOVid(ins->k, EAX);
 				break;
 
 			case BPF_LDX|BPF_IMM:
 				/* X <- k */
 				printf("BPF_LDX|BPF_IMM\n");
-				panic("implement me");
+				mov(emitm, &stream, REG_X, ins->k);
 				//MOVid(ins->k, EDX);
 				break;
 
@@ -1231,11 +1238,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_JMP|BPF_JGE|BPF_K:
 				/* pc += (A >= k) ? jt : jf */
 				printf("BPF_JMP|BPF_JGE|BPF_K\n");
-				panic("implement me");
+
 				if (ins->jt == ins->jf) {
 					//JUMP(ins->jt);
 					break;
 				}
+
+				mov(emitm, &stream, ARM_R1, ins->k);
+				cmp_r(emitm, &stream, REG_A, ARM_R1);
+				jump(emitm, &stream, ins, COND_GE, COND_LT);
+
 				//CMPid(ins->k, EAX);
 				//JCC(JAE, JB);
 				break;
