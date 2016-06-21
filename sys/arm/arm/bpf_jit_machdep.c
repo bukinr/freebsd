@@ -206,6 +206,32 @@ mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
+mul(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t rs, uint32_t rn)
+{
+	uint32_t instr;
+
+#define	MUL_ACCUMULATE	(1 << 21)
+#define	RS_S		8
+
+	/* Rd:=Rm*Rs */
+
+	instr = (1 << 4) | (1 << 7);
+	instr |= (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rs << RS_S) | (rm << RM_S);
+
+	if (rn > 0) {
+		/* Rd:=Rm*Rs+Rn */
+		instr |= MUL_ACCUMULATE;
+		instr |= (rn << RN_S);
+	}
+
+	emitm(stream, instr, 4);
+
+	return (0);
+}
+
+static int
 tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
     uint32_t val)
 {
@@ -1313,31 +1339,36 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_MUL|BPF_X:
 				/* A <- A * X */
-				printf("BPF_ALU|BPF_MUL|BPF_X\n");
-				panic("implement me");
-				MOVrd(EDX, ECX);
-				MULrd(EDX);
-				MOVrd(ECX, EDX);
+				printf("BPF_ALU|BPF_MUL|BPF_X not tested\n");
+
+				mul(emitm, &stream, REG_A, REG_A, REG_X, 0);
+
+				//MOVrd(EDX, ECX);
+				//MULrd(EDX);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_DIV|BPF_X:
 				/* A <- A / X */
 				printf("BPF_ALU|BPF_DIV|BPF_X\n");
-				panic("implement me");
-				TESTrd(EDX, EDX);
-				if (fmem) {
-					JNEb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JNEb(3);
-					ZEROrd(EAX);
-				}
-				RET();
-				MOVrd(EDX, ECX);
-				ZEROrd(EDX);
-				DIVrd(ECX);
-				MOVrd(ECX, EDX);
+
+				printf("No div instruction implemented");
+				return (0);
+
+				//TESTrd(EDX, EDX);
+				//if (fmem) {
+				//	JNEb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JNEb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//MOVrd(EDX, ECX);
+				//ZEROrd(EDX);
+				//DIVrd(ECX);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_AND|BPF_X:
@@ -1377,7 +1408,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_ADD|BPF_K:
 				/* A <- A + k */
 				//printf("BPF_ALU|BPF_ADD|BPF_K\n");
-				//panic("implement me");
 
 				add_i(emitm, &stream, REG_A, REG_A, ins->k);
 
@@ -1393,23 +1423,29 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_MUL|BPF_K:
 				/* A <- A * k */
-				printf("BPF_ALU|BPF_MUL|BPF_K\n");
-				panic("implement me");
-				MOVrd(EDX, ECX);
-				MOVid(ins->k, EDX);
-				MULrd(EDX);
-				MOVrd(ECX, EDX);
+				printf("BPF_ALU|BPF_MUL|BPF_K not tested\n");
+
+				mov(emitm, &stream, ARM_R1, ins->k);
+				mul(emitm, &stream, REG_A, REG_A, ARM_R1, 0);
+
+				//MOVrd(EDX, ECX);
+				//MOVid(ins->k, EDX);
+				//MULrd(EDX);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_DIV|BPF_K:
 				/* A <- A / k */
 				printf("BPF_ALU|BPF_DIV|BPF_K\n");
-				panic("implement me");
-				MOVrd(EDX, ECX);
-				ZEROrd(EDX);
-				MOVid(ins->k, ESI);
-				DIVrd(ESI);
-				MOVrd(ECX, EDX);
+
+				printf("No div instruction implemented");
+				return (0);
+
+				//MOVrd(EDX, ECX);
+				//ZEROrd(EDX);
+				//MOVid(ins->k, ESI);
+				//DIVrd(ESI);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_AND|BPF_K:
