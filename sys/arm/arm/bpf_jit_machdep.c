@@ -325,7 +325,7 @@ lsr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
-add_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+add(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
 	uint32_t instr;
@@ -350,7 +350,7 @@ add_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
-orr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+orr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
 	uint32_t instr;
@@ -371,32 +371,6 @@ orr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 
 	emitm(stream, instr);
 
-	return (0);
-}
-
-static int
-and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	//int imm12;
-
-	printf("%s\n", __func__);
-
-	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S | rn << RN_S);
-
-	//imm12 = imm8m(val);
-	//if (imm12 >= 0) {
-		//printf("%s imm12 0x%08x\n", __func__, imm12);
-		instr |= (val << IMM_S);
-		instr |= IMM_OP;	/* operand 2 is an immediate value */
-	//} else {
-	//	mov(emitm, stream, ARM_R1, val);
-	//	instr |= (ARM_R1 << RM_S);
-	//}
-
-	emitm(stream, instr);
 	return (0);
 }
 
@@ -438,6 +412,24 @@ rsb(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr |= (ARM_R1 << RM_S);
 		emitm(stream, instr);
 	}
+
+	return (0);
+}
+
+static int
+and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S | rn << RN_S);
+	instr |= (val << IMM_S);
+	instr |= IMM_OP;	/* operand 2 is an immediate value */
+
+	emitm(stream, instr);
 
 	return (0);
 }
@@ -585,7 +577,6 @@ jump(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 
 	return (0);
 }
-
 
 #if 0
 #define	POST_INDEX	(0 << 24)	/* add offset after transfer */
@@ -1426,7 +1417,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A + k */
 				//printf("BPF_ALU|BPF_ADD|BPF_K\n");
 
-				add_i(emitm, &stream, REG_A, REG_A, ins->k);
+				add(emitm, &stream, REG_A, REG_A, ins->k);
 
 				//ADD_EAXi(ins->k);
 				break;
@@ -1475,7 +1466,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_OR|BPF_K:
 				/* A <- A | k */
 				printf("BPF_ALU|BPF_OR|BPF_K\n");
-				orr_i(emitm, &stream, REG_A, REG_A, ins->k);
+				orr(emitm, &stream, REG_A, REG_A, ins->k);
 				//ORid(ins->k, EAX);
 				break;
 
