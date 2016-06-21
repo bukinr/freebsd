@@ -353,6 +353,31 @@ add(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 static int
+sub(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	instr = (OPCODE_SUB << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		instr |= (val << IMM_S);
+		instr |= IMM_OP;
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+		instr |= (ARM_R1 << RM_S);
+	}
+
+	emitm(stream, instr);
+
+	return (0);
+}
+
+static int
 orr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -595,8 +620,30 @@ jump(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 #endif
 
 static uint32_t
+str(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm, uint32_t offs)
+{
+	uint32_t instr;
+
+	instr = (1 << 26);
+	instr |= (COND_AL << COND_S) | WORD_BIT | OP_STORE;
+	instr |= UP_BIT | PRE_INDEX;
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	if (offs > 0) {
+		if (offs > 0xfff)
+			panic("offset is too big");
+		instr |= offs;
+	}
+
+	emitm(stream, instr);
+
+	return (0);
+}
+
+static uint32_t
 ldr(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rm)
+    uint32_t rd, uint32_t rm, uint32_t offs)
 {
 	uint32_t instr;
 
@@ -604,6 +651,12 @@ ldr(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (COND_AL << COND_S) | WORD_BIT | OP_LOAD;
 	instr |= UP_BIT | PRE_INDEX;
 	instr |= (rd << RD_S) | (rm << RM_S);
+
+	if (offs > 0) {
+		if (offs > 0xfff)
+			panic("offset is too big");
+		instr |= offs;
+	}
 
 	emitm(stream, instr);
 
@@ -813,6 +866,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		//	PUSH(RBP);
 		//	MOVrq(RSP, RBP);
 		//	SUBib(BPF_MEMWORDS * sizeof(uint32_t), RSP);
+			sub(emitm, &stream, ARM_SP, ARM_SP,
+			    BPF_MEMWORDS * sizeof(uint32_t));
 		}
 		if (flen) {
 			printf("flen\n");
@@ -890,7 +945,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
-				ldr(emitm, &stream, ARM_R0, ARM_R0);
+				ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
 
 				/* Reverse as network packets are big-endian */
 				rev(emitm, &stream, REG_A, ARM_R0);
@@ -1014,7 +1069,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
-				ldr(emitm, &stream, ARM_R0, ARM_R0);
+				ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
 
 				/* Change byte order as network packets are big-endian */
 				rev(emitm, &stream, REG_A, ARM_R0);
@@ -1174,7 +1229,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LD|BPF_MEM:
 				/* A <- M[k] */
 				printf("BPF_LD|BPF_MEM\n");
-				panic("implement me");
+
+				ldr(emitm, &stream, REG_A, ARM_SP,
+				    (ins->k * sizeof(uint32_t)));
+
 				//MOVid(ins->k * sizeof(uint32_t), ESI);
 				//MOVobd(RSP, RSI, EAX);
 				break;
@@ -1182,15 +1240,20 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LDX|BPF_MEM:
 				/* X <- M[k] */
 				printf("BPF_LDX|BPF_MEM\n");
-				panic("implement me");
+
+				ldr(emitm, &stream, REG_X, ARM_SP,
+				    (ins->k * sizeof(uint32_t)));
+
 				//MOVid(ins->k * sizeof(uint32_t), ESI);
 				//MOVobd(RSP, RSI, EDX);
 				break;
 
 			case BPF_ST:
 				/* M[k] <- A */
-				printf("BPF_ST\n");
-				panic("implement me");
+				printf("BPF_ST not tested\n");
+
+				str(emitm, &stream, REG_A, REG_SP,
+				    (ins->k * sizeof(uint32_t)));
 				/*
 				 * XXX this command and the following could
 				 * be optimized if the previous instruction
@@ -1202,8 +1265,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_STX:
 				/* M[k] <- X */
-				printf("BPF_STX\n");
-				panic("implement me");
+				printf("BPF_STX not tested\n");
+				str(emitm, &stream, REG_X, REG_SP,
+				    (ins->k * sizeof(uint32_t)));
+
 				//MOVid(ins->k * sizeof(uint32_t), ESI);
 				//MOVomd(EDX, RSP, RSI);
 				break;
@@ -1226,9 +1291,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				}
 
 				mov(emitm, &stream, ARM_R1, ins->k);
-
 				cmp_r(emitm, &stream, REG_A, ARM_R1);
-
 				jump(emitm, &stream, ins, COND_GT, COND_LE);
 
 				//CMPid(ins->k, EAX);

@@ -111,6 +111,7 @@
 #define	OPCODE_AND	0b0000
 #define	OPCODE_ADD	0b0100
 #define	OPCODE_TST	0b1000
+#define	OPCODE_SUB	0b0010
 #define	OPCODE_MOV	0b1101
 #define	OPCODE_CMP	0b1010
 #define	OPCODE_RSB	0b0011
@@ -327,7 +328,7 @@ typedef void (*emit_func)(bpf_bin_stream *stream, u_int value);
 } while (0)
 
 /* retq */
-#define RET() do {							\
+#define RETaaaa() do {							\
 	emitm(&stream, 0xc3, 1);					\
 } while (0)
 
