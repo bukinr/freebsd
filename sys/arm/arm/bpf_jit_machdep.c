@@ -253,14 +253,16 @@ tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 	return (0);
 }
 
+#define	ARM_LSL_I	0x01a00000
+#define	ARM_LSL_R	0x01a00010
+#define	ARM_LSR_I	0x01a00020
+#define	ARM_LSR_R	0x01a00030
+
 static int
 lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rm, uint32_t imm)
 {
 	uint32_t instr;
-
-#define	ARM_LSL_I	0x01a00000
-#define	ARM_LSL_R	0x01a00010
 
 	if (imm > 31)
 		panic("lsl");
@@ -270,6 +272,7 @@ lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (rd << RD_S | rm << RM_S);
 
 	emitm(stream, instr);
+
 	return (0);
 }
 
@@ -279,9 +282,6 @@ lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 {
 	uint32_t instr;
 
-#define	ARM_LSR_I	0x01a00020
-#define	ARM_LSR_R	0x01a00030
-
 	if (imm > 31)
 		panic("lsr");
 
@@ -290,6 +290,37 @@ lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (rd << RD_S | rm << RM_S);
 
 	emitm(stream, instr);
+
+	return (0);
+}
+
+static int
+lsl_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t rs)
+{
+	uint32_t instr;
+
+	instr = ARM_LSL_R | (COND_AL << COND_S);
+	instr |= (rs << RS_S);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr);
+
+	return (0);
+}
+
+static int
+lsr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t rs)
+{
+	uint32_t instr;
+
+	instr = ARM_LSR_R | (COND_AL << COND_S);
+	instr |= (rs << RS_S);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr);
+
 	return (0);
 }
 
@@ -857,7 +888,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_W|BPF_ABS\n");
 
 				/* Copy K value to R1 */
-				mov_i(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
@@ -894,7 +925,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_H|BPF_ABS: ins->k 0x%x\n", ins->k);
 
 				/* Copy K value to R1 */
-				mov_i(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
@@ -932,7 +963,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_B|BPF_ABS: ins->k 0x%x\n", ins->k);
 
 				/* Copy K value to R1 */
-				mov_i(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
@@ -976,7 +1007,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_W|BPF_IND\n");
 
 				/* Copy K value to R1 */
-				mov_i(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Add X */
 				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
@@ -1021,7 +1052,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_H|BPF_IND\n");
 
 				/* Copy K value to R1 */
-				mov_i(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Add X */
 				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
@@ -1064,7 +1095,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_B|BPF_IND\n");
 
 				/* Copy K value to R1 */
-				mov_i(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Add X */
 				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
@@ -1099,7 +1130,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				    ins->jt, ins->jf, ins->k);
 
 				/* Copy K value to R1 */
-				mov_i(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
@@ -1231,7 +1262,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//cmp_i(REG_A, ins->k);
 
 				mov(emitm, &stream, ARM_R1, ins->k);
-
 				cmp_r(emitm, &stream, REG_A, ARM_R1);
 
 				//emitm(&stream, KERNEL_BREAKPOINT, 4);
@@ -1377,7 +1407,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_LSH|BPF_X:
 				/* A <- A << X */
 				printf("BPF_ALU|BPF_LSH|BPF_X\n");
-				panic("implement me");
+				lsl_r(emitm, &stream, REG_A, REG_A, REG_X);
+
 				//MOVrd(EDX, ECX);
 				//SHL_CLrb(EAX);
 				break;
@@ -1385,7 +1416,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_RSH|BPF_X:
 				/* A <- A >> X */
 				printf("BPF_ALU|BPF_RSH|BPF_X\n");
-				panic("implement me");
+				lsr_r(emitm, &stream, REG_A, REG_A, REG_X);
+
 				//MOVrd(EDX, ECX);
 				//SHR_CLrb(EAX);
 				break;
