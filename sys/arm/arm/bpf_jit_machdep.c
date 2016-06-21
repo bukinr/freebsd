@@ -124,7 +124,8 @@ imm8m(uint32_t x)
 }
 
 static uint32_t
-push(uint32_t reg_list)
+push(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t reg_list)
 {
 	uint32_t instr;
 
@@ -134,11 +135,14 @@ push(uint32_t reg_list)
 	instr |= (WRITE_BACK | PRE_INDEX);
 	instr |= (reg_list);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 static uint32_t
-pop(uint32_t reg_list)
+pop(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t reg_list)
 {
 	uint32_t instr;
 
@@ -148,7 +152,9 @@ pop(uint32_t reg_list)
 	instr |= (WRITE_BACK | POST_INDEX | UP_BIT | OP_LOAD);
 	instr |= (reg_list);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 static uint32_t
@@ -581,7 +587,8 @@ jump(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 #endif
 
 static uint32_t
-ldr(uint32_t rd, uint32_t rm)
+ldr(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
 {
 	uint32_t instr;
 
@@ -590,11 +597,14 @@ ldr(uint32_t rd, uint32_t rm)
 	instr |= UP_BIT | PRE_INDEX;
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 static uint32_t
-ldrb(uint32_t rd, uint32_t rm)
+ldrb(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
 {
 	uint32_t instr;
 
@@ -603,7 +613,9 @@ ldrb(uint32_t rd, uint32_t rm)
 	instr |= UP_BIT | PRE_INDEX;
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 #define	SH_S		5
@@ -613,7 +625,8 @@ ldrb(uint32_t rd, uint32_t rm)
 #define	SH_SH		3	/* Signed halfwords */
 
 static uint32_t
-ldrh(uint32_t rd, uint32_t rn)
+ldrh(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn)
 {
 	uint32_t instr;
 
@@ -623,11 +636,14 @@ ldrh(uint32_t rd, uint32_t rn)
 	instr |= (SH_UH << SH_S);
 	instr |= (rd << RD_S) | (rn << RN_S);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 static uint32_t
-rev(uint32_t rd, uint32_t rm)
+rev(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
 {
 	uint32_t instr;
 
@@ -640,11 +656,14 @@ rev(uint32_t rd, uint32_t rm)
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 static uint32_t
-rev16(uint32_t rd, uint32_t rm)
+rev16(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
 {
 	uint32_t instr;
 
@@ -658,7 +677,9 @@ rev16(uint32_t rd, uint32_t rm)
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
-	return (instr);
+	emitm(stream, instr, 4);
+
+	return (0);
 }
 
 /*
@@ -766,7 +787,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	emitm = emit_length;
 
 	uint32_t reg_list;
-	uint32_t instr;
 
 	reg_list = (1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6);
 
@@ -774,8 +794,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		ins = prog;
 
 		//if (fpkt || fmem) {
-			instr = push(reg_list);
-			emitm(&stream, instr, 4);
+			push(emitm, &stream, reg_list);
 		//}
 
 		/* Create the procedure header. */
@@ -832,8 +851,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//RET();
 
 				//if (fmem) {
-					instr = pop(reg_list);
-					emitm(&stream, instr, 4);
+					pop(emitm, &stream, reg_list);
 				//}
 
 				// BX LR
@@ -862,12 +880,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
-				instr = ldr(ARM_R0, ARM_R0);
-				emitm(&stream, instr, 4);
+				ldr(emitm, &stream, ARM_R0, ARM_R0);
 
 				/* Reverse as network packets are big-endian */
-				instr = rev(REG_A, ARM_R0);
-				emitm(&stream, instr, 4);
+				rev(emitm, &stream, REG_A, ARM_R0);
 
 				//MOVid(ins->k, ESI);
 				//CMPrd(EDI, ESI);
@@ -901,12 +917,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load half word from offset */
-				instr = ldrh(ARM_R0, ARM_R0);
-				emitm(&stream, instr, 4);
+				ldrh(emitm, &stream, ARM_R0, ARM_R0);
 
 				/* Reverse as network packets are big-endian */
-				instr = rev16(REG_A, ARM_R0);
-				emitm(&stream, instr, 4);
+				rev16(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					panic("implement LEAVE\n");
@@ -941,8 +955,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
-				instr = ldrb(REG_A, ARM_R0);
-				emitm(&stream, instr, 4);
+				ldrb(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					panic("implement LEAVE 1\n");
@@ -989,12 +1002,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
-				instr = ldr(ARM_R0, ARM_R0);
-				emitm(&stream, instr, 4);
+				ldr(emitm, &stream, ARM_R0, ARM_R0);
 
 				/* Change byte order as network packets are big-endian */
-				instr = rev(REG_A, ARM_R0);
-				emitm(&stream, instr, 4);
+				rev(emitm, &stream, REG_A, ARM_R0);
 
 				//CMPrd(EDI, EDX);
 				//JAb(27);
@@ -1036,12 +1047,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load half word from offset */
-				instr = ldrh(ARM_R0, ARM_R0);
-				emitm(&stream, instr, 4);
+				ldrh(emitm, &stream, ARM_R0, ARM_R0);
 
 				/* Reverse as network packets are big-endian */
-				instr = rev16(REG_A, ARM_R0);
-				emitm(&stream, instr, 4);
+				rev16(emitm, &stream, REG_A, ARM_R0);
 
 				//ZEROrd(EAX);
 				//CMPrd(EDI, EDX);
@@ -1081,8 +1090,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
-				instr = ldrb(REG_A, ARM_R0);
-				emitm(&stream, instr, 4);
+				ldrb(emitm, &stream, REG_A, ARM_R0);
 
 				//ZEROrd(EAX);
 				//CMPrd(EDI, EDX);
@@ -1114,8 +1122,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
-				instr = ldrb(ARM_R1, ARM_R0);
-				emitm(&stream, instr, 4);
+				ldrb(emitm, &stream, ARM_R1, ARM_R0);
 
 				and_i(emitm, &stream, ARM_R1, ARM_R1, 0xf);
 				lsl(emitm, &stream, REG_X, ARM_R1, 2);
