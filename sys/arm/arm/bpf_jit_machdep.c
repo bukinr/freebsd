@@ -256,6 +256,23 @@ tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 	return (0);
 }
 
+static int
+tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
+    uint32_t rm)
+{
+	uint32_t instr;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_TST << OPCODE_S) | (COND_AL << COND_S);
+	instr |= COND_SET;
+	instr |= (rn << RN_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+	return (0);
+}
+
 #define	ARM_LSL_I	0x01a00000
 #define	ARM_LSL_R	0x01a00010
 #define	ARM_LSR_I	0x01a00020
@@ -574,7 +591,7 @@ and_r(emit_func emitm, bpf_bin_stream *stream,
 }
 
 static int
-jump(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
+jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
     uint8_t cond1, uint8_t cond2)
 {
 	uint32_t offs;
@@ -1252,7 +1269,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* M[k] <- A */
 				printf("BPF_ST not tested\n");
 
-				str(emitm, &stream, REG_A, REG_SP,
+				str(emitm, &stream, REG_A, ARM_SP,
 				    (ins->k * sizeof(uint32_t)));
 				/*
 				 * XXX this command and the following could
@@ -1266,7 +1283,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_STX:
 				/* M[k] <- X */
 				printf("BPF_STX not tested\n");
-				str(emitm, &stream, REG_X, REG_SP,
+				str(emitm, &stream, REG_X, ARM_SP,
 				    (ins->k * sizeof(uint32_t)));
 
 				//MOVid(ins->k * sizeof(uint32_t), ESI);
@@ -1276,7 +1293,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_JMP|BPF_JA:
 				/* pc += k */
 				printf("BPF_JMP|BPF_JA\n");
-				panic("implement me");
+				branch(emitm, &stream, COND_AL, ins->k);
 				//JUMP(ins->k);
 				break;
 
@@ -1285,14 +1302,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JGT|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
 				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
-					panic("implement me: 11");
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
 
 				mov(emitm, &stream, ARM_R1, ins->k);
 				cmp_r(emitm, &stream, REG_A, ARM_R1);
-				jump(emitm, &stream, ins, COND_GT, COND_LE);
+				jcc(emitm, &stream, ins, COND_GT, COND_LE);
 
 				//CMPid(ins->k, EAX);
 				//JCC(JA, JBE);
@@ -1303,13 +1320,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JGE|BPF_K\n");
 
 				if (ins->jt == ins->jf) {
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
 
 				mov(emitm, &stream, ARM_R1, ins->k);
 				cmp_r(emitm, &stream, REG_A, ARM_R1);
-				jump(emitm, &stream, ins, COND_GE, COND_LT);
+				jcc(emitm, &stream, ins, COND_GE, COND_LT);
 
 				//CMPid(ins->k, EAX);
 				//JCC(JAE, JB);
@@ -1320,7 +1338,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JEQ|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
 				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
-					panic("implement jump\n");
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
@@ -1331,7 +1349,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				cmp_r(emitm, &stream, REG_A, ARM_R1);
 
 				//emitm(&stream, KERNEL_BREAKPOINT, 4);
-				jump(emitm, &stream, ins, COND_EQ, COND_NE);
+				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
 
 				//CMPid(ins->k, EAX);
 				//JCC(JE, JNE);
@@ -1343,13 +1361,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				    ins->jt, ins->jf, ins->k);
 
 				if (ins->jt == ins->jf) {
-					panic("implement jump 1\n");
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
 				//and(emitm, &stream, ARM_R1, REG_A, ins->k);
 				tst(emitm, &stream, REG_A, ins->k);
-				jump(emitm, &stream, ins, COND_NE, COND_EQ);
+				jcc(emitm, &stream, ins, COND_NE, COND_EQ);
 				//TESTid(ins->k, EAX);
 				//JCC(JNE, JE);
 				break;
@@ -1357,11 +1375,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_JMP|BPF_JGT|BPF_X:
 				/* pc += (A > X) ? jt : jf */
 				printf("BPF_JMP|BPF_JGT|BPF_X\n");
-				panic("implement me");
 				if (ins->jt == ins->jf) {
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_GT, COND_LE);
 				//CMPrd(EDX, EAX);
 				//JCC(JA, JBE);
 				break;
@@ -1369,11 +1389,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_JMP|BPF_JGE|BPF_X:
 				/* pc += (A >= X) ? jt : jf */
 				printf("BPF_JMP|BPF_JGE|BPF_X\n");
-				panic("implement me");
 				if (ins->jt == ins->jf) {
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_GE, COND_LT);
 				//CMPrd(EDX, EAX);
 				//JCC(JAE, JB);
 				break;
@@ -1381,11 +1403,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_JMP|BPF_JEQ|BPF_X:
 				/* pc += (A == X) ? jt : jf */
 				printf("BPF_JMP|BPF_JEQ|BPF_X\n");
-				panic("implement me");
 				if (ins->jt == ins->jf) {
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
 				//CMPrd(EDX, EAX);
 				//JCC(JE, JNE);
 				break;
@@ -1393,11 +1417,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_JMP|BPF_JSET|BPF_X:
 				/* pc += (A & X) ? jt : jf */
 				printf("BPF_JMP|BPF_JSET|BPF_X\n");
-				panic("implement me");
 				if (ins->jt == ins->jf) {
+					branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_NE, COND_EQ);
 				//TESTrd(EDX, EAX);
 				//JCC(JNE, JE);
 				break;
