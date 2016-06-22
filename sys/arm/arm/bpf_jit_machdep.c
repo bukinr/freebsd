@@ -596,27 +596,17 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 {
 	uint32_t offs;
 
-	if (ins->jt != 0 && ins->jf != 0) {
-		//panic("implement me 12\n");
-
-		offs = stream->refs[stream->bpf_pc + ins->jt] -	\
-		    stream->refs[stream->bpf_pc] - 4;
-		printf("offs 0x%08x\n", offs);
-
-		branch(emitm, stream, cond1, offs);
-
-	} else if (ins->jt != 0) {
+	if (ins->jt != 0) {
 		offs = stream->refs[stream->bpf_pc + ins->jt] - \
 		    stream->refs[stream->bpf_pc] - 4;
-		printf("offs 0x%08x\n", offs);
-
+		//printf("offs 0x%08x\n", offs);
 		branch(emitm, stream, cond1, offs);
+	}
 
-	} else if (ins->jf != 0) {
+	if (ins->jf != 0) {
 		offs = stream->refs[stream->bpf_pc + ins->jf] - \
 		    stream->refs[stream->bpf_pc] - 4;
-		printf("offs 0x%08x\n", offs);
-
+		//printf("offs 0x%08x\n", offs);
 		branch(emitm, stream, cond2, offs);
 	}
 
