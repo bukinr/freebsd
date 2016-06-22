@@ -649,14 +649,7 @@ rev(emit_func emitm, bpf_bin_stream *stream,
 {
 	uint32_t instr;
 
-	instr = (1 << 23) | (1 << 25) | (1 << 26);
-	instr |= (1 << 20) | (1 << 21);
-	instr |= (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19);
-	instr |= (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11);
-	instr |= (1 << 4) | (1 << 5);
-
 	instr = ARM_REV;
-
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
@@ -669,15 +662,7 @@ rev16(emit_func emitm, bpf_bin_stream *stream,
 {
 	uint32_t instr;
 
-	instr = (1 << 23) | (1 << 25) | (1 << 26);
-	instr |= (1 << 20) | (1 << 21);
-	instr |= (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19);
-	instr |= (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11);
-	instr |= (1 << 4) | (1 << 5);
-	instr |= (1 << 7);
-
 	instr = ARM_REV16;
-
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
