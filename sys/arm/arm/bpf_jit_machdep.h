@@ -38,7 +38,7 @@
 #define _BPF_JIT_MACHDEP_H_
 
 /*
- * Registers
+ * ARMv7 registers
  */
 #define	ARM_R0	0
 #define	ARM_R1	1
@@ -60,15 +60,33 @@
 #define rol32(i32, n) ((i32) << (n) | (i32) >> (32 - (n)))
 #define ror32(i32, n) ((i32) >> (n) | (i32) << (32 - (n)))
 
-#define	ARM_INST_MOVW	0x03000000
-#define	ARM_INST_MOVT	0x03400000
+#define	ARM_RET		0xe12fff1e	/* bx lr */
+#define	ARM_LSL_I	0x01a00000	/* shift left by imm */
+#define	ARM_LSL_R	0x01a00010	/* shift left by reg */
+#define	ARM_LSR_I	0x01a00020	/* shirt right by imm */
+#define	ARM_LSR_R	0x01a00030	/* shift right by reg */
+#define	ARM_REV		0x06bf0f30	/* reverse word */
+#define	ARM_REV16	0x06bf0fb0
 
+#define	ARM_INST_MOVW	0x03000000	/* copy bottom half word */
+#define	ARM_INST_MOVT	0x03400000	/* copy top half word */
 #define	ARM_MOVW(rd, imm)	\
-    (ARM_INST_MOVW | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0x0fff))
+    (ARM_INST_MOVW | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0xfff))
 #define	ARM_MOVT(rd, imm)	\
-    (ARM_INST_MOVT | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0x0fff))
+    (ARM_INST_MOVT | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0xfff))
 
-/* ---- MOV, ADD, CMP Instruction Format ---- */
+/* ---- MUL ---- */
+#define	MUL_ACCUMULATE	(1 << 21)	/* multiply and accumulate */
+#define	RS_S		8		/* operand register */
+
+/* ---- MOV, ADD, CMP ---- */
+#define	RD_S		12		/* Destination register */
+#define	RN_S		16		/* 1st operand register */
+#define	COND_SET	(1 << 20)	/* Set condition codes */
+#define	OPCODE_S	21		/* Operation Code */
+#define	IMM_OP		(1 << 25)	/* Immediate Operand */
+#define	COND_S		28		/* Condition field */
+
 /* IMM_OP == 0 */
 #define	RM_S		0		/* 2nd operand register */
 #define	RM_SHIFT_S	4		/* shift applied to Rm */
@@ -77,17 +95,7 @@
 #define	IMM_S		0		/* Unsigned 8 bit immediate value */
 #define	ROTATE_S	8		/* shift applied to Imm */
 
-#define	RD_S		12		/* Destination register */
-#define	RN_S		16		/* 1st operand register */
-#define	COND_SET	(1 << 20)	/* Set condition codes */
-#define	OPCODE_S	21		/* Operation Code */
-#define	IMM_OP		(1 << 25)	/* Immediate Operand */
-#define	COND_S		28		/* Condition field */
-/* ------- */
-
-/* ---- LDR,STR (Single Data Transfer) Instruction Format ---- */
-//#define	COND_S		28		/* Condition field */
-//#define	IMM_OP		(1 << 25)	/* Immediate offset */
+/* ---- LDR, STR (Single Data Transfer) ---- */
 #define	POST_INDEX	(0 << 24)	/* add offset after transfer */
 #define	PRE_INDEX	(1 << 24)	/* add offset before transfer */
 #define	DOWN_BIT	(0 << 23)	/* subtract offset from base */
@@ -98,15 +106,13 @@
 #define	WRITE_BACK	(1 << 21)	/* write address into base */
 #define	OP_STORE	(0 << 20)	/* Store to memory */
 #define	OP_LOAD		(1 << 20)	/* Load from memory */
-/* ------- */
 
 /* ---- Halfword and Signed Data Transfer ---- */
-#define	SH_S	5
+#define	SH_S	5	/* SH shift */
 #define	SH_SWP	0	/* SWP instruction */
 #define	SH_UH	1	/* Unsigned halfwords */
 #define	SH_SB	2	/* Signed byte */
 #define	SH_SH	3	/* Signed halfwords */
-/* ------- */
 
 #define	OPCODE_AND	0b0000
 #define	OPCODE_ADD	0b0100
@@ -124,10 +130,6 @@
 #define	COND_LE		0b1101
 #define	COND_LT		0b1011
 #define	COND_AL		0b1110	/* Always */
-
-#define	ARM_MOV_I_TEST(rd, imm) do {						\
-	emitm(&stream, (COND_AL << CONS_S) | (rd << RD_S) | (imm << IMM_S), 4);					\
-} while (0)
 
 /* Optimization flags */
 #define	BPF_JIT_FRET	0x01
