@@ -66,14 +66,9 @@
 #define	ARM_LSR_I	0x01a00020	/* shirt right by imm */
 #define	ARM_LSR_R	0x01a00030	/* shift right by reg */
 #define	ARM_REV		0x06bf0f30	/* reverse word */
-#define	ARM_REV16	0x06bf0fb0
-
-#define	ARM_INST_MOVW	0x03000000	/* copy bottom half word */
-#define	ARM_INST_MOVT	0x03400000	/* copy top half word */
-#define	ARM_MOVW(rd, imm)	\
-    (ARM_INST_MOVW | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0xfff))
-#define	ARM_MOVT(rd, imm)	\
-    (ARM_INST_MOVT | ((imm) >> 12) << 16 | (rd) << 12 | ((imm) & 0xfff))
+#define	ARM_REV16	0x06bf0fb0	/* reverse half word */
+#define	ARM_MOVW	0x03000000	/* copy bottom half word */
+#define	ARM_MOVT	0x03400000	/* copy top half word */
 
 /* ---- MUL ---- */
 #define	MUL_ACCUMULATE	(1 << 21)	/* multiply and accumulate */

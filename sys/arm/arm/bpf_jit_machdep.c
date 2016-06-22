@@ -107,7 +107,7 @@ imm8m(uint32_t x)
 	return (-1);
 }
 
-static uint32_t
+static void
 push(emit_func emitm, bpf_bin_stream *stream,
     uint32_t reg_list)
 {
@@ -120,11 +120,9 @@ push(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (reg_list);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 pop(emit_func emitm, bpf_bin_stream *stream,
     uint32_t reg_list)
 {
@@ -137,11 +135,9 @@ pop(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (reg_list);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 branch(emit_func emitm, bpf_bin_stream *stream,
     uint32_t cond, uint32_t offs)
 {
@@ -152,11 +148,9 @@ branch(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (offs >> 2);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 mov_i(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t imm)
 {
@@ -167,15 +161,38 @@ mov_i(emit_func emitm, bpf_bin_stream *stream,
 	instr |= IMM_OP;	/* operand 2 is an immediate value */
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
+movw(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t imm)
+{
+	uint32_t instr;
+
+	instr = ARM_MOVW | (COND_AL << COND_S);
+	instr |= (imm >> 12) << RN_S;
+	instr |= (rd << RD_S) | (imm & 0xfff);
+
+	emitm(stream, instr);
+}
+
+static void
+movt(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t imm)
+{
+	uint32_t instr;
+
+	instr = ARM_MOVT | (COND_AL << COND_S);
+	instr |= (imm >> 12) << RN_S;
+	instr |= (rd << RD_S) | (imm & 0xfff);
+
+	emitm(stream, instr);
+}
+
+static void
 mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t val)
 {
-	uint32_t instr;
 	int imm12;
 
 	printf("%s\n", __func__);
@@ -185,22 +202,16 @@ mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		mov_i(emitm, stream, rd, imm12);
 	} else {
 		printf("to emit MOVW\n");
-		instr = ARM_MOVW(rd, val & 0xffff);
-		instr |= (COND_AL << COND_S);
-		emitm(stream, instr);
+		movw(emitm, stream, rd, val & 0xffff);
 
 		if (val > 0xffff) {
 			printf("to emit MOVT\n");
-			instr = ARM_MOVT(rd, (val >> 16));
-			instr |= (COND_AL << COND_S);
-			emitm(stream, instr);
+			movt(emitm, stream, rd, (val >> 16));
 		}
 	}
-
-	return (0);
 }
 
-static int
+static void
 mul(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rm, uint32_t rs, uint32_t rn)
 {
@@ -218,11 +229,9 @@ mul(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	}
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
     uint32_t val)
 {
@@ -247,10 +256,9 @@ tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 	}
 
 	emitm(stream, instr);
-	return (0);
 }
 
-static int
+static void
 tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
     uint32_t rm)
 {
@@ -264,10 +272,9 @@ tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 	instr |= (rm << RM_S);
 
 	emitm(stream, instr);
-	return (0);
 }
 
-static int
+static void
 lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rm, uint32_t imm)
 {
@@ -281,11 +288,9 @@ lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (rd << RD_S | rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rm, uint32_t imm)
 {
@@ -299,11 +304,9 @@ lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (rd << RD_S | rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 lsl_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rm, uint32_t rs)
 {
@@ -314,11 +317,9 @@ lsl_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (rd << RD_S | rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 lsr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rm, uint32_t rs)
 {
@@ -329,11 +330,9 @@ lsr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (rd << RD_S | rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 add(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -354,11 +353,9 @@ add(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	}
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 sub(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -379,11 +376,9 @@ sub(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	}
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 orr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -404,11 +399,9 @@ orr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	}
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 rsb_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -423,10 +416,9 @@ rsb_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= IMM_OP;	/* operand 2 is an immediate value */
 
 	emitm(stream, instr);
-	return (0);
 }
 
-static int
+static void
 rsb(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -446,11 +438,9 @@ rsb(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr |= (ARM_R1 << RM_S);
 		emitm(stream, instr);
 	}
-
-	return (0);
 }
 
-static int
+static void
 and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -464,11 +454,9 @@ and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= IMM_OP;	/* operand 2 is an immediate value */
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
 {
@@ -488,11 +476,9 @@ and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 		instr |= (ARM_R1 << RM_S);
 		emitm(stream, instr);
 	}
-
-	return (0);
 }
 
-static uint32_t
+static void
 mov_r(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rm)
 {
@@ -502,11 +488,9 @@ mov_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 cmp_r(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rn, uint32_t rm)
 {
@@ -518,11 +502,9 @@ cmp_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= COND_SET;
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 add_r(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rn, uint32_t rm)
 {
@@ -533,11 +515,9 @@ add_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rn << RN_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 orr_r(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rn, uint32_t rm)
 {
@@ -547,11 +527,9 @@ orr_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 rsb_r(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rn, uint32_t rm)
 {
@@ -561,11 +539,9 @@ rsb_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 and_r(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rn, uint32_t rm)
 {
@@ -575,11 +551,9 @@ and_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static int
+static void
 jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
     uint8_t cond1, uint8_t cond2)
 {
@@ -598,11 +572,9 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 		//printf("offs 0x%08x\n", offs);
 		branch(emitm, stream, cond2, offs);
 	}
-
-	return (0);
 }
 
-static uint32_t
+static void
 str(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rm, uint32_t offs)
 {
@@ -620,11 +592,9 @@ str(emit_func emitm, bpf_bin_stream *stream,
 	}
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 ldr(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rm, uint32_t offs)
 {
@@ -642,11 +612,9 @@ ldr(emit_func emitm, bpf_bin_stream *stream,
 	}
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 ldrb(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rm)
 {
@@ -658,11 +626,9 @@ ldrb(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 ldrh(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rn)
 {
@@ -675,11 +641,9 @@ ldrh(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rn << RN_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 rev(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rm)
 {
@@ -697,11 +661,9 @@ rev(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
-static uint32_t
+static void
 rev16(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rm)
 {
@@ -720,8 +682,6 @@ rev16(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (rd << RD_S) | (rm << RM_S);
 
 	emitm(stream, instr);
-
-	return (0);
 }
 
 /*
@@ -1449,7 +1409,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_ALU|BPF_DIV|BPF_X\n");
 
 				printf("No div instruction implemented\n");
-				return (0);
+				return (NULL);
 
 				//TESTrd(EDX, EDX);
 				//if (fmem) {
