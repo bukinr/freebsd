@@ -691,6 +691,8 @@ rev(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11);
 	instr |= (1 << 4) | (1 << 5);
 
+	instr = ARM_REV;
+
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
 
@@ -711,6 +713,8 @@ rev16(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11);
 	instr |= (1 << 4) | (1 << 5);
 	instr |= (1 << 7);
+
+	instr = ARM_REV16;
 
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rm << RM_S);
@@ -889,7 +893,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 					pop(emitm, &stream, reg_list);
 				}
 
-				emitm(&stream, RET);
+				emitm(&stream, ARM_RET);
 
 				break;
 
@@ -906,7 +910,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 					pop(emitm, &stream, reg_list);
 				}
 
-				emitm(&stream, RET);
+				emitm(&stream, ARM_RET);
 
 				break;
 
@@ -1445,7 +1449,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A / X */
 				printf("BPF_ALU|BPF_DIV|BPF_X\n");
 
-				printf("No div instruction implemented");
+				printf("No div instruction implemented\n");
 				return (0);
 
 				//TESTrd(EDX, EDX);
@@ -1534,7 +1538,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_ALU|BPF_DIV|BPF_K\n");
 
 				printf("No div instruction implemented");
-				return (0);
+				return (NULL);
 
 				//MOVrd(EDX, ECX);
 				//ZEROrd(EDX);
