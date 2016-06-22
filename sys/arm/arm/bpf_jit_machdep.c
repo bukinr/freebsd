@@ -785,9 +785,10 @@ bpf_jit_optimize(struct bpf_insn *prog, u_int nins)
 bpf_filter_func
 bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 {
+	int flags, fret, fpkt, fmem, fjmp, flen;
 	bpf_bin_stream stream;
 	struct bpf_insn *ins;
-	int flags, fret, fpkt, fmem, fjmp, flen;
+	uint32_t reg_list;
 	u_int i, pass;
 
 	printf("%s: nins %d\n", __func__, nins);
@@ -828,10 +829,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	 */
 	emitm = emit_length;
 
-	uint32_t reg_list;
-
-	//reg_list = (1 << 1 | 1 << 2 | 1 << 3 | 1 << 4 | 1 << 5 | 1 << 6);
-	reg_list = (1 << REG_A) | (1 << REG_X) | (1 << REG_MBUF) | (1 << REG_MBUFLEN);
+	reg_list = (1 << REG_A) | (1 << REG_X);
+	reg_list |= (1 << REG_MBUF) | (1 << REG_MBUFLEN);
 
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
