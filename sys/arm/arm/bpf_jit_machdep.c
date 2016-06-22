@@ -862,17 +862,18 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
 
-		//if (fpkt || fmem) {
+		if (fpkt || flen || fmem) {
 			push(emitm, &stream, reg_list);
-		//}
+		}
 
 		/* Create the procedure header. */
 		if (fmem) {
 			printf("fmem\n");
-
 		//	PUSH(RBP);
 		//	MOVrq(RSP, RBP);
 		//	SUBib(BPF_MEMWORDS * sizeof(uint32_t), RSP);
+
+			/* Using stack for memory scratch space */
 			sub(emitm, &stream, ARM_SP, ARM_SP,
 			    BPF_MEMWORDS * sizeof(uint32_t));
 		}
@@ -907,24 +908,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_RET|BPF_K, ins->k 0x%08x\n", ins->k);
 
 				mov(emitm, &stream, ARM_R0, ins->k);
-				//imm12 = imm8m(ins->k);
-				//if (imm12 >= 0) {
-				//	mov_i(emitm, &stream, ARM_R0, imm12);
-				//} else {
-				//	panic("implement me 1\n");
-				//}
-
-				if (fmem)
-					panic("implement fmem");
-
 				//MOVid(ins->k, EAX);
-				//if (fmem)
-				//	LEAVE();
-				//RET();
 
-				//if (fmem) {
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
+				if (fpkt || flen || fmem) {
 					pop(emitm, &stream, reg_list);
-				//}
+				}
 
 				emitm(&stream, RET);
 
@@ -935,10 +928,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_RET|BPF_A\n");
 				mov_r(emitm, &stream, ARM_R0, REG_A);
 				if (fmem) {
-					//LEAVE();
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
-				//RET();
+
+				if (fpkt || flen || fmem) {
+					pop(emitm, &stream, reg_list);
+				}
+
 				emitm(&stream, RET);
+
 				break;
 
 			case BPF_LD|BPF_W|BPF_ABS:
@@ -956,6 +955,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 				/* Reverse as network packets are big-endian */
 				rev(emitm, &stream, REG_A, ARM_R0);
+
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
 
 				//MOVid(ins->k, ESI);
 				//CMPrd(EDI, ESI);
@@ -995,7 +999,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				rev16(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					panic("implement LEAVE\n");
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//ZEROrd(EAX);
@@ -1030,7 +1035,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				ldrb(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					panic("implement LEAVE 1\n");
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//ZEROrd(EAX);
@@ -1081,6 +1087,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* Change byte order as network packets are big-endian */
 				rev(emitm, &stream, REG_A, ARM_R0);
 
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
 				//CMPrd(EDI, EDX);
 				//JAb(27);
 				//MOVid(ins->k, ESI);
@@ -1126,6 +1137,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* Reverse as network packets are big-endian */
 				rev16(emitm, &stream, REG_A, ARM_R0);
 
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
 				//ZEROrd(EAX);
 				//CMPrd(EDI, EDX);
 				//JAb(27);
@@ -1166,6 +1182,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* Load byte from offset */
 				ldrb(emitm, &stream, REG_A, ARM_R0);
 
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
 				//ZEROrd(EAX);
 				//CMPrd(EDI, EDX);
 				//JAEb(13);
@@ -1200,6 +1221,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 				and_i(emitm, &stream, ARM_R1, ARM_R1, 0xf);
 				lsl(emitm, &stream, REG_X, ARM_R1, 2);
+
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
 
 				//MOVid(ins->k, ESI);
 				//CMPrd(EDI, ESI);
