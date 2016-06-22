@@ -1660,5 +1660,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	} else {
 		printf("compilation failed\n");
 	}
+
 	return ((bpf_filter_func)stream.ibuf);
 }

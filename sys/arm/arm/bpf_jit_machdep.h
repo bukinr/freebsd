@@ -129,54 +129,6 @@
 	emitm(&stream, (COND_AL << CONS_S) | (rd << RD_S) | (imm << IMM_S), 4);					\
 } while (0)
 
-#define RAX	0
-#define RCX	1
-#define RDX	2
-#define RBX	3
-#define RSP	4
-#define RBP	5
-#define RSI	6
-#define RDI	7
-#define R8	0
-#define R9	1
-#define R10	2
-#define R11	3
-#define R12	4
-#define R13	5
-#define R14	6
-#define R15	7
-
-#define EAX	0
-#define ECX	1
-#define EDX	2
-#define EBX	3
-#define ESP	4
-#define EBP	5
-#define ESI	6
-#define EDI	7
-#define R8D	0
-#define R9D	1
-#define R10D	2
-#define R11D	3
-#define R12D	4
-#define R13D	5
-#define R14D	6
-#define R15D	7
-
-#define AX	0
-#define CX	1
-#define DX	2
-#define BX	3
-#define SP	4
-#define BP	5
-#define SI	6
-#define DI	7
-
-#define AL	0
-#define CL	1
-#define DL	2
-#define BL	3
-
 /* Optimization flags */
 #define	BPF_JIT_FRET	0x01
 #define	BPF_JIT_FPKT	0x02
@@ -213,8 +165,6 @@ typedef struct bpf_bin_stream {
  * instruction macros.
  * The first parameter is the stream that will receive the data.
  * The second one is a variable containing the data.
- * The third one is the length, that can be 1, 2, or 4 since it is possible
- * to emit a byte, a short, or a word at a time.
  */
 typedef void (*emit_func)(bpf_bin_stream *stream, u_int value);
 
