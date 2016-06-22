@@ -66,8 +66,6 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 #define	REG_MBUF	ARM_R6
 #define	REG_MBUFLEN	ARM_R7
 
-#define	RET		0xe12fff1e	/* bx lr */
-
 /*
  * Emit routine to update the jump table.
  */
@@ -208,11 +206,7 @@ mul(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 {
 	uint32_t instr;
 
-#define	MUL_ACCUMULATE	(1 << 21)
-#define	RS_S		8
-
 	/* Rd:=Rm*Rs */
-
 	instr = (1 << 4) | (1 << 7);
 	instr |= (COND_AL << COND_S);
 	instr |= (rd << RD_S) | (rs << RS_S) | (rm << RM_S);
@@ -245,7 +239,7 @@ tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 	if (imm12 >= 0) {
 		printf("%s, imm12 >= 0\n", __func__);
 		instr |= (imm12 << IMM_S);
-		instr |= IMM_OP;	/* operand 2 is an immediate value */
+		instr |= IMM_OP; /* operand 2 is an immediate value */
 	} else {
 		printf("%s, imm12 < 0\n", __func__);
 		mov(emitm, stream, ARM_R0, val);
@@ -272,11 +266,6 @@ tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 	emitm(stream, instr);
 	return (0);
 }
-
-#define	ARM_LSL_I	0x01a00000
-#define	ARM_LSL_R	0x01a00010
-#define	ARM_LSR_I	0x01a00020
-#define	ARM_LSR_R	0x01a00030
 
 static int
 lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
@@ -358,7 +347,7 @@ add(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	imm12 = imm8m(val);
 	if (imm12 >= 0) {
 		instr |= (val << IMM_S);
-		instr |= IMM_OP;
+		instr |= IMM_OP; /* operand 2 is an immediate value */
 	} else {
 		mov(emitm, stream, ARM_R1, val);
 		instr |= (ARM_R1 << RM_S);
@@ -613,19 +602,6 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 	return (0);
 }
 
-#if 0
-#define	POST_INDEX	(0 << 24)	/* add offset after transfer */
-#define	PRE_INDEX	(1 << 24)	/* add offset before transfer */
-#define	DOWN_BIT	(0 << 23)	/* subtract offset from base */
-#define	UP_BIT		(1 << 23)	/* add offset to base */
-#define	WORD_BIT	(0 << 22)	/* transfer word quantity */
-#define	BYTE_BIT	(1 << 22)	/* transfer byte quantity */
-#define	NO_WRITE_BACK	(0 << 21)	/* no write-back */
-#define	WRITE_BACK	(1 << 21)	/* write address into base */
-#define	OP_STORE	(0 << 20)	/* Store to memory */
-#define	OP_LOAD		(1 << 20)	/* Load from memory */
-#endif
-
 static uint32_t
 str(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rm, uint32_t offs)
@@ -685,12 +661,6 @@ ldrb(emit_func emitm, bpf_bin_stream *stream,
 
 	return (0);
 }
-
-#define	SH_S		5
-#define	SH_SWP		0	/* SWP instruction */
-#define	SH_UH		1	/* Unsigned halfwords */
-#define	SH_SB		2	/* Signed byte */
-#define	SH_SH		3	/* Signed halfwords */
 
 static uint32_t
 ldrh(emit_func emitm, bpf_bin_stream *stream,
