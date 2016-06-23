@@ -67,6 +67,16 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 #define	REG_MBUFLEN	ARM_R7
 
 /*
+ * Wrapper around __aeabi_udiv
+ */
+static uint32_t
+jit_udiv(uint32_t dividend, uint32_t divisor)
+{
+
+	return (dividend / divisor);
+}
+
+/*
  * Emit routine to update the jump table.
  */
 static void
@@ -146,6 +156,22 @@ branch(emit_func emitm, bpf_bin_stream *stream,
 	instr = (1 << 25) | (1 << 27);
 	instr |= (cond << COND_S);
 	instr |= (offs >> 2);
+
+	emitm(stream, instr);
+}
+
+/* Branch and Exchange (BX) */
+static void
+branch_lx(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t cond, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 24) | (1 << 21) | (0xfff << 8);
+	instr |= (1 << 4);
+	instr |= (1 << 5); /* link */
+	instr |= (cond << COND_S);
+	instr |= (rm << RM_S);
 
 	emitm(stream, instr);
 }
@@ -776,6 +802,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 	reg_list = (1 << REG_A) | (1 << REG_X);
 	reg_list |= (1 << REG_MBUF) | (1 << REG_MBUFLEN);
+	reg_list |= (1 << ARM_LR); /* Used for jit_udiv */
 
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
@@ -1282,7 +1309,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				mov(emitm, &stream, ARM_R1, ins->k);
 				cmp_r(emitm, &stream, REG_A, ARM_R1);
 
-				//emitm(&stream, KERNEL_BREAKPOINT, 4);
+				//emitm(&stream, KERNEL_BREAKPOINT);
 				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
 
 				//CMPid(ins->k, EAX);
@@ -1393,8 +1420,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A / X */
 				printf("BPF_ALU|BPF_DIV|BPF_X\n");
 
-				printf("No div instruction implemented\n");
-				return (NULL);
+				mov_r(emitm, &stream, ARM_R0, REG_A);
+				mov_r(emitm, &stream, ARM_R1, REG_X);
+				mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
+				branch_lx(emitm, &stream, COND_AL, ARM_R2);
+				mov_r(emitm, &stream, REG_A, ARM_R0);
 
 				//TESTrd(EDX, EDX);
 				//if (fmem) {
@@ -1481,8 +1511,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A / k */
 				printf("BPF_ALU|BPF_DIV|BPF_K\n");
 
-				printf("No div instruction implemented");
-				return (NULL);
+				mov_r(emitm, &stream, ARM_R0, REG_A);
+				mov(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
+				branch_lx(emitm, &stream, COND_AL, ARM_R2);
+				mov_r(emitm, &stream, REG_A, ARM_R0);
 
 				//MOVrd(EDX, ECX);
 				//ZEROrd(EDX);
