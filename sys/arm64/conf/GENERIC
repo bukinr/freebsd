@@ -23,6 +23,7 @@ ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
+makeoptions	NO_MODULES=1
 
 options 	SCHED_ULE		# ULE scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
@@ -70,7 +71,7 @@ options 	RACCT			# Resource accounting framework
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 options 	SMP
-options 	INTRNG
+#options 	INTRNG
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
@@ -90,7 +91,6 @@ options 	SOC_CAVM_THUNDERX
 options 	SOC_HISI_HI6220
 
 options 	BPF_JITTER
-
 device		bpf_jitter
 
 # VirtIO support
@@ -112,6 +112,7 @@ device		igb		# Intel PRO/1000 PCIE Server Gigabit Family
 device		ix		# Intel 10Gb Ethernet Family
 device		msk		# Marvell/SysKonnect Yukon II Gigabit Ethernet
 device		vnic		# Cavium ThunderX NIC
+device		re
 
 # Block devices
 device		ahci
