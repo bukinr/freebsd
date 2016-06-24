@@ -1,32 +1,35 @@
 /*-
- * Copyright (C) 2002-2003 NetGroup, Politecnico di Torino (Italy)
- * Copyright (C) 2005-2009 Jung-uk Kim <jkim@FreeBSD.org>
+ * Copyright (c) 2016 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ *
+ * Portions of this software were developed by SRI International and the
+ * University of Cambridge Computer Laboratory under DARPA/AFRL contract
+ * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Portions of this software were developed by the University of Cambridge
+ * Computer Laboratory as part of the CTSRD Project, with support from the
+ * UK Higher Education Innovation Fund (HEIF).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- *
  * 1. Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the Politecnico di Torino nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 #include <sys/cdefs.h>
@@ -53,51 +56,643 @@ __FBSDID("$FreeBSD$");
 #include <net/bpf.h>
 #include <net/bpf_jitter.h>
 
-#include <arm64/arm64/bpf_jit_machdep.h>
+#include <arm/arm/bpf_jit_machdep.h>
+#include <arm/include/trap.h>
 
 bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
+
+#define	REG_A		ARM_R4
+#define	REG_X		ARM_R5
+#define	REG_MBUF	ARM_R6
+#define	REG_MBUFLEN	ARM_R7
+
+/*
+ * Wrapper around __aeabi_uidiv
+ */
+static uint32_t
+jit_udiv(uint32_t dividend, uint32_t divisor)
+{
+
+	return (dividend / divisor);
+}
 
 /*
  * Emit routine to update the jump table.
  */
 static void
-emit_length(bpf_bin_stream *stream, __unused u_int value, u_int len)
+emit_length(bpf_bin_stream *stream, __unused u_int value)
 {
 
 	printf("%s\n", __func__);
 
 	if (stream->refs != NULL)
-		(stream->refs)[stream->bpf_pc] += len;
-	stream->cur_ip += len;
+		(stream->refs)[stream->bpf_pc] += 4;
+	stream->cur_ip += 4;
 }
 
 /*
  * Emit routine to output the actual binary code.
  */
 static void
-emit_code(bpf_bin_stream *stream, u_int value, u_int len)
+emit_code(bpf_bin_stream *stream, u_int value)
 {
+
+	printf("emitting 0x%08x\n", value);
+
+	*((u_int *)(stream->ibuf + stream->cur_ip)) = value;
+	stream->cur_ip += 4;
+}
+
+static int16_t
+imm8m(uint32_t x)
+{
+	uint32_t rot;
+
+	for (rot = 0; rot < 16; rot++) {
+		if ((x & ~ror32(0xff, 2 * rot)) == 0) {
+			return (rol32(x, 2 * rot) | (rot << 8));
+		}
+	}
+
+	return (-1);
+}
+
+static void
+push(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t reg_list)
+{
+	uint32_t instr;
+
+	instr = (1 << 27);
+	instr |= (ARM_SP << RN_S);
+	instr |= (COND_AL << COND_S);
+	instr |= (WRITE_BACK | PRE_INDEX);
+	instr |= (reg_list);
+
+	emitm(stream, instr);
+}
+
+static void
+pop(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t reg_list)
+{
+	uint32_t instr;
+
+	instr = (1 << 27);
+	instr |= (ARM_SP << RN_S);
+	instr |= (COND_AL << COND_S);
+	instr |= (WRITE_BACK | POST_INDEX | UP_BIT | OP_LOAD);
+	instr |= (reg_list);
+
+	emitm(stream, instr);
+}
+
+static void
+branch(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t cond, uint32_t offs)
+{
+	uint32_t instr;
+
+	instr = (1 << 25) | (1 << 27);
+	instr |= (cond << COND_S);
+	instr |= (offs >> 2);
+
+	emitm(stream, instr);
+}
+
+/* Branch and Exchange (BX) */
+static void
+branch_lx(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t cond, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 24) | (1 << 21) | (0xfff << 8);
+	instr |= (1 << 4);
+	instr |= (1 << 5); /* link */
+	instr |= (cond << COND_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+mov_i(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t imm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (imm << IMM_S);
+	instr |= IMM_OP;	/* operand 2 is an immediate value */
+
+	emitm(stream, instr);
+}
+
+static void
+movw(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t imm)
+{
+	uint32_t instr;
+
+	instr = ARM_MOVW | (COND_AL << COND_S);
+	instr |= (imm >> 12) << RN_S;
+	instr |= (rd << RD_S) | (imm & 0xfff);
+
+	emitm(stream, instr);
+}
+
+static void
+movt(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t imm)
+{
+	uint32_t instr;
+
+	instr = ARM_MOVT | (COND_AL << COND_S);
+	instr |= (imm >> 12) << RN_S;
+	instr |= (rd << RD_S) | (imm & 0xfff);
+
+	emitm(stream, instr);
+}
+
+static void
+mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t val)
+{
+	int imm12;
 
 	printf("%s\n", __func__);
 
-	switch (len) {
-	case 1:
-		stream->ibuf[stream->cur_ip] = (u_char)value;
-		stream->cur_ip++;
-		break;
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		mov_i(emitm, stream, rd, imm12);
+	} else {
+		printf("to emit MOVW\n");
+		movw(emitm, stream, rd, val & 0xffff);
 
-	case 2:
-		*((u_short *)(stream->ibuf + stream->cur_ip)) = (u_short)value;
-		stream->cur_ip += 2;
-		break;
+		if (val > 0xffff) {
+			printf("to emit MOVT\n");
+			movt(emitm, stream, rd, (val >> 16));
+		}
+	}
+}
 
-	case 4:
-		*((u_int *)(stream->ibuf + stream->cur_ip)) = value;
-		stream->cur_ip += 4;
-		break;
+static void
+mul(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t rs, uint32_t rn)
+{
+	uint32_t instr;
+
+	/* Rd:=Rm*Rs */
+	instr = (1 << 4) | (1 << 7);
+	instr |= (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rs << RS_S) | (rm << RM_S);
+
+	if (rn > 0) {
+		/* Rd:=Rm*Rs+Rn */
+		instr |= MUL_ACCUMULATE;
+		instr |= (rn << RN_S);
 	}
 
-	return;
+	emitm(stream, instr);
+}
+
+static void
+tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
+    uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_TST << OPCODE_S) | (COND_AL << COND_S);
+	instr |= COND_SET;
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		printf("%s, imm12 >= 0\n", __func__);
+		instr |= (imm12 << IMM_S);
+		instr |= IMM_OP; /* operand 2 is an immediate value */
+	} else {
+		printf("%s, imm12 < 0\n", __func__);
+		mov(emitm, stream, ARM_R0, val);
+		instr |= (ARM_R0 << RM_S);
+	}
+
+	emitm(stream, instr);
+}
+
+static void
+tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
+    uint32_t rm)
+{
+	uint32_t instr;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_TST << OPCODE_S) | (COND_AL << COND_S);
+	instr |= COND_SET;
+	instr |= (rn << RN_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t imm)
+{
+	uint32_t instr;
+
+	if (imm > 31)
+		panic("lsl");
+
+	instr = ARM_LSL_I | (COND_AL << COND_S);
+	instr |= (imm << 7);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t imm)
+{
+	uint32_t instr;
+
+	if (imm > 31)
+		panic("lsr");
+
+	instr = ARM_LSR_I | (COND_AL << COND_S);
+	instr |= (imm << 7);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+lsl_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t rs)
+{
+	uint32_t instr;
+
+	instr = ARM_LSL_R | (COND_AL << COND_S);
+	instr |= (rs << RS_S);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+lsr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rm, uint32_t rs)
+{
+	uint32_t instr;
+
+	instr = ARM_LSR_R | (COND_AL << COND_S);
+	instr |= (rs << RS_S);
+	instr |= (rd << RD_S | rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+add(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	instr = (OPCODE_ADD << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		instr |= (val << IMM_S);
+		instr |= IMM_OP; /* operand 2 is an immediate value */
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+		instr |= (ARM_R1 << RM_S);
+	}
+
+	emitm(stream, instr);
+}
+
+static void
+sub(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	instr = (OPCODE_SUB << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		instr |= (val << IMM_S);
+		instr |= IMM_OP;
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+		instr |= (ARM_R1 << RM_S);
+	}
+
+	emitm(stream, instr);
+}
+
+static void
+orr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		instr |= (val << IMM_S);
+		instr |= IMM_OP;
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+		instr |= (ARM_R1 << RM_S);
+	}
+
+	emitm(stream, instr);
+}
+
+static void
+rsb_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S | rn << RN_S);
+
+	instr |= (val << IMM_S);
+	instr |= IMM_OP;	/* operand 2 is an immediate value */
+
+	emitm(stream, instr);
+}
+
+static void
+rsb(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	printf("%s\n", __func__);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		rsb_i(emitm, stream, rd, rn, val);
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+
+		instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
+		instr |= (rd << RD_S | rn << RN_S);
+		instr |= (ARM_R1 << RM_S);
+		emitm(stream, instr);
+	}
+}
+
+static void
+and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+
+	printf("%s\n", __func__);
+
+	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S | rn << RN_S);
+	instr |= (val << IMM_S);
+	instr |= IMM_OP;	/* operand 2 is an immediate value */
+
+	emitm(stream, instr);
+}
+
+static void
+and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	int imm12;
+
+	printf("%s\n", __func__);
+
+	imm12 = imm8m(val);
+	if (imm12 >= 0) {
+		and_i(emitm, stream, rd, rn, val);
+	} else {
+		mov(emitm, stream, ARM_R1, val);
+
+		instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+		instr |= (rd << RD_S | rn << RN_S);
+		instr |= (ARM_R1 << RM_S);
+		emitm(stream, instr);
+	}
+}
+
+static void
+mov_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+cmp_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_CMP << OPCODE_S) | (COND_AL << COND_S);
+	//instr |= (rd << RD_S) | (rm << RM_S);
+	instr |= (rn << RN_S) | (rm << RM_S);
+	instr |= COND_SET;
+
+	emitm(stream, instr);
+}
+
+static void
+add_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_ADD << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+orr_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+rsb_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+and_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
+    uint8_t cond1, uint8_t cond2)
+{
+	uint32_t offs;
+
+	if (ins->jt != 0) {
+		offs = stream->refs[stream->bpf_pc + ins->jt] - \
+		    stream->refs[stream->bpf_pc] - 4;
+		//printf("offs 0x%08x\n", offs);
+		branch(emitm, stream, cond1, offs);
+	}
+
+	if (ins->jf != 0) {
+		offs = stream->refs[stream->bpf_pc + ins->jf] - \
+		    stream->refs[stream->bpf_pc] - 4;
+		//printf("offs 0x%08x\n", offs);
+		branch(emitm, stream, cond2, offs);
+	}
+}
+
+static void
+str(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm, uint32_t offs)
+{
+	uint32_t instr;
+
+	instr = (1 << 26);
+	instr |= (COND_AL << COND_S) | WORD_BIT | OP_STORE;
+	instr |= UP_BIT | PRE_INDEX;
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	if (offs > 0) {
+		if (offs > 0xfff)
+			panic("offset is too big");
+		instr |= offs;
+	}
+
+	emitm(stream, instr);
+}
+
+static void
+ldr(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm, uint32_t offs)
+{
+	uint32_t instr;
+
+	instr = (1 << 26);
+	instr |= (COND_AL << COND_S) | WORD_BIT | OP_LOAD;
+	instr |= UP_BIT | PRE_INDEX;
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	if (offs > 0) {
+		if (offs > 0xfff)
+			panic("offset is too big");
+		instr |= offs;
+	}
+
+	emitm(stream, instr);
+}
+
+static void
+ldrb(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 26);
+	instr |= (COND_AL << COND_S) | BYTE_BIT | OP_LOAD;
+	instr |= UP_BIT | PRE_INDEX;
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+ldrh(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn)
+{
+	uint32_t instr;
+
+	instr = (1 << 4) | (1 << 7);
+	instr |= (COND_AL << COND_S) | OP_LOAD;
+	instr |= (BYTE_BIT | UP_BIT | PRE_INDEX);
+	instr |= (SH_UH << SH_S);
+	instr |= (rd << RD_S) | (rn << RN_S);
+
+	emitm(stream, instr);
+}
+
+static void
+rev(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = ARM_REV;
+	instr |= (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+rev16(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = ARM_REV16;
+	instr |= (COND_AL << COND_S);
+	instr |= (rd << RD_S) | (rm << RM_S);
+
+	emitm(stream, instr);
 }
 
 /*
@@ -161,9 +756,10 @@ bpf_jit_optimize(struct bpf_insn *prog, u_int nins)
 bpf_filter_func
 bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 {
+	int flags, fret, fpkt, fmem, fjmp, flen;
 	bpf_bin_stream stream;
 	struct bpf_insn *ins;
-	int flags, fret, fpkt, fmem, fjmp, flen;
+	uint32_t reg_list;
 	u_int i, pass;
 
 	printf("%s: nins %d\n", __func__, nins);
@@ -204,20 +800,40 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	 */
 	emitm = emit_length;
 
+	reg_list = (1 << REG_A) | (1 << REG_X);
+	reg_list |= (1 << REG_MBUF) | (1 << REG_MBUFLEN);
+	reg_list |= (1 << ARM_LR); /* Used for jit_udiv */
+
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
 
+		if (fpkt || flen || fmem) {
+			push(emitm, &stream, reg_list);
+		}
+
 		/* Create the procedure header. */
 		if (fmem) {
-			PUSH(RBP);
-			MOVrq(RSP, RBP);
-			SUBib(BPF_MEMWORDS * sizeof(uint32_t), RSP);
+			printf("fmem\n");
+		//	PUSH(RBP);
+		//	MOVrq(RSP, RBP);
+		//	SUBib(BPF_MEMWORDS * sizeof(uint32_t), RSP);
+
+			/* Using stack for memory scratch space */
+			sub(emitm, &stream, ARM_SP, ARM_SP,
+			    BPF_MEMWORDS * sizeof(uint32_t));
 		}
-		if (flen)
-			MOVrd2(ESI, R9D);
+		if (flen) {
+			printf("flen\n");
+			mov_r(emitm, &stream, REG_MBUFLEN, ARM_R1);
+		//	MOVrd2(ESI, R9D);
+		}
 		if (fpkt) {
-			MOVrq2(RDI, R8);
-			MOVrd(EDX, EDI);
+			printf("fpkt\n");
+
+			mov_r(emitm, &stream, REG_MBUF, ARM_R0);
+
+		//	MOVrq2(RDI, R8);
+		//	MOVrd(EDX, EDI);
 		}
 
 		for (i = 0; i < nins; i++) {
@@ -233,375 +849,731 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 #endif
 
 			case BPF_RET|BPF_K:
-				MOVid(ins->k, EAX);
-				if (fmem)
-					LEAVE();
-				RET();
+				/* accept k bytes */
+				printf("BPF_RET|BPF_K, ins->k 0x%08x\n", ins->k);
+
+				mov(emitm, &stream, ARM_R0, ins->k);
+				//MOVid(ins->k, EAX);
+
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
+				if (fpkt || flen || fmem) {
+					pop(emitm, &stream, reg_list);
+				}
+
+				emitm(&stream, ARM_RET);
+
 				break;
 
 			case BPF_RET|BPF_A:
-				if (fmem)
-					LEAVE();
-				RET();
+				/* accept A bytes */
+				printf("BPF_RET|BPF_A\n");
+				mov_r(emitm, &stream, ARM_R0, REG_A);
+				if (fmem) {
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
+				if (fpkt || flen || fmem) {
+					pop(emitm, &stream, reg_list);
+				}
+
+				emitm(&stream, ARM_RET);
+
 				break;
 
 			case BPF_LD|BPF_W|BPF_ABS:
-				MOVid(ins->k, ESI);
-				CMPrd(EDI, ESI);
-				JAb(12);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int32_t), ECX);
+				/* A <- P[k:4] */
+				printf("BPF_LD|BPF_W|BPF_ABS\n");
+
+				/* Copy K value to R1 */
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				/* Get offset */
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+
+				/* Load word from offset */
+				ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
+
+				/* Reverse as network packets are big-endian */
+				rev(emitm, &stream, REG_A, ARM_R0);
+
 				if (fmem) {
-					JAEb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JAEb(3);
-					ZEROrd(EAX);
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobd(RCX, RSI, EAX);
-				BSWAP(EAX);
+
+				//MOVid(ins->k, ESI);
+				//CMPrd(EDI, ESI);
+				//JAb(12);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int32_t), ECX);
+				//if (fmem) {
+				//	JAEb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JAEb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobd(RCX, RSI, EAX);
+				//BSWAP(EAX);
+
 				break;
 
 			case BPF_LD|BPF_H|BPF_ABS:
-				ZEROrd(EAX);
-				MOVid(ins->k, ESI);
-				CMPrd(EDI, ESI);
-				JAb(12);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int16_t), ECX);
+				/* A <- P[k:2] */
+				printf("BPF_LD|BPF_H|BPF_ABS: ins->k 0x%x\n", ins->k);
+
+				/* Copy K value to R1 */
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				/* Get offset */
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+
+				/* Load half word from offset */
+				ldrh(emitm, &stream, ARM_R0, ARM_R0);
+
+				/* Reverse as network packets are big-endian */
+				rev16(emitm, &stream, REG_A, ARM_R0);
+
 				if (fmem) {
-					JAEb(2);
-					LEAVE();
-				} else
-					JAEb(1);
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobw(RCX, RSI, AX);
-				SWAP_AX();
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
+				//ZEROrd(EAX);
+				//MOVid(ins->k, ESI);
+				//CMPrd(EDI, ESI);
+				//JAb(12);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int16_t), ECX);
+				//if (fmem) {
+				//	JAEb(2);
+				//	LEAVE();
+				//} else
+				//	JAEb(1);
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobw(RCX, RSI, AX);
+				//SWAP_AX();
 				break;
 
 			case BPF_LD|BPF_B|BPF_ABS:
-				ZEROrd(EAX);
-				MOVid(ins->k, ESI);
-				CMPrd(EDI, ESI);
+				/* A <- P[k:1] */
+				printf("BPF_LD|BPF_B|BPF_ABS: ins->k 0x%x\n", ins->k);
+
+				/* Copy K value to R1 */
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				/* Get offset */
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+
+				/* Load byte from offset */
+				ldrb(emitm, &stream, REG_A, ARM_R0);
+
 				if (fmem) {
-					JBb(2);
-					LEAVE();
-				} else
-					JBb(1);
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobb(RCX, RSI, AL);
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
+				//ZEROrd(EAX);
+				//MOVid(ins->k, ESI);
+				//CMPrd(EDI, ESI);
+				//if (fmem) {
+				//	JBb(2);
+				//	LEAVE();
+				//} else
+				//	JBb(1);
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobb(RCX, RSI, AL);
 				break;
 
 			case BPF_LD|BPF_W|BPF_LEN:
-				MOVrd3(R9D, EAX);
+				/* A <- len */
+				printf("BPF_LD|BPF_W|BPF_LEN\n");
+
+				mov_r(emitm, &stream, REG_A, REG_MBUFLEN);
+
+				//MOVrd3(R9D, EAX);
 				break;
 
 			case BPF_LDX|BPF_W|BPF_LEN:
-				MOVrd3(R9D, EDX);
+				/* X <- len */
+				printf("BPF_LDX|BPF_W|BPF_LEN\n");
+				mov_r(emitm, &stream, REG_X, REG_MBUFLEN);
+				//MOVrd3(R9D, EDX);
 				break;
 
 			case BPF_LD|BPF_W|BPF_IND:
-				CMPrd(EDI, EDX);
-				JAb(27);
-				MOVid(ins->k, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(EDX, ECX);
-				CMPrd(ESI, ECX);
-				JBb(14);
-				ADDrd(EDX, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int32_t), ECX);
+				/* A <- P[X+k:4] */
+				printf("BPF_LD|BPF_W|BPF_IND\n");
+
+				/* Copy K value to R1 */
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				/* Add X */
+				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
+
+				/* Get offset */
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+
+				/* Load word from offset */
+				ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
+
+				/* Change byte order as network packets are big-endian */
+				rev(emitm, &stream, REG_A, ARM_R0);
+
 				if (fmem) {
-					JAEb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JAEb(3);
-					ZEROrd(EAX);
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobd(RCX, RSI, EAX);
-				BSWAP(EAX);
+
+				//CMPrd(EDI, EDX);
+				//JAb(27);
+				//MOVid(ins->k, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(EDX, ECX);
+				//CMPrd(ESI, ECX);
+				//JBb(14);
+				//ADDrd(EDX, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int32_t), ECX);
+				//if (fmem) {
+				//	JAEb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JAEb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobd(RCX, RSI, EAX);
+				//BSWAP(EAX);
 				break;
 
 			case BPF_LD|BPF_H|BPF_IND:
-				ZEROrd(EAX);
-				CMPrd(EDI, EDX);
-				JAb(27);
-				MOVid(ins->k, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(EDX, ECX);
-				CMPrd(ESI, ECX);
-				JBb(14);
-				ADDrd(EDX, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(ESI, ECX);
-				CMPid(sizeof(int16_t), ECX);
+				/* A <- P[X+k:2] */
+
+				printf("BPF_LD|BPF_H|BPF_IND\n");
+
+				/* Copy K value to R1 */
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				/* Add X */
+				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
+
+				/* Get offset */
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+
+				/* Load half word from offset */
+				ldrh(emitm, &stream, ARM_R0, ARM_R0);
+
+				/* Reverse as network packets are big-endian */
+				rev16(emitm, &stream, REG_A, ARM_R0);
+
 				if (fmem) {
-					JAEb(2);
-					LEAVE();
-				} else
-					JAEb(1);
-				RET();
-				MOVrq3(R8, RCX);
-				MOVobw(RCX, RSI, AX);
-				SWAP_AX();
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
+				//ZEROrd(EAX);
+				//CMPrd(EDI, EDX);
+				//JAb(27);
+				//MOVid(ins->k, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(EDX, ECX);
+				//CMPrd(ESI, ECX);
+				//JBb(14);
+				//ADDrd(EDX, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(ESI, ECX);
+				//CMPid(sizeof(int16_t), ECX);
+				//if (fmem) {
+				//	JAEb(2);
+				//	LEAVE();
+				//} else
+				//	JAEb(1);
+				//RET();
+				//MOVrq3(R8, RCX);
+				//MOVobw(RCX, RSI, AX);
+				//SWAP_AX();
+
 				break;
 
 			case BPF_LD|BPF_B|BPF_IND:
-				ZEROrd(EAX);
-				CMPrd(EDI, EDX);
-				JAEb(13);
-				MOVid(ins->k, ESI);
-				MOVrd(EDI, ECX);
-				SUBrd(EDX, ECX);
-				CMPrd(ESI, ECX);
+				/* A <- P[X+k:1] */
+				printf("BPF_LD|BPF_B|BPF_IND\n");
+
+				/* Copy K value to R1 */
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				/* Add X */
+				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
+
+				/* Get offset */
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+
+				/* Load byte from offset */
+				ldrb(emitm, &stream, REG_A, ARM_R0);
+
 				if (fmem) {
-					JAb(2);
-					LEAVE();
-				} else
-					JAb(1);
-				RET();
-				MOVrq3(R8, RCX);
-				ADDrd(EDX, ESI);
-				MOVobb(RCX, RSI, AL);
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
+				}
+
+				//ZEROrd(EAX);
+				//CMPrd(EDI, EDX);
+				//JAEb(13);
+				//MOVid(ins->k, ESI);
+				//MOVrd(EDI, ECX);
+				//SUBrd(EDX, ECX);
+				//CMPrd(ESI, ECX);
+				//if (fmem) {
+				//	JAb(2);
+				//	LEAVE();
+				//} else
+				//	JAb(1);
+				//RET();
+				//MOVrq3(R8, RCX);
+				//ADDrd(EDX, ESI);
+				//MOVobb(RCX, RSI, AL);
 				break;
 
-			case BPF_LDX|BPF_MSH|BPF_B:
-				MOVid(ins->k, ESI);
-				CMPrd(EDI, ESI);
+			case BPF_LDX|BPF_MSH|BPF_B: //implement me for dst port 22
+				/* X <- 4*(P[k:1]&0xf) */
+				printf("BPF_LDX|BPF_MSH|BPF_B ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
+
+				/* Copy K value to R1 */
+				mov(emitm, &stream, ARM_R1, ins->k);
+
+				/* Get offset */
+				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+
+				/* Load byte from offset */
+				ldrb(emitm, &stream, ARM_R1, ARM_R0);
+
+				and_i(emitm, &stream, ARM_R1, ARM_R1, 0xf);
+				lsl(emitm, &stream, REG_X, ARM_R1, 2);
+
 				if (fmem) {
-					JBb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JBb(3);
-					ZEROrd(EAX);
+					add(emitm, &stream, ARM_SP, ARM_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
-				RET();
-				ZEROrd(EDX);
-				MOVrq3(R8, RCX);
-				MOVobb(RCX, RSI, DL);
-				ANDib(0x0f, DL);
-				SHLib(2, EDX);
+
+				//MOVid(ins->k, ESI);
+				//CMPrd(EDI, ESI);
+				//if (fmem) {
+				//	JBb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JBb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//ZEROrd(EDX);
+				//MOVrq3(R8, RCX);
+				//MOVobb(RCX, RSI, DL);
+				//ANDib(0x0f, DL);
+				//SHLib(2, EDX);
 				break;
 
 			case BPF_LD|BPF_IMM:
-				MOVid(ins->k, EAX);
+				/* A <- k */
+				printf("BPF_LD|BPF_IMM\n");
+				mov(emitm, &stream, REG_A, ins->k);
+				//MOVid(ins->k, EAX);
 				break;
 
 			case BPF_LDX|BPF_IMM:
-				MOVid(ins->k, EDX);
+				/* X <- k */
+				printf("BPF_LDX|BPF_IMM\n");
+				mov(emitm, &stream, REG_X, ins->k);
+				//MOVid(ins->k, EDX);
 				break;
 
 			case BPF_LD|BPF_MEM:
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVobd(RSP, RSI, EAX);
+				/* A <- M[k] */
+				printf("BPF_LD|BPF_MEM\n");
+
+				ldr(emitm, &stream, REG_A, ARM_SP,
+				    (ins->k * sizeof(uint32_t)));
+
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVobd(RSP, RSI, EAX);
 				break;
 
 			case BPF_LDX|BPF_MEM:
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVobd(RSP, RSI, EDX);
+				/* X <- M[k] */
+				printf("BPF_LDX|BPF_MEM\n");
+
+				ldr(emitm, &stream, REG_X, ARM_SP,
+				    (ins->k * sizeof(uint32_t)));
+
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVobd(RSP, RSI, EDX);
 				break;
 
 			case BPF_ST:
+				/* M[k] <- A */
+				printf("BPF_ST not tested\n");
+
+				str(emitm, &stream, REG_A, ARM_SP,
+				    (ins->k * sizeof(uint32_t)));
 				/*
 				 * XXX this command and the following could
 				 * be optimized if the previous instruction
 				 * was already of this type
 				 */
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVomd(EAX, RSP, RSI);
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVomd(EAX, RSP, RSI);
 				break;
 
 			case BPF_STX:
-				MOVid(ins->k * sizeof(uint32_t), ESI);
-				MOVomd(EDX, RSP, RSI);
+				/* M[k] <- X */
+				printf("BPF_STX not tested\n");
+				str(emitm, &stream, REG_X, ARM_SP,
+				    (ins->k * sizeof(uint32_t)));
+
+				//MOVid(ins->k * sizeof(uint32_t), ESI);
+				//MOVomd(EDX, RSP, RSI);
 				break;
 
 			case BPF_JMP|BPF_JA:
-				JUMP(ins->k);
+				/* pc += k */
+				printf("BPF_JMP|BPF_JA\n");
+				branch(emitm, &stream, COND_AL, ins->k);
+				//JUMP(ins->k);
 				break;
 
 			case BPF_JMP|BPF_JGT|BPF_K:
+				/* pc += (A > k) ? jt : jf */
+				printf("BPF_JMP|BPF_JGT|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPid(ins->k, EAX);
-				JCC(JA, JBE);
+
+				mov(emitm, &stream, ARM_R1, ins->k);
+				cmp_r(emitm, &stream, REG_A, ARM_R1);
+				jcc(emitm, &stream, ins, COND_GT, COND_LE);
+
+				//CMPid(ins->k, EAX);
+				//JCC(JA, JBE);
 				break;
 
 			case BPF_JMP|BPF_JGE|BPF_K:
+				/* pc += (A >= k) ? jt : jf */
+				printf("BPF_JMP|BPF_JGE|BPF_K\n");
+
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPid(ins->k, EAX);
-				JCC(JAE, JB);
+
+				mov(emitm, &stream, ARM_R1, ins->k);
+				cmp_r(emitm, &stream, REG_A, ARM_R1);
+				jcc(emitm, &stream, ins, COND_GE, COND_LT);
+
+				//CMPid(ins->k, EAX);
+				//JCC(JAE, JB);
 				break;
 
 			case BPF_JMP|BPF_JEQ|BPF_K:
+				/* pc += (A == k) ? jt : jf */
+				printf("BPF_JMP|BPF_JEQ|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPid(ins->k, EAX);
-				JCC(JE, JNE);
+
+				//cmp_i(REG_A, ins->k);
+
+				mov(emitm, &stream, ARM_R1, ins->k);
+				cmp_r(emitm, &stream, REG_A, ARM_R1);
+
+				//emitm(&stream, KERNEL_BREAKPOINT);
+				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
+
+				//CMPid(ins->k, EAX);
+				//JCC(JE, JNE);
 				break;
 
-			case BPF_JMP|BPF_JSET|BPF_K:
+			case BPF_JMP|BPF_JSET|BPF_K: //implement me for dst port 22
+				/* pc += (A & k) ? jt : jf */
+				printf("BPF_JMP|BPF_JSET|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
+				    ins->jt, ins->jf, ins->k);
+
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				TESTid(ins->k, EAX);
-				JCC(JNE, JE);
+				//and(emitm, &stream, ARM_R1, REG_A, ins->k);
+				tst(emitm, &stream, REG_A, ins->k);
+				jcc(emitm, &stream, ins, COND_NE, COND_EQ);
+				//TESTid(ins->k, EAX);
+				//JCC(JNE, JE);
 				break;
 
 			case BPF_JMP|BPF_JGT|BPF_X:
+				/* pc += (A > X) ? jt : jf */
+				printf("BPF_JMP|BPF_JGT|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPrd(EDX, EAX);
-				JCC(JA, JBE);
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_GT, COND_LE);
+				//CMPrd(EDX, EAX);
+				//JCC(JA, JBE);
 				break;
 
 			case BPF_JMP|BPF_JGE|BPF_X:
+				/* pc += (A >= X) ? jt : jf */
+				printf("BPF_JMP|BPF_JGE|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPrd(EDX, EAX);
-				JCC(JAE, JB);
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_GE, COND_LT);
+				//CMPrd(EDX, EAX);
+				//JCC(JAE, JB);
 				break;
 
 			case BPF_JMP|BPF_JEQ|BPF_X:
+				/* pc += (A == X) ? jt : jf */
+				printf("BPF_JMP|BPF_JEQ|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				CMPrd(EDX, EAX);
-				JCC(JE, JNE);
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
+				//CMPrd(EDX, EAX);
+				//JCC(JE, JNE);
 				break;
 
 			case BPF_JMP|BPF_JSET|BPF_X:
+				/* pc += (A & X) ? jt : jf */
+				printf("BPF_JMP|BPF_JSET|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					JUMP(ins->jt);
+					branch(emitm, &stream, COND_AL, ins->jt);
+					//JUMP(ins->jt);
 					break;
 				}
-				TESTrd(EDX, EAX);
-				JCC(JNE, JE);
+				tst_r(emitm, &stream, REG_A, REG_X);
+				jcc(emitm, &stream, ins, COND_NE, COND_EQ);
+				//TESTrd(EDX, EAX);
+				//JCC(JNE, JE);
 				break;
 
 			case BPF_ALU|BPF_ADD|BPF_X:
-				ADDrd(EDX, EAX);
+				/* A <- A + X */
+				printf("BPF_ALU|BPF_ADD|BPF_X\n");
+
+				add_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//ADDrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_SUB|BPF_X:
-				SUBrd(EDX, EAX);
+				/* A <- A - X */
+				printf("BPF_ALU|BPF_SUB|BPF_X not tested: checkme\n");
+				rsb_r(emitm, &stream, REG_A, REG_X, REG_A);
+				//SUBrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_MUL|BPF_X:
-				MOVrd(EDX, ECX);
-				MULrd(EDX);
-				MOVrd(ECX, EDX);
+				/* A <- A * X */
+				printf("BPF_ALU|BPF_MUL|BPF_X not tested\n");
+
+				mul(emitm, &stream, REG_A, REG_A, REG_X, 0);
+
+				//MOVrd(EDX, ECX);
+				//MULrd(EDX);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_DIV|BPF_X:
-				TESTrd(EDX, EDX);
-				if (fmem) {
-					JNEb(4);
-					ZEROrd(EAX);
-					LEAVE();
-				} else {
-					JNEb(3);
-					ZEROrd(EAX);
-				}
-				RET();
-				MOVrd(EDX, ECX);
-				ZEROrd(EDX);
-				DIVrd(ECX);
-				MOVrd(ECX, EDX);
+				/* A <- A / X */
+				printf("BPF_ALU|BPF_DIV|BPF_X\n");
+
+				mov_r(emitm, &stream, ARM_R0, REG_A);
+				mov_r(emitm, &stream, ARM_R1, REG_X);
+				mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
+				branch_lx(emitm, &stream, COND_AL, ARM_R2);
+				mov_r(emitm, &stream, REG_A, ARM_R0);
+
+				//TESTrd(EDX, EDX);
+				//if (fmem) {
+				//	JNEb(4);
+				//	ZEROrd(EAX);
+				//	LEAVE();
+				//} else {
+				//	JNEb(3);
+				//	ZEROrd(EAX);
+				//}
+				//RET();
+				//MOVrd(EDX, ECX);
+				//ZEROrd(EDX);
+				//DIVrd(ECX);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_AND|BPF_X:
-				ANDrd(EDX, EAX);
+				/* A <- A & X */
+				printf("BPF_ALU|BPF_AND|BPF_X\n");
+
+				and_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//ANDrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_OR|BPF_X:
-				ORrd(EDX, EAX);
+				/* A <- A | X */
+				printf("BPF_ALU|BPF_OR|BPF_X\n");
+
+				orr_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//ORrd(EDX, EAX);
 				break;
 
 			case BPF_ALU|BPF_LSH|BPF_X:
-				MOVrd(EDX, ECX);
-				SHL_CLrb(EAX);
+				/* A <- A << X */
+				printf("BPF_ALU|BPF_LSH|BPF_X\n");
+				lsl_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//MOVrd(EDX, ECX);
+				//SHL_CLrb(EAX);
 				break;
 
 			case BPF_ALU|BPF_RSH|BPF_X:
-				MOVrd(EDX, ECX);
-				SHR_CLrb(EAX);
+				/* A <- A >> X */
+				printf("BPF_ALU|BPF_RSH|BPF_X\n");
+				lsr_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//MOVrd(EDX, ECX);
+				//SHR_CLrb(EAX);
 				break;
 
 			case BPF_ALU|BPF_ADD|BPF_K:
-				ADD_EAXi(ins->k);
+				/* A <- A + k */
+				//printf("BPF_ALU|BPF_ADD|BPF_K\n");
+
+				add(emitm, &stream, REG_A, REG_A, ins->k);
+
+				//ADD_EAXi(ins->k);
 				break;
 
 			case BPF_ALU|BPF_SUB|BPF_K:
-				SUB_EAXi(ins->k);
+				/* A <- A - k */
+				printf("BPF_ALU|BPF_SUB|BPF_K\n");
+				rsb(emitm, &stream, REG_A, REG_A, ins->k);
+				//SUB_EAXi(ins->k);
 				break;
 
 			case BPF_ALU|BPF_MUL|BPF_K:
-				MOVrd(EDX, ECX);
-				MOVid(ins->k, EDX);
-				MULrd(EDX);
-				MOVrd(ECX, EDX);
+				/* A <- A * k */
+				printf("BPF_ALU|BPF_MUL|BPF_K not tested\n");
+
+				mov(emitm, &stream, ARM_R1, ins->k);
+				mul(emitm, &stream, REG_A, REG_A, ARM_R1, 0);
+
+				//MOVrd(EDX, ECX);
+				//MOVid(ins->k, EDX);
+				//MULrd(EDX);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_DIV|BPF_K:
-				MOVrd(EDX, ECX);
-				ZEROrd(EDX);
-				MOVid(ins->k, ESI);
-				DIVrd(ESI);
-				MOVrd(ECX, EDX);
+				/* A <- A / k */
+				printf("BPF_ALU|BPF_DIV|BPF_K\n");
+
+				mov_r(emitm, &stream, ARM_R0, REG_A);
+				mov(emitm, &stream, ARM_R1, ins->k);
+				mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
+				branch_lx(emitm, &stream, COND_AL, ARM_R2);
+				mov_r(emitm, &stream, REG_A, ARM_R0);
+
+				//MOVrd(EDX, ECX);
+				//ZEROrd(EDX);
+				//MOVid(ins->k, ESI);
+				//DIVrd(ESI);
+				//MOVrd(ECX, EDX);
 				break;
 
 			case BPF_ALU|BPF_AND|BPF_K:
-				ANDid(ins->k, EAX);
+				/* A <- A & k */
+				printf("BPF_ALU|BPF_AND|BPF_K ins->k 0x%x\n", ins->k);
+				and(emitm, &stream, REG_A, REG_A, ins->k);
+				//ANDid(ins->k, EAX);
 				break;
 
 			case BPF_ALU|BPF_OR|BPF_K:
-				ORid(ins->k, EAX);
+				/* A <- A | k */
+				printf("BPF_ALU|BPF_OR|BPF_K\n");
+				orr(emitm, &stream, REG_A, REG_A, ins->k);
+				//ORid(ins->k, EAX);
 				break;
 
 			case BPF_ALU|BPF_LSH|BPF_K:
-				SHLib((ins->k) & 0xff, EAX);
+				/* A <- A << k */
+				printf("BPF_ALU|BPF_LSH|BPF_K\n");
+				lsl(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
+				//SHLib((ins->k) & 0xff, EAX);
 				break;
 
 			case BPF_ALU|BPF_RSH|BPF_K:
-				SHRib((ins->k) & 0xff, EAX);
+				/* A <- A >> k */
+				printf("BPF_ALU|BPF_RSH|BPF_K ins->k %d\n", ins->k);
+				lsr(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
+				//SHRib((ins->k) & 0xff, EAX);
 				break;
 
 			case BPF_ALU|BPF_NEG:
-				NEGd(EAX);
+				/* A <- -A */
+				printf("BPF_ALU|BPF_NEG\n");
+				/* substruct from zero */
+				rsb(emitm, &stream, REG_A, REG_A, 0);
+				//NEGd(EAX);
 				break;
 
 			case BPF_MISC|BPF_TAX:
-				MOVrd(EAX, EDX);
+				/* X <- A */
+				printf("BPF_MISC|BPF_TAX\n");
+
+				mov_r(emitm, &stream, REG_X, REG_A);
+
 				break;
 
 			case BPF_MISC|BPF_TXA:
-				MOVrd(EDX, EAX);
+				/* A <- X */
+				printf("BPF_MISC|BPF_TXA\n");
+
+				mov_r(emitm, &stream, REG_A, REG_X);
+
 				break;
 			}
 			ins++;
@@ -659,9 +1631,12 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	}
 #endif
 
-	if (stream.ibuf != NULL)
-		printf("compilation success\n");
-	else
+	if (stream.ibuf != NULL) {
+		printf("compilation success: inst buf 0x%08x\n", (uint32_t)stream.ibuf);
+		breakpoint();
+	} else {
 		printf("compilation failed\n");
+	}
+
 	return ((bpf_filter_func)stream.ibuf);
 }
