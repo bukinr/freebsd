@@ -67,7 +67,7 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 #define	REG_MBUFLEN	ARM_R7
 
 /*
- * Wrapper around __aeabi_udiv
+ * Wrapper around __aeabi_uidiv
  */
 static uint32_t
 jit_udiv(uint32_t dividend, uint32_t divisor)
