@@ -56,15 +56,15 @@ __FBSDID("$FreeBSD$");
 #include <net/bpf.h>
 #include <net/bpf_jitter.h>
 
-#include <arm/arm/bpf_jit_machdep.h>
+#include <arm64/arm64/bpf_jit_machdep.h>
 #include <arm/include/trap.h>
 
 bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 
-#define	REG_A		ARM_R4
-#define	REG_X		ARM_R5
-#define	REG_MBUF	ARM_R6
-#define	REG_MBUFLEN	ARM_R7
+#define	REG_A		A64_R(4)
+#define	REG_X		A64_R(5)
+#define	REG_MBUF	A64_R(6)
+#define	REG_MBUFLEN	A64_R(7)
 
 /*
  * Wrapper around __aeabi_uidiv
@@ -102,6 +102,245 @@ emit_code(bpf_bin_stream *stream, u_int value)
 	*((u_int *)(stream->ibuf + stream->cur_ip)) = value;
 	stream->cur_ip += 4;
 }
+
+#define	OPC_S		30
+#define	OPC_LDP		0b10
+#define	OPC_STP		0b10
+#define	IMM7_S		15
+#define	RT2_S		10
+#define	RT1_S		0
+#define	RN_S		5
+
+static void
+stp(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t reg_list)
+{
+	uint32_t instr;
+
+	/* Load/store register pair (post-indexed) */
+	instr = (1 << 23) | (1 << 27) | (1 << 29);
+	instr |= (OPC_STP << OPC_S);
+
+	emitm(stream, instr);
+}
+
+#define	IMM26_S	0
+/* Unconditional branch (immediate) */
+static void
+arm64_branch_i(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t imm26)
+{
+	uint32_t instr;
+
+	instr = (1 << 28) | (1 << 26);
+	instr |= (imm26 << IMM26_S);
+
+	emitm(stream, instr);
+}
+
+/* Unconditional branch (register) */
+static void
+arm64_branch_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rn)
+{
+	uint32_t instr;
+
+#define	RN_S	5
+
+	instr = (1 << 31) | (1 << 30) | (1 << 28) | (1 << 26) | (1 << 25);
+	instr |= (0b10 << 21);		/* opc */
+	instr |= (0b11111 << 16);	/* op2 */
+	instr |= (rn << RN_S);
+
+	emitm(stream, instr);
+}
+
+static void
+ret(emit_func emitm, bpf_bin_stream *stream)
+{
+
+	arm64_branch_r(emitm, stream, A64_LR);
+}
+
+#define	IMM19_S	5
+
+/*
+ * B.cond
+ * C6.6.19
+ */
+static void
+arm64_branch_cond(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t cond, uint32_t imm19)
+{
+	uint32_t instr;
+
+	instr = (1 << 30) | (1 << 28) | (1 << 26);
+	instr |= (imm19 << IMM19_S);
+	instr |= (cond << COND_S);
+
+	emitm(stream, instr);
+}
+
+#define	SHIFT_LSL	0
+#define	SHIFT_LSR	1
+#define	SHIFT_ASR	10
+#define	SHIFT_S		22
+#define	RD_S		0
+#define	IMM12_S		10
+/*
+ * Add (immediate): Rd = Rn + shift(imm)
+ * C6.6.4
+ */
+static void
+add_i(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t imm12)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64 bit datasize */
+	instr |= (1 << 28) | (1 << 24);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+	instr |= (imm12 << IMM12_S);
+
+	emitm(stream, instr);
+}
+
+#define	RM_S	16
+#define	IMM6_S	10
+/*
+ * Add (shifted register): Rd = Rn + shift(Rm, amount)
+ * C6.6.5
+ */
+static void
+arm64_add_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64 bit datasize */
+	instr |= (1 << 27) | (1 << 25) | (1 << 24);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+#define	MOVE_WIDE_OP_S	29
+#define	MOVE_WIDE_OP_N	0
+#define	MOVE_WIDE_OP_Z	2
+#define	MOVE_WIDE_OP_K	3
+#define	IMM16_S		5
+#define	HW_S		21
+
+/*
+ * Move shifted 16-bit immediate to register:
+ * Rd = LSL (imm16, shift)
+ */
+static void
+arm64_mov_wide(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t op, uint32_t rd, uint32_t imm16, uint32_t shift)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64 bit datasize */
+	instr |= (op << MOVE_WIDE_OP_S);
+	instr |= (1 << 28) | (1 << 25) | (1 << 23);
+	instr |= (imm16 << IMM16_S);
+	instr |= (rd << RD_S);
+	instr |= (shift / 16) << HW_S;
+
+	emitm(stream, instr);
+}
+
+static void
+arm64_mov_i(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint64_t val)
+{
+	uint32_t shift;
+	uint64_t tmp;
+
+	arm64_mov_wide(emitm, stream, MOVE_WIDE_OP_Z,
+	    rd, (val & 0xffff), 0);
+	tmp = (val >> 16);
+	shift = 16;
+
+	while (tmp != 0) {
+		if (tmp & 0xffff)
+			arm64_mov_wide(emitm, stream, MOVE_WIDE_OP_K,
+			    rd, (tmp & 0xffff), shift);
+		tmp >>= 16;
+		shift += 16;
+	}
+}
+
+/*
+ * LDRH (register)
+ * C6.6.89
+ */
+
+#define	RT_S	0
+/*
+ * LDRH (immediate) Pre-index
+ * C6.6.88
+ */
+static void
+arm64_ldrh(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rt, uint32_t rn)
+{
+	uint32_t instr;
+
+	instr = (1 << 30);
+	//instr |= (1 << 29) | (1 << 28) | (1 << 27);
+	//instr |= (1 << 21) | (1 << 22);
+	//instr |= (1 << 11);
+	instr |= (1 << 29) | (1 << 28) | (1 << 27);
+	instr |= (1 << 22);
+	instr |= (1 << 11) | (1 << 10);
+	instr |= (rn << RN_S) | (rt << RT_S);
+	
+	emitm(stream, instr);
+}
+
+static void
+arm64_rev16(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 30) | (1 << 28) | (1 << 27);
+	instr |= (1 << 25) | (1 << 23) | (1 << 22);
+	instr |= (1 << 10);
+	instr |= (rd << RD_S) | (rn << RN_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * CMP (shifted register)
+ * C6.6.46
+ */
+static void
+arm64_cmp_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	//instr = (OPCODE_CMP << OPCODE_S) | (COND_AL << COND_S);
+	//instr |= (rd << RD_S) | (rm << RM_S);
+	//instr |= (rn << RN_S) | (rm << RM_S);
+	//instr |= COND_SET;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 30) | (1 << 29) | (1 << 27);
+	instr |= (1 << 25) | (1 << 24);
+	instr |= (rn << RN_S) | (rm << RM_S);
+	instr |= (A64_R(31) << RD_S);
+
+	emitm(stream, instr);
+}
+
+/* armv7 */
 
 static int16_t
 imm8m(uint32_t x)
@@ -589,14 +828,22 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 		offs = stream->refs[stream->bpf_pc + ins->jt] - \
 		    stream->refs[stream->bpf_pc] - 4;
 		//printf("offs 0x%08x\n", offs);
-		branch(emitm, stream, cond1, offs);
+
+		/* TODO: check if offs fit imm19 */
+
+		arm64_branch_cond(emitm, stream, cond1, offs);
+		//arm32 branch(emitm, stream, cond1, offs);
 	}
 
 	if (ins->jf != 0) {
 		offs = stream->refs[stream->bpf_pc + ins->jf] - \
 		    stream->refs[stream->bpf_pc] - 4;
 		//printf("offs 0x%08x\n", offs);
-		branch(emitm, stream, cond2, offs);
+
+		/* TODO: check if offs fit imm19 */
+
+		arm64_branch_cond(emitm, stream, cond2, offs);
+		//arm32 branch(emitm, stream, cond2, offs);
 	}
 }
 
@@ -808,7 +1055,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		ins = prog;
 
 		if (fpkt || flen || fmem) {
-			push(emitm, &stream, reg_list);
+			//arm32 push(emitm, &stream, reg_list);
 		}
 
 		/* Create the procedure header. */
@@ -819,18 +1066,18 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		//	SUBib(BPF_MEMWORDS * sizeof(uint32_t), RSP);
 
 			/* Using stack for memory scratch space */
-			sub(emitm, &stream, ARM_SP, ARM_SP,
-			    BPF_MEMWORDS * sizeof(uint32_t));
+			//arm32 sub(emitm, &stream, ARM_SP, ARM_SP,
+			//   BPF_MEMWORDS * sizeof(uint32_t));
 		}
 		if (flen) {
 			printf("flen\n");
-			mov_r(emitm, &stream, REG_MBUFLEN, ARM_R1);
+			//arm32 mov_r(emitm, &stream, REG_MBUFLEN, ARM_R1);
 		//	MOVrd2(ESI, R9D);
 		}
 		if (fpkt) {
 			printf("fpkt\n");
 
-			mov_r(emitm, &stream, REG_MBUF, ARM_R0);
+			//arm32 mov_r(emitm, &stream, REG_MBUF, ARM_R0);
 
 		//	MOVrq2(RDI, R8);
 		//	MOVrd(EDX, EDI);
@@ -852,19 +1099,21 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* accept k bytes */
 				printf("BPF_RET|BPF_K, ins->k 0x%08x\n", ins->k);
 
-				mov(emitm, &stream, ARM_R0, ins->k);
-				//MOVid(ins->k, EAX);
+				arm64_mov_i(emitm, &stream, A64_R(0), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R0, ins->k);
+				//amd64 MOVid(ins->k, EAX);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
-					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+					//    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				if (fpkt || flen || fmem) {
-					pop(emitm, &stream, reg_list);
+					//pop(emitm, &stream, reg_list);
 				}
 
-				emitm(&stream, ARM_RET);
+				ret(emitm, &stream);
+				//emitm(&stream, ARM_RET);
 
 				break;
 
@@ -932,16 +1181,20 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_H|BPF_ABS: ins->k 0x%x\n", ins->k);
 
 				/* Copy K value to R1 */
-				mov(emitm, &stream, ARM_R1, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
-				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+				arm64_add_r(emitm, &stream, A64_R(0), A64_R(1), REG_MBUF);
+				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load half word from offset */
-				ldrh(emitm, &stream, ARM_R0, ARM_R0);
+				arm64_ldrh(emitm, &stream, A64_R(0), A64_R(0));
+				//arm32 ldrh(emitm, &stream, ARM_R0, ARM_R0);
 
 				/* Reverse as network packets are big-endian */
-				rev16(emitm, &stream, REG_A, ARM_R0);
+				arm64_rev16(emitm, &stream, REG_A, A64_R(0));
+				//arm32 rev16(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
@@ -964,6 +1217,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//MOVrq3(R8, RCX);
 				//MOVobw(RCX, RSI, AX);
 				//SWAP_AX();
+
 				break;
 
 			case BPF_LD|BPF_B|BPF_ABS:
@@ -1299,15 +1553,19 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JEQ|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
 				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//arm32 branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
 
-				//cmp_i(REG_A, ins->k);
+				////cmp_i(REG_A, ins->k);
 
-				mov(emitm, &stream, ARM_R1, ins->k);
-				cmp_r(emitm, &stream, REG_A, ARM_R1);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
+
+				arm64_cmp_r(emitm, &stream, REG_A, A64_R(1));
+				//arm32 cmp_r(emitm, &stream, REG_A, ARM_R1);
 
 				//emitm(&stream, KERNEL_BREAKPOINT);
 				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
@@ -1632,7 +1890,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 #endif
 
 	if (stream.ibuf != NULL) {
-		printf("compilation success: inst buf 0x%08x\n", (uint32_t)stream.ibuf);
+		printf("compilation success: inst buf 0x%016lx\n", (uint64_t)stream.ibuf);
 		breakpoint();
 	} else {
 		printf("compilation failed\n");

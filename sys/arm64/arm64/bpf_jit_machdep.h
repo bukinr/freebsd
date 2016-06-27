@@ -38,7 +38,7 @@
 #define _BPF_JIT_MACHDEP_H_
 
 /*
- * ARMv7 registers
+ * ARMv8 registers
  */
 #define	ARM_R0	0
 #define	ARM_R1	1
@@ -56,6 +56,11 @@
 #define	ARM_SP	13
 #define	ARM_LR	14
 #define	ARM_PC	15
+
+#define	A64_R(x)	(x)
+#define	A64_FP		A64_R(29)
+#define	A64_LR		A64_R(30)
+#define	A64_SP		A64_R(31)
 
 #define rol32(i32, n) ((i32) << (n) | (i32) >> (32 - (n)))
 #define ror32(i32, n) ((i32) >> (n) | (i32) << (32 - (n)))
@@ -75,15 +80,15 @@
 #define	RS_S		8		/* operand register */
 
 /* ---- MOV, ADD, CMP ---- */
-#define	RD_S		12		/* Destination register */
-#define	RN_S		16		/* 1st operand register */
+//#define	RD_S		12		/* Destination register */
+//#define	RN_S		16		/* 1st operand register */
 #define	COND_SET	(1 << 20)	/* Set condition codes */
 #define	OPCODE_S	21		/* Operation Code */
 #define	IMM_OP		(1 << 25)	/* Immediate Operand */
 #define	COND_S		28		/* Condition field */
 
 /* IMM_OP == 0 */
-#define	RM_S		0		/* 2nd operand register */
+//#define	RM_S		0		/* 2nd operand register */
 #define	RM_SHIFT_S	4		/* shift applied to Rm */
 
 /* IMM_OP == 1 */
@@ -120,6 +125,8 @@
 
 #define	COND_EQ		0b0000
 #define	COND_NE		0b0001
+#define	COND_CS		0b0010
+#define	COND_CC		0b0011
 #define	COND_GT		0b1100
 #define	COND_GE		0b1010
 #define	COND_LE		0b1101
