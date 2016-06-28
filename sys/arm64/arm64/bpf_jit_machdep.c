@@ -319,6 +319,22 @@ arm64_ldrh(emit_func emitm, bpf_bin_stream *stream,
 	
 	emitm(stream, instr);
 }
+/*
+ * C6.6.86 LDRB (immediate), Unsigned offset
+ */
+static void
+arm64_ldrb(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rt, uint32_t rn)
+{
+	uint32_t instr;
+
+	instr = (1 << 29) | (1 << 28) | (1 << 27);
+	instr |= (1 << 22);
+	instr |= (1 << 24);
+	instr |= (rn << RN_S) | (rt << RT_S);
+
+	emitm(stream, instr);
+}
 
 static void
 arm64_rev16(emit_func emitm, bpf_bin_stream *stream,
@@ -355,6 +371,140 @@ arm64_cmp_r(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (1 << 25) | (1 << 24);
 	instr |= (rn << RN_S) | (rm << RM_S);
 	instr |= (A64_R(31) << RD_S);
+
+	emitm(stream, instr);
+}
+
+#define	IMMR_S	16
+#define	IMMS_S	10
+#define	IMM_N	(1 << 22)
+
+/* C6.6.209 TST (immediate) */
+static void
+arm64_tst_i(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	uint32_t immr;
+	uint32_t imms;
+	uint32_t sz;
+
+	sz = 64;
+	immr = (unsigned)-(val) % sz;
+	imms = sz - 1 - (val);
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 30) | (1 << 29);
+	instr |= (1 << 28) | (1 << 25);
+	instr |= (immr << IMMR_S);
+	instr |= (imms << IMMS_S);
+	instr |= (rn << RN_S);
+	instr |= (A64_R(31) << RD_S);	/* discard result */
+	//if (val & (1 << 12))
+	//	instr |= IMM_N;
+
+	emitm(stream, instr);
+}
+
+/* C6.6.210 TST (shifted register) */
+static void
+arm64_tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
+    uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 30) | (1 << 29);
+	instr |= (1 << 27) | (1 << 25);
+	instr |= (rn << RN_S);
+	instr |= (rm << RM_S);
+	instr |= (A64_R(31) << RD_S);	/* discard result */
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.11 AND (immediate)
+ * Bitwise AND (immediate): Rd = Rn AND imm
+ */
+static void
+arm64_and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	uint32_t immr;
+	uint32_t imms;
+
+	if (val > 0xfff)
+		panic("%s: implement me\n", __func__);
+
+	uint32_t sz;
+	sz = 64;
+	immr = (unsigned)-(val) % sz;
+	imms = sz - 1 - (val);
+
+	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= IMM_N;
+	instr |= (1 << 28) | (1 << 25);
+	instr |= (immr << IMMR_S);
+	instr |= (imms << IMMS_S);
+	instr |= (rn << RN_S);
+	instr |= (rd << RD_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.12 AND (shifted register)
+ * Bitwise AND (shifted register): Rd = Rn AND shift(Rm, amount)
+ */
+static void
+arm64_and_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 27) | (1 << 25);
+	instr |= (rm << RM_S);
+	instr |= (rn << RN_S);
+	instr |= (rd << RD_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.114 LSL (immediate)
+ * Logical shift left (immediate): Rd = LSL(Rn, shift)
+ */
+static void
+arm64_lsl_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	uint32_t immr;
+	uint32_t imms;
+
+	if (val > 0xfff)
+		panic("%s: implement me\n", __func__);
+
+	uint32_t sz;
+	sz = 64;
+	immr = (unsigned)-(val) % sz;
+	imms = sz - 1 - (val);
+
+	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= IMM_N;
+	instr |= (1 << 30);
+	instr |= (1 << 28) | (1 << 25) | (1 << 24);
+	instr |= (immr << IMMR_S);
+	instr |= (imms << IMMS_S);
+	instr |= (rn << RN_S);
+	instr |= (rd << RD_S);
 
 	emitm(stream, instr);
 }
@@ -1245,13 +1395,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_B|BPF_ABS: ins->k 0x%x\n", ins->k);
 
 				/* Copy K value to R1 */
-				mov(emitm, &stream, ARM_R1, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
-				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+				arm64_add_r(emitm, &stream, A64_R(0), A64_R(1), REG_MBUF);
+				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
-				ldrb(emitm, &stream, REG_A, ARM_R0);
+				arm64_ldrb(emitm, &stream, REG_A, A64_R(0));
+				//arm32 ldrb(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
@@ -1342,19 +1495,24 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_H|BPF_IND\n");
 
 				/* Copy K value to R1 */
-				mov(emitm, &stream, ARM_R1, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Add X */
-				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
+				arm64_add_r(emitm, &stream, A64_R(1), A64_R(1), REG_X);
+				//arm32 add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
 
 				/* Get offset */
-				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+				arm64_add_r(emitm, &stream, A64_R(0), A64_R(1), REG_MBUF);
+				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load half word from offset */
-				ldrh(emitm, &stream, ARM_R0, ARM_R0);
+				arm64_ldrh(emitm, &stream, A64_R(0), A64_R(0));
+				//arm32 ldrh(emitm, &stream, ARM_R0, ARM_R0);
 
 				/* Reverse as network packets are big-endian */
-				rev16(emitm, &stream, REG_A, ARM_R0);
+				arm64_rev16(emitm, &stream, REG_A, A64_R(0));
+				//arm32 rev16(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
@@ -1430,16 +1588,23 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				    ins->jt, ins->jf, ins->k);
 
 				/* Copy K value to R1 */
-				mov(emitm, &stream, ARM_R1, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
-				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+				arm64_add_r(emitm, &stream, A64_R(0), A64_R(1), REG_MBUF);
+				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
-				ldrb(emitm, &stream, ARM_R1, ARM_R0);
+				arm64_ldrb(emitm, &stream, A64_R(1), A64_R(0));
+				//arm32 ldrb(emitm, &stream, ARM_R1, ARM_R0);
 
-				and_i(emitm, &stream, ARM_R1, ARM_R1, 0xf);
-				lsl(emitm, &stream, REG_X, ARM_R1, 2);
+				arm64_mov_i(emitm, &stream, A64_R(3), 0xf);
+				arm64_and_r(emitm, &stream, A64_R(1), A64_R(1), A64_R(3));
+				//arm32 and_i(emitm, &stream, ARM_R1, ARM_R1, 0xf);
+
+				arm64_lsl_i(emitm, &stream, REG_X, A64_R(1), 2);
+				//arm32 lsl(emitm, &stream, REG_X, ARM_R1, 2);
 
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
@@ -1600,12 +1765,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				    ins->jt, ins->jf, ins->k);
 
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//arm32 branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
-				//and(emitm, &stream, ARM_R1, REG_A, ins->k);
-				tst(emitm, &stream, REG_A, ins->k);
+				////and(emitm, &stream, ARM_R1, REG_A, ins->k);
+
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				arm64_tst_r(emitm, &stream, REG_A, A64_R(1));
+				//arm32 tst(emitm, &stream, REG_A, ins->k);
 				jcc(emitm, &stream, ins, COND_NE, COND_EQ);
 				//TESTid(ins->k, EAX);
 				//JCC(JNE, JE);
