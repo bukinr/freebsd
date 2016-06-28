@@ -85,7 +85,7 @@
 #define	COND_SET	(1 << 20)	/* Set condition codes */
 #define	OPCODE_S	21		/* Operation Code */
 #define	IMM_OP		(1 << 25)	/* Immediate Operand */
-#define	COND_S		28		/* Condition field */
+//#define	COND_S		28		/* Condition field */
 
 /* IMM_OP == 0 */
 //#define	RM_S		0		/* 2nd operand register */

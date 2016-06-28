@@ -163,16 +163,20 @@ ret(emit_func emitm, bpf_bin_stream *stream)
 }
 
 #define	IMM19_S	5
+#define	COND_S	0
 
 /*
- * B.cond
- * C6.6.19
+ * C6.6.19 B.cond
  */
 static void
 arm64_branch_cond(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t cond, uint32_t imm19)
+    uint32_t cond, uint32_t val)
 {
 	uint32_t instr;
+	uint32_t imm19;
+
+	imm19 = (val / 4);
+	imm19 += 1;
 
 	instr = (1 << 30) | (1 << 28) | (1 << 26);
 	instr |= (imm19 << IMM19_S);
@@ -271,6 +275,24 @@ arm64_mov_i(emit_func emitm, bpf_bin_stream *stream,
 		tmp >>= 16;
 		shift += 16;
 	}
+}
+
+/*
+ * C6.6.125 MOV (register)
+ * Move register to register: Rd = Rm
+ */
+static void
+arm64_mov_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint64_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64 bit datasize */
+	instr |= (1 << 29) | (1 << 27) | (1 << 25);
+	instr |= (rm << RM_S) | (rd << RD_S);
+	instr |= (A64_R(31) << RN_S);
+
+	emitm(stream, instr);
 }
 
 /*
@@ -826,7 +848,7 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 
 	if (ins->jt != 0) {
 		offs = stream->refs[stream->bpf_pc + ins->jt] - \
-		    stream->refs[stream->bpf_pc] - 4;
+		    stream->refs[stream->bpf_pc];
 		//printf("offs 0x%08x\n", offs);
 
 		/* TODO: check if offs fit imm19 */
@@ -837,7 +859,7 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 
 	if (ins->jf != 0) {
 		offs = stream->refs[stream->bpf_pc + ins->jf] - \
-		    stream->refs[stream->bpf_pc] - 4;
+		    stream->refs[stream->bpf_pc];
 		//printf("offs 0x%08x\n", offs);
 
 		/* TODO: check if offs fit imm19 */
@@ -1077,6 +1099,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		if (fpkt) {
 			printf("fpkt\n");
 
+			arm64_mov_r(emitm, &stream, REG_MBUF, A64_R(0));
 			//arm32 mov_r(emitm, &stream, REG_MBUF, ARM_R0);
 
 		//	MOVrq2(RDI, R8);
