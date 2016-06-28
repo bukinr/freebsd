@@ -302,8 +302,7 @@ arm64_mov_r(emit_func emitm, bpf_bin_stream *stream,
 
 #define	RT_S	0
 /*
- * LDRH (immediate) Pre-index
- * C6.6.88
+ * C6.6.88 LDRH (immediate), Unsigned offset
  */
 static void
 arm64_ldrh(emit_func emitm, bpf_bin_stream *stream,
@@ -312,12 +311,10 @@ arm64_ldrh(emit_func emitm, bpf_bin_stream *stream,
 	uint32_t instr;
 
 	instr = (1 << 30);
-	//instr |= (1 << 29) | (1 << 28) | (1 << 27);
-	//instr |= (1 << 21) | (1 << 22);
-	//instr |= (1 << 11);
 	instr |= (1 << 29) | (1 << 28) | (1 << 27);
 	instr |= (1 << 22);
-	instr |= (1 << 11) | (1 << 10);
+	instr |= (1 << 24);
+	//instr |= (1 << 11) | (1 << 10);
 	instr |= (rn << RN_S) | (rt << RT_S);
 	
 	emitm(stream, instr);
