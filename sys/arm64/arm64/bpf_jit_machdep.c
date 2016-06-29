@@ -301,12 +301,13 @@ arm64_mov_r(emit_func emitm, bpf_bin_stream *stream,
  */
 
 #define	RT_S	0
+#define	IMM9_S	12
 /*
  * C6.6.83 LDR (immediate), Unsigned offset
  */
 static void
 arm64_ldr(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rt, uint32_t rn)
+    uint32_t rt, uint32_t rn, uint32_t imm9)
 {
 	uint32_t instr;
 
@@ -315,6 +316,7 @@ arm64_ldr(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (1 << 22);
 	instr |= (1 << 24);
 	instr |= (rn << RN_S) | (rt << RT_S);
+	instr |= (imm9 << IMM9_S);
 
 	emitm(stream, instr);
 }
@@ -1352,7 +1354,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
-				arm64_ldr(emitm, &stream, A64_R(0), A64_R(0));
+				arm64_ldr(emitm, &stream, A64_R(0), A64_R(0), 0);
 				//arm32 ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
 
 				/* Reverse as network packets are big-endian */
@@ -1466,16 +1468,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LD|BPF_W|BPF_LEN:
 				/* A <- len */
 				printf("BPF_LD|BPF_W|BPF_LEN\n");
-
-				mov_r(emitm, &stream, REG_A, REG_MBUFLEN);
-
+				arm64_mov_r(emitm, &stream, REG_A, REG_MBUFLEN);
+				//arm32 mov_r(emitm, &stream, REG_A, REG_MBUFLEN);
 				//MOVrd3(R9D, EAX);
 				break;
 
 			case BPF_LDX|BPF_W|BPF_LEN:
 				/* X <- len */
 				printf("BPF_LDX|BPF_W|BPF_LEN\n");
-				mov_r(emitm, &stream, REG_X, REG_MBUFLEN);
+				arm64_mov_r(emitm, &stream, REG_X, REG_MBUFLEN);
+				//arm32 mov_r(emitm, &stream, REG_X, REG_MBUFLEN);
 				//MOVrd3(R9D, EDX);
 				break;
 
@@ -1484,19 +1486,24 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_W|BPF_IND\n");
 
 				/* Copy K value to R1 */
-				mov(emitm, &stream, ARM_R1, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Add X */
-				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
+				arm64_add_r(emitm, &stream, A64_R(1), A64_R(1), REG_X);
+				//arm32 add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
 
 				/* Get offset */
-				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+				arm64_add_r(emitm, &stream, A64_R(0), A64_R(1), REG_MBUF);
+				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
-				ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
+				arm64_ldr(emitm, &stream, A64_R(0), A64_R(0), 0);
+				//arm32 ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
 
 				/* Change byte order as network packets are big-endian */
-				rev(emitm, &stream, REG_A, ARM_R0);
+				arm64_rev16(emitm, &stream, REG_A, A64_R(0));
+				//arm32 rev(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
@@ -1587,16 +1594,20 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_B|BPF_IND\n");
 
 				/* Copy K value to R1 */
-				mov(emitm, &stream, ARM_R1, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Add X */
-				add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
+				arm64_add_r(emitm, &stream, A64_R(1), A64_R(1), REG_X);
+				//arm32 add_r(emitm, &stream, ARM_R1, ARM_R1, REG_X);
 
 				/* Get offset */
-				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+				arm64_add_r(emitm, &stream, A64_R(0), A64_R(1), REG_MBUF);
+				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load byte from offset */
-				ldrb(emitm, &stream, REG_A, ARM_R0);
+				arm64_ldrb(emitm, &stream, REG_A, A64_R(0));
+				//arm32 ldrb(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
@@ -1671,24 +1682,26 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LD|BPF_IMM:
 				/* A <- k */
 				printf("BPF_LD|BPF_IMM\n");
-				mov(emitm, &stream, REG_A, ins->k);
+				arm64_mov_i(emitm, &stream, REG_A, ins->k);
+				//arm32 mov(emitm, &stream, REG_A, ins->k);
 				//MOVid(ins->k, EAX);
 				break;
 
 			case BPF_LDX|BPF_IMM:
 				/* X <- k */
 				printf("BPF_LDX|BPF_IMM\n");
-				mov(emitm, &stream, REG_X, ins->k);
+				arm64_mov_i(emitm, &stream, REG_X, ins->k);
+				//arm32 mov(emitm, &stream, REG_X, ins->k);
 				//MOVid(ins->k, EDX);
 				break;
 
 			case BPF_LD|BPF_MEM:
 				/* A <- M[k] */
 				printf("BPF_LD|BPF_MEM\n");
-
-				ldr(emitm, &stream, REG_A, ARM_SP,
+				arm64_ldr(emitm, &stream, REG_A, ARM_SP,
 				    (ins->k * sizeof(uint32_t)));
-
+				//arm32 ldr(emitm, &stream, REG_A, ARM_SP,
+				//   (ins->k * sizeof(uint32_t)));
 				//MOVid(ins->k * sizeof(uint32_t), ESI);
 				//MOVobd(RSP, RSI, EAX);
 				break;
@@ -1696,10 +1709,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LDX|BPF_MEM:
 				/* X <- M[k] */
 				printf("BPF_LDX|BPF_MEM\n");
-
-				ldr(emitm, &stream, REG_X, ARM_SP,
+				arm64_ldr(emitm, &stream, REG_X, ARM_SP,
 				    (ins->k * sizeof(uint32_t)));
-
+				//arm32 ldr(emitm, &stream, REG_X, ARM_SP,
+				//   (ins->k * sizeof(uint32_t)));
 				//MOVid(ins->k * sizeof(uint32_t), ESI);
 				//MOVobd(RSP, RSI, EDX);
 				break;
