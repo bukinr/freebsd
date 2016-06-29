@@ -302,6 +302,24 @@ arm64_mov_r(emit_func emitm, bpf_bin_stream *stream,
 
 #define	RT_S	0
 /*
+ * C6.6.83 LDR (immediate), Unsigned offset
+ */
+static void
+arm64_ldr(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rt, uint32_t rn)
+{
+	uint32_t instr;
+
+	instr = (0b10 << 30);	/* 32-bit variant */
+	instr |= (1 << 29) | (1 << 28) | (1 << 27);
+	instr |= (1 << 22);
+	instr |= (1 << 24);
+	instr |= (rn << RN_S) | (rt << RT_S);
+
+	emitm(stream, instr);
+}
+
+/*
  * C6.6.88 LDRH (immediate), Unsigned offset
  */
 static void
@@ -332,6 +350,22 @@ arm64_ldrb(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (1 << 22);
 	instr |= (1 << 24);
 	instr |= (rn << RN_S) | (rt << RT_S);
+
+	emitm(stream, instr);
+}
+
+static void
+arm64_rev(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn)
+{
+	uint32_t instr;
+
+	instr = (1 << 30) | (1 << 28) | (1 << 27);
+	instr |= (1 << 25) | (1 << 23) | (1 << 22);
+	instr |= (1 << 10);
+	instr |= (rd << RD_S) | (rn << RN_S);
+	instr |= (0b10 << 10); /* 32-bit variant */
+	instr |= (rd << RD_S) | (rn << RN_S);
 
 	emitm(stream, instr);
 }
@@ -496,6 +530,7 @@ arm64_lsl_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	imms = sz - 1 - (val);
 
 	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
+	printf("val 0x%08x, unsigned -val is 0x%08x\n", val, (unsigned)-val);
 
 	instr = (1 << 31); /* 64-bit variant */
 	instr |= IMM_N;
@@ -1309,16 +1344,20 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_LD|BPF_W|BPF_ABS\n");
 
 				/* Copy K value to R1 */
-				mov(emitm, &stream, ARM_R1, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
 
 				/* Get offset */
-				add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
+				arm64_add_r(emitm, &stream, A64_R(0), A64_R(1), REG_MBUF);
+				//arm32 add_r(emitm, &stream, ARM_R0, ARM_R1, REG_MBUF);
 
 				/* Load word from offset */
-				ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
+				arm64_ldr(emitm, &stream, A64_R(0), A64_R(0));
+				//arm32 ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
 
 				/* Reverse as network packets are big-endian */
-				rev(emitm, &stream, REG_A, ARM_R0);
+				arm64_rev(emitm, &stream, REG_A, A64_R(0));
+				//rev(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
