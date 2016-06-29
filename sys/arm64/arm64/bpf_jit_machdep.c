@@ -356,6 +356,9 @@ arm64_ldrb(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
+/*
+ * C6.6.149 REV
+ */
 static void
 arm64_rev(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rn)
@@ -364,7 +367,6 @@ arm64_rev(emit_func emitm, bpf_bin_stream *stream,
 
 	instr = (1 << 30) | (1 << 28) | (1 << 27);
 	instr |= (1 << 25) | (1 << 23) | (1 << 22);
-	instr |= (1 << 10);
 	instr |= (rd << RD_S) | (rn << RN_S);
 	instr |= (0b10 << 10); /* 32-bit variant */
 	instr |= (rd << RD_S) | (rn << RN_S);
@@ -522,17 +524,42 @@ arm64_lsl_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	uint32_t instr;
 	uint32_t immr;
 	uint32_t imms;
-
-	if (val > 0xfff)
-		panic("%s: implement me\n", __func__);
-
 	uint32_t sz;
+
 	sz = 64;
 	immr = (unsigned)-(val) % sz;
 	imms = sz - 1 - (val);
 
 	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
 	printf("val 0x%08x, unsigned -val is 0x%08x\n", val, (unsigned)-val);
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= IMM_N;
+	instr |= (1 << 30);
+	instr |= (1 << 28) | (1 << 25) | (1 << 24);
+	instr |= (immr << IMMR_S);
+	instr |= (imms << IMMS_S);
+	instr |= (rn << RN_S);
+	instr |= (rd << RD_S);
+
+	emitm(stream, instr);
+}
+
+static void
+arm64_lsr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t val)
+{
+	uint32_t instr;
+	uint32_t immr;
+	uint32_t imms;
+	//uint32_t sz;
+
+	//sz = 64;
+	immr = val; //(unsigned)-(val) % sz;
+	imms = 0b111111; //sz - 1 - (val);
+
+	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
+	//printf("val 0x%08x, unsigned -val is 0x%08x\n", val, (unsigned)-val);
 
 	instr = (1 << 31); /* 64-bit variant */
 	instr |= IMM_N;
@@ -1502,7 +1529,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 ldr(emitm, &stream, ARM_R0, ARM_R0, 0);
 
 				/* Change byte order as network packets are big-endian */
-				arm64_rev16(emitm, &stream, REG_A, A64_R(0));
+				arm64_rev(emitm, &stream, REG_A, A64_R(0));
 				//arm32 rev(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
@@ -1745,7 +1772,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_JMP|BPF_JA:
 				/* pc += k */
 				printf("BPF_JMP|BPF_JA\n");
-				branch(emitm, &stream, COND_AL, ins->k);
+				arm64_branch_i(emitm, &stream, ins->k);
+				//arm32 branch(emitm, &stream, COND_AL, ins->k);
 				//JUMP(ins->k);
 				break;
 
@@ -1754,13 +1782,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JGT|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
 				    ins->jt, ins->jf, ins->k);
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
 
-				mov(emitm, &stream, ARM_R1, ins->k);
-				cmp_r(emitm, &stream, REG_A, ARM_R1);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				arm64_cmp_r(emitm, &stream, REG_A, A64_R(1));
+				//mov(emitm, &stream, ARM_R1, ins->k);
+				//cmp_r(emitm, &stream, REG_A, ARM_R1);
 				jcc(emitm, &stream, ins, COND_GT, COND_LE);
 
 				//CMPid(ins->k, EAX);
@@ -1772,13 +1803,16 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				printf("BPF_JMP|BPF_JGE|BPF_K\n");
 
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
 
-				mov(emitm, &stream, ARM_R1, ins->k);
-				cmp_r(emitm, &stream, REG_A, ARM_R1);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				arm64_cmp_r(emitm, &stream, REG_A, A64_R(1));
+				//mov(emitm, &stream, ARM_R1, ins->k);
+				//cmp_r(emitm, &stream, REG_A, ARM_R1);
 				jcc(emitm, &stream, ins, COND_GE, COND_LT);
 
 				//CMPid(ins->k, EAX);
@@ -1799,14 +1833,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				////cmp_i(REG_A, ins->k);
 
 				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
-				//arm32 mov(emitm, &stream, ARM_R1, ins->k);
-
 				arm64_cmp_r(emitm, &stream, REG_A, A64_R(1));
-				//arm32 cmp_r(emitm, &stream, REG_A, ARM_R1);
-
-				//emitm(&stream, KERNEL_BREAKPOINT);
 				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
 
+				//emitm(&stream, KERNEL_BREAKPOINT);
 				//CMPid(ins->k, EAX);
 				//JCC(JE, JNE);
 				break;
@@ -1836,11 +1866,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* pc += (A > X) ? jt : jf */
 				printf("BPF_JMP|BPF_JGT|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
-				tst_r(emitm, &stream, REG_A, REG_X);
+				arm64_tst_r(emitm, &stream, REG_A, REG_X);
+				//tst_r(emitm, &stream, REG_A, REG_X);
 				jcc(emitm, &stream, ins, COND_GT, COND_LE);
 				//CMPrd(EDX, EAX);
 				//JCC(JA, JBE);
@@ -1850,11 +1882,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* pc += (A >= X) ? jt : jf */
 				printf("BPF_JMP|BPF_JGE|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
-				tst_r(emitm, &stream, REG_A, REG_X);
+				//tst_r(emitm, &stream, REG_A, REG_X);
+				arm64_tst_r(emitm, &stream, REG_A, REG_X);
 				jcc(emitm, &stream, ins, COND_GE, COND_LT);
 				//CMPrd(EDX, EAX);
 				//JCC(JAE, JB);
@@ -1864,11 +1898,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* pc += (A == X) ? jt : jf */
 				printf("BPF_JMP|BPF_JEQ|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
-				tst_r(emitm, &stream, REG_A, REG_X);
+				arm64_tst_r(emitm, &stream, REG_A, REG_X);
+				//tst_r(emitm, &stream, REG_A, REG_X);
 				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
 				//CMPrd(EDX, EAX);
 				//JCC(JE, JNE);
@@ -1878,11 +1914,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* pc += (A & X) ? jt : jf */
 				printf("BPF_JMP|BPF_JSET|BPF_X\n");
 				if (ins->jt == ins->jf) {
-					branch(emitm, &stream, COND_AL, ins->jt);
+					arm64_branch_i(emitm, &stream, ins->jt);
+					//branch(emitm, &stream, COND_AL, ins->jt);
 					//JUMP(ins->jt);
 					break;
 				}
-				tst_r(emitm, &stream, REG_A, REG_X);
+				arm64_tst_r(emitm, &stream, REG_A, REG_X);
+				//tst_r(emitm, &stream, REG_A, REG_X);
 				jcc(emitm, &stream, ins, COND_NE, COND_EQ);
 				//TESTrd(EDX, EAX);
 				//JCC(JNE, JE);
@@ -1892,7 +1930,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A + X */
 				printf("BPF_ALU|BPF_ADD|BPF_X\n");
 
-				add_r(emitm, &stream, REG_A, REG_A, REG_X);
+				arm64_add_r(emitm, &stream, REG_A, REG_A, REG_X);
+				//add_r(emitm, &stream, REG_A, REG_A, REG_X);
 
 				//ADDrd(EDX, EAX);
 				break;
@@ -2039,15 +2078,18 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 			case BPF_ALU|BPF_LSH|BPF_K:
 				/* A <- A << k */
-				printf("BPF_ALU|BPF_LSH|BPF_K\n");
-				lsl(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
+				//printf("BPF_ALU|BPF_LSH|BPF_K\n");
+				/* TODO: check 0xff fit lsl_i */
+				arm64_lsl_i(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
+				//arm32 lsl(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
 				//SHLib((ins->k) & 0xff, EAX);
 				break;
 
 			case BPF_ALU|BPF_RSH|BPF_K:
 				/* A <- A >> k */
 				printf("BPF_ALU|BPF_RSH|BPF_K ins->k %d\n", ins->k);
-				lsr(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
+				arm64_lsr_i(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
+				//lsr(emitm, &stream, REG_A, REG_A, (ins->k) & 0xff);
 				//SHRib((ins->k) & 0xff, EAX);
 				break;
 
@@ -2063,7 +2105,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* X <- A */
 				printf("BPF_MISC|BPF_TAX\n");
 
-				mov_r(emitm, &stream, REG_X, REG_A);
+				arm64_mov_r(emitm, &stream, REG_X, REG_A);
+				//arm32 mov_r(emitm, &stream, REG_X, REG_A);
 
 				break;
 
@@ -2071,7 +2114,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- X */
 				printf("BPF_MISC|BPF_TXA\n");
 
-				mov_r(emitm, &stream, REG_A, REG_X);
+				arm64_mov_r(emitm, &stream, REG_A, REG_X);
+				//arm32 mov_r(emitm, &stream, REG_A, REG_X);
 
 				break;
 			}
