@@ -573,6 +573,41 @@ arm64_lsr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	emitm(stream, instr);
 }
 
+/*
+ * C6.6.196 SUB (shifted register)
+ * Subtract (shifted register): Rd = Rn - shift(Rm, amount)
+ */
+static void
+arm64_sub_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 30) | (1 << 27) | (1 << 25);
+	instr |= (1 << 24) | (1 << 21);
+	instr |= (rn << RN_S) | (rm << RM_S);
+	instr |= (rd << RD_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.195 SUB (immediate)
+ * Subtract (immediate): Rd = Rn - shift(imm)
+ */
+static void
+arm64_sub_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t imm12)
+{
+	uint32_t instr;
+
+	instr = (1 << 30) | (1 << 28) | (1 << 24);
+	instr |= (rn << RN_S) | (rd << RD_S);
+	instr |= (imm12 << IMM12_S);
+
+	emitm(stream, instr);
+}
+
 /* armv7 */
 
 static int16_t
