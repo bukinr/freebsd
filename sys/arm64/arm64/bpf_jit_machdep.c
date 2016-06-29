@@ -125,7 +125,10 @@ stp(emit_func emitm, bpf_bin_stream *stream,
 }
 
 #define	IMM26_S	0
-/* Unconditional branch (immediate) */
+/*
+ * C6.6.20 B
+ * Unconditional branch (immediate), PC-relative offset
+ */
 static void
 arm64_branch_i(emit_func emitm, bpf_bin_stream *stream,
     uint32_t imm26)
@@ -138,7 +141,10 @@ arm64_branch_i(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
-/* Unconditional branch (register) */
+/*
+ * C6.6.28 BR
+ * Unconditional branch (register)
+ */
 static void
 arm64_branch_r(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rn)
@@ -147,8 +153,9 @@ arm64_branch_r(emit_func emitm, bpf_bin_stream *stream,
 
 #define	RN_S	5
 
-	instr = (1 << 31) | (1 << 30) | (1 << 28) | (1 << 26) | (1 << 25);
-	instr |= (0b10 << 21);		/* opc */
+	instr = (1 << 31) | (1 << 30) | (1 << 28);
+	instr |= (1 << 26) | (1 << 25);
+	instr |= (0b10 << 21);		/* op BranchType_RET */
 	instr |= (0b11111 << 16);	/* op2 */
 	instr |= (rn << RN_S);
 
@@ -167,6 +174,7 @@ ret(emit_func emitm, bpf_bin_stream *stream)
 
 /*
  * C6.6.19 B.cond
+ * Conditional branch (immediate), PC-relative offset
  */
 static void
 arm64_branch_cond(emit_func emitm, bpf_bin_stream *stream,
@@ -192,8 +200,8 @@ arm64_branch_cond(emit_func emitm, bpf_bin_stream *stream,
 #define	RD_S		0
 #define	IMM12_S		10
 /*
+ * C6.6.4  ADD (immediate)
  * Add (immediate): Rd = Rn + shift(imm)
- * C6.6.4
  */
 static void
 add_i(emit_func emitm, bpf_bin_stream *stream,
@@ -213,8 +221,8 @@ add_i(emit_func emitm, bpf_bin_stream *stream,
 #define	RM_S	16
 #define	IMM6_S	10
 /*
+ * C6.6.5  ADD (shifted register)
  * Add (shifted register): Rd = Rn + shift(Rm, amount)
- * C6.6.5
  */
 static void
 arm64_add_r(emit_func emitm, bpf_bin_stream *stream,
@@ -237,8 +245,15 @@ arm64_add_r(emit_func emitm, bpf_bin_stream *stream,
 #define	HW_S		21
 
 /*
- * Move shifted 16-bit immediate to register:
- * Rd = LSL (imm16, shift)
+ * C6.6.126 MOVK
+ *    Move 16-bit immediate into register, keeping other bits unchanged:
+ *    Rd<shift+15:shift> = imm16
+ * C6.6.127 MOVN
+ *    Move inverse of shifted 16-bit immediate to register:
+ *    Rd = NOT (LSL (imm16, shift))
+ * C6.6.128 MOVZ
+ *    Move shifted 16-bit immediate to register:
+ *    Rd = LSL (imm16, shift)
  */
 static void
 arm64_mov_wide(emit_func emitm, bpf_bin_stream *stream,
@@ -295,13 +310,9 @@ arm64_mov_r(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
-/*
- * LDRH (register)
- * C6.6.89
- */
-
 #define	RT_S	0
 #define	IMM9_S	12
+
 /*
  * C6.6.83 LDR (immediate), Unsigned offset
  */
@@ -358,6 +369,7 @@ arm64_ldrb(emit_func emitm, bpf_bin_stream *stream,
 
 /*
  * C6.6.149 REV
+ * Reverse bytes
  */
 static void
 arm64_rev(emit_func emitm, bpf_bin_stream *stream,
@@ -374,6 +386,10 @@ arm64_rev(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
+/*
+ * C6.6.150 REV16
+ * Reverse bytes in 16-bit halfwords
+ */
 static void
 arm64_rev16(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rd, uint32_t rn)
@@ -390,8 +406,9 @@ arm64_rev16(emit_func emitm, bpf_bin_stream *stream,
 }
 
 /*
- * CMP (shifted register)
- * C6.6.46
+ * C6.6.46 CMP (shifted register)
+ * Compare (shifted register), setting the condition flags and
+ * discarding the result: Rn - shift(Rm,amount)
  */
 static void
 arm64_cmp_r(emit_func emitm, bpf_bin_stream *stream,
@@ -417,7 +434,11 @@ arm64_cmp_r(emit_func emitm, bpf_bin_stream *stream,
 #define	IMMS_S	10
 #define	IMM_N	(1 << 22)
 
-/* C6.6.209 TST (immediate) */
+/*
+ * C6.6.209 TST (immediate)
+ * Test bits (immediate), setting the condition flags and
+ * discarding the result: Rn AND imm
+ */
 static void
 arm64_tst_i(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rn, uint32_t val)
@@ -444,7 +465,11 @@ arm64_tst_i(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
-/* C6.6.210 TST (shifted register) */
+/*
+ * C6.6.210 TST (shifted register)
+ * Test bits (shifted register), setting the condition flags and
+ * discarding the result: Rn AND shift(Rm, amount)
+ */
 static void
 arm64_tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
     uint32_t rm)
@@ -533,6 +558,9 @@ arm64_lsl_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
 	printf("val 0x%08x, unsigned -val is 0x%08x\n", val, (unsigned)-val);
 
+	if (imms == 63)
+		panic("unexpected imms\n");
+
 	instr = (1 << 31); /* 64-bit variant */
 	instr |= IMM_N;
 	instr |= (1 << 30);
@@ -545,6 +573,10 @@ arm64_lsl_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	emitm(stream, instr);
 }
 
+/*
+ * C6.6.117 LSR (immediate)
+ * Logical shift right (immediate): Rd = LSR(Rn, shift)
+ */
 static void
 arm64_lsr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t val)
