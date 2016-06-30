@@ -101,6 +101,13 @@ emit_code(bpf_bin_stream *stream, u_int value)
 #define	RT1_S		0
 #define	RN_S		5
 
+/*
+ * Manual used:
+ * ARM Architecture Reference Manual
+ * ARMv8, for ARMv8-A architecture profile, Beta
+ * pdf, 44134380 bytes
+ */
+
 static void
 stp(emit_func emitm, bpf_bin_stream *stream,
     uint32_t reg_list)
@@ -2095,7 +2102,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A | X */
 				printf("BPF_ALU|BPF_OR|BPF_X\n");
 
-				orr_r(emitm, &stream, REG_A, REG_A, REG_X);
+				arm64_orr_r(emitm, &stream, REG_A, REG_A, REG_X);
+				//orr_r(emitm, &stream, REG_A, REG_A, REG_X);
 
 				//ORrd(EDX, EAX);
 				break;
