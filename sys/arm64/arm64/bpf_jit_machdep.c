@@ -719,6 +719,26 @@ arm64_udiv_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	emitm(stream, instr);
 }
 
+#define	RA_S	10	/* Addend */
+/*
+ * C6.6.133 MUL
+ * Multiply: Rd = Rn * Rm
+ */
+static void
+arm64_mul_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 28) | (1 << 27);
+	instr |= (1 << 25) | (1 << 24);
+	instr |= (rn << RN_S) | (rd << RD_S);
+	instr |= (rm << RM_S) | (A64_R(31) << RA_S);
+
+	emitm(stream, instr);
+}
+
 /* armv7 */
 
 static int16_t
@@ -2094,7 +2114,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A * X */
 				printf("BPF_ALU|BPF_MUL|BPF_X not tested\n");
 
-				mul(emitm, &stream, REG_A, REG_A, REG_X, 0);
+				arm64_mul_r(emitm, &stream, REG_A, REG_A, REG_X);
+				//mul(emitm, &stream, REG_A, REG_A, REG_X, 0);
 
 				//MOVrd(EDX, ECX);
 				//MULrd(EDX);
@@ -2188,8 +2209,11 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A * k */
 				printf("BPF_ALU|BPF_MUL|BPF_K not tested\n");
 
-				mov(emitm, &stream, ARM_R1, ins->k);
-				mul(emitm, &stream, REG_A, REG_A, ARM_R1, 0);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				arm64_mul_r(emitm, &stream, REG_A, REG_A, A64_R(1));
+
+				//mov(emitm, &stream, ARM_R1, ins->k);
+				//mul(emitm, &stream, REG_A, REG_A, ARM_R1, 0);
 
 				//MOVrd(EDX, ECX);
 				//MOVid(ins->k, EDX);
