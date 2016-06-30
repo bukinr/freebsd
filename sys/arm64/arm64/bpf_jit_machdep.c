@@ -67,16 +67,6 @@ bpf_filter_func	bpf_jit_compile(struct bpf_insn *, u_int, size_t *);
 #define	REG_MBUFLEN	A64_R(7)
 
 /*
- * Wrapper around __aeabi_uidiv
- */
-static uint32_t
-jit_udiv(uint32_t dividend, uint32_t divisor)
-{
-
-	return (dividend / divisor);
-}
-
-/*
  * Emit routine to update the jump table.
  */
 static void
@@ -657,6 +647,25 @@ arm64_orr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 
 	instr = (1 << 31); /* 64-bit variant */
 	instr |= (1 << 29) | (1 << 27) | (1 << 25);
+	instr |= (rn << RN_S) | (rd << RD_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.214 UDIV
+ * Rd = Rn / Rm
+ */
+static void
+arm64_udiv_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 28) | (1 << 27) | (1 << 25);
+	instr |= (1 << 23) | (1 << 22) | (1 << 11);
 	instr |= (rn << RN_S) | (rd << RD_S);
 	instr |= (rm << RM_S);
 
@@ -2049,11 +2058,13 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A / X */
 				printf("BPF_ALU|BPF_DIV|BPF_X\n");
 
-				mov_r(emitm, &stream, ARM_R0, REG_A);
-				mov_r(emitm, &stream, ARM_R1, REG_X);
-				mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
-				branch_lx(emitm, &stream, COND_AL, ARM_R2);
-				mov_r(emitm, &stream, REG_A, ARM_R0);
+				arm64_udiv_r(emitm, &stream, REG_A, REG_A, REG_X);
+
+				//mov_r(emitm, &stream, ARM_R0, REG_A);
+				//mov_r(emitm, &stream, ARM_R1, REG_X);
+				//mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
+				//branch_lx(emitm, &stream, COND_AL, ARM_R2);
+				//mov_r(emitm, &stream, REG_A, ARM_R0);
 
 				//TESTrd(EDX, EDX);
 				//if (fmem) {
@@ -2141,11 +2152,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A / k */
 				printf("BPF_ALU|BPF_DIV|BPF_K\n");
 
-				mov_r(emitm, &stream, ARM_R0, REG_A);
-				mov(emitm, &stream, ARM_R1, ins->k);
-				mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
-				branch_lx(emitm, &stream, COND_AL, ARM_R2);
-				mov_r(emitm, &stream, REG_A, ARM_R0);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				arm64_udiv_r(emitm, &stream, REG_A, REG_A, A64_R(1));
+
+				//mov_r(emitm, &stream, ARM_R0, REG_A);
+				//mov(emitm, &stream, ARM_R1, ins->k);
+				//mov(emitm, &stream, ARM_R2, (uint32_t)jit_udiv);
+				//branch_lx(emitm, &stream, COND_AL, ARM_R2);
+				//mov_r(emitm, &stream, REG_A, ARM_R0);
 
 				//MOVrd(EDX, ECX);
 				//ZEROrd(EDX);
