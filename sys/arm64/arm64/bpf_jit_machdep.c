@@ -603,6 +603,46 @@ arm64_lsr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 }
 
 /*
+ * C6.6.116 LSR (register)
+ * Logical shift right (register): Rd = LSR(Rn, Rm)
+ */
+static void
+arm64_lsr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 28) | (1 << 27) | (1 << 25);
+	instr |= (1 << 23) | (1 << 22);
+	instr |= (1 << 13) | (1 << 10);
+	instr |= (rn << RN_S) | (rd << RD_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.113 LSL (register)
+ * Logical shift left (register): Rd = LSL(Rn, Rm)
+ */
+static void
+arm64_lsl_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 28) | (1 << 27) | (1 << 25);
+	instr |= (1 << 23) | (1 << 22);
+	instr |= (1 << 13);
+	instr |= (rn << RN_S) | (rd << RD_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+/*
  * C6.6.196 SUB (shifted register)
  * Subtract (shifted register): Rd = Rn - shift(Rm, amount)
  */
@@ -2111,7 +2151,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_LSH|BPF_X:
 				/* A <- A << X */
 				printf("BPF_ALU|BPF_LSH|BPF_X\n");
-				lsl_r(emitm, &stream, REG_A, REG_A, REG_X);
+				arm64_lsl_r(emitm, &stream, REG_A, REG_A, REG_X);
+				//lsl_r(emitm, &stream, REG_A, REG_A, REG_X);
 
 				//MOVrd(EDX, ECX);
 				//SHL_CLrb(EAX);
@@ -2120,8 +2161,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_RSH|BPF_X:
 				/* A <- A >> X */
 				printf("BPF_ALU|BPF_RSH|BPF_X\n");
-				lsr_r(emitm, &stream, REG_A, REG_A, REG_X);
-
+				arm64_lsr_r(emitm, &stream, REG_A, REG_A, REG_X);
+				//lsr_r(emitm, &stream, REG_A, REG_A, REG_X);
 				//MOVrd(EDX, ECX);
 				//SHR_CLrb(EAX);
 				break;
