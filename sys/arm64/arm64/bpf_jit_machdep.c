@@ -1964,8 +1964,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* M[k] <- A */
 				printf("BPF_ST not tested\n");
 
-				str(emitm, &stream, REG_A, ARM_SP,
+				arm64_str_i(emitm, &stream, REG_A, A64_SP,
 				    (ins->k * sizeof(uint32_t)));
+				//str(emitm, &stream, REG_A, ARM_SP,
+				//   (ins->k * sizeof(uint32_t)));
 				/*
 				 * XXX this command and the following could
 				 * be optimized if the previous instruction
@@ -1978,9 +1980,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_STX:
 				/* M[k] <- X */
 				printf("BPF_STX not tested\n");
-				str(emitm, &stream, REG_X, ARM_SP,
+				arm64_str_i(emitm, &stream, REG_X, A64_SP,
 				    (ins->k * sizeof(uint32_t)));
-
+				//str(emitm, &stream, REG_X, ARM_SP,
+				//   (ins->k * sizeof(uint32_t)));
 				//MOVid(ins->k * sizeof(uint32_t), ESI);
 				//MOVomd(EDX, RSP, RSI);
 				break;
