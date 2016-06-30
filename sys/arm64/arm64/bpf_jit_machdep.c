@@ -101,6 +101,12 @@ emit_code(bpf_bin_stream *stream, u_int value)
 #define	RT1_S		0
 #define	RN_S		5
 
+#define	RM_S	16
+#define	RD_S	0
+#define	IMM6_S	10
+#define	RT_S	0
+#define	IMM9_S	12
+
 /*
  * Manual used:
  * ARM Architecture Reference Manual
@@ -190,50 +196,6 @@ arm64_branch_cond(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
-#define	SHIFT_LSL	0
-#define	SHIFT_LSR	1
-#define	SHIFT_ASR	10
-#define	SHIFT_S		22
-#define	RD_S		0
-#define	IMM12_S		10
-/*
- * C6.6.4  ADD (immediate)
- * Add (immediate): Rd = Rn + shift(imm)
- */
-static void
-add_i(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rn, uint32_t imm12)
-{
-	uint32_t instr;
-
-	instr = (1 << 31); /* 64 bit datasize */
-	instr |= (1 << 28) | (1 << 24);
-	instr |= (rd << RD_S);
-	instr |= (rn << RN_S);
-	instr |= (imm12 << IMM12_S);
-
-	emitm(stream, instr);
-}
-
-#define	RM_S	16
-#define	IMM6_S	10
-/*
- * C6.6.5  ADD (shifted register)
- * Add (shifted register): Rd = Rn + shift(Rm, amount)
- */
-static void
-arm64_add_r(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rn, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (1 << 31); /* 64 bit datasize */
-	instr |= (1 << 27) | (1 << 25) | (1 << 24);
-	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
 #define	MOVE_WIDE_OP_S	29
 #define	MOVE_WIDE_OP_N	0
 #define	MOVE_WIDE_OP_Z	2
@@ -307,8 +269,59 @@ arm64_mov_r(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
-#define	RT_S	0
-#define	IMM9_S	12
+#define	SHIFT_LSL	0
+#define	SHIFT_LSR	1
+#define	SHIFT_ASR	10
+#define	SHIFT_S		22
+#define	IMM12_S		10
+/*
+ * C6.6.4  ADD (immediate)
+ * Add (immediate): Rd = Rn + shift(imm)
+ */
+static void
+arm64_add_i(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t imm12)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64 bit datasize */
+	instr |= (1 << 28) | (1 << 24);
+	instr |= (rd << RD_S);
+	instr |= (rn << RN_S);
+	instr |= (imm12 << IMM12_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.5  ADD (shifted register)
+ * Add (shifted register): Rd = Rn + shift(Rm, amount)
+ */
+static void
+arm64_add_r(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64 bit datasize */
+	instr |= (1 << 27) | (1 << 25) | (1 << 24);
+	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+static void
+arm64_add(emit_func emitm, bpf_bin_stream *stream,
+    uint32_t rd, uint32_t rn, uint32_t val)
+{
+
+	if (val > 0xfff) {
+		arm64_mov_i(emitm, stream, A64_R(1), val);
+		arm64_add_r(emitm, stream, rd, rn, A64_R(1));
+	} else {
+		arm64_add_i(emitm, stream, rd, rn, val);
+	}
+}
 
 /*
  * C6.6.83 LDR (immediate), Unsigned offset
@@ -2192,8 +2205,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A + k */
 				//printf("BPF_ALU|BPF_ADD|BPF_K\n");
 
-				add(emitm, &stream, REG_A, REG_A, ins->k);
-
+				arm64_add(emitm, &stream, REG_A, REG_A, ins->k);
+				//add(emitm, &stream, REG_A, REG_A, ins->k);
 				//ADD_EAXi(ins->k);
 				break;
 
