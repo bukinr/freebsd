@@ -1533,7 +1533,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_RET|BPF_A:
 				/* accept A bytes */
 				printf("BPF_RET|BPF_A\n");
-				mov_r(emitm, &stream, ARM_R0, REG_A);
+				arm64_mov_r(emitm, &stream, A64_R(0), REG_A);
+				//mov_r(emitm, &stream, ARM_R0, REG_A);
 				if (fmem) {
 					add(emitm, &stream, ARM_SP, ARM_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
@@ -2167,8 +2168,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				/* A <- A & X */
 				printf("BPF_ALU|BPF_AND|BPF_X\n");
 
-				and_r(emitm, &stream, REG_A, REG_A, REG_X);
-
+				arm64_and_r(emitm, &stream, REG_A, REG_A, REG_X);
+				//and_r(emitm, &stream, REG_A, REG_A, REG_X);
 				//ANDrd(EDX, EAX);
 				break;
 
