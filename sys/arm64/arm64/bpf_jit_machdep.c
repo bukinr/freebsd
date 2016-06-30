@@ -644,6 +644,25 @@ arm64_sub_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	emitm(stream, instr);
 }
 
+/*
+ * C6.6.142 ORR (shifted register)
+ * Bitwise inclusive OR (shifted register):
+ * Rd = Rn OR shift(Rm, amount)
+ */
+static void
+arm64_orr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 29) | (1 << 27) | (1 << 25);
+	instr |= (rn << RN_S) | (rd << RD_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
 /* armv7 */
 
 static int16_t
@@ -2146,7 +2165,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_OR|BPF_K:
 				/* A <- A | k */
 				printf("BPF_ALU|BPF_OR|BPF_K\n");
-				orr(emitm, &stream, REG_A, REG_A, ins->k);
+				arm64_mov_i(emitm, &stream, A64_R(1), ins->k);
+				arm64_orr_r(emitm, &stream, REG_A, REG_A, A64_R(1));
+				//orr(emitm, &stream, REG_A, REG_A, ins->k);
 				//ORid(ins->k, EAX);
 				break;
 
