@@ -752,6 +752,42 @@ arm64_mul_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	emitm(stream, instr);
 }
 
+/*
+ * C6.6.179 STR (register)
+ */
+static void
+arm64_str_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rt,
+    uint32_t rn, uint32_t rm)
+{
+	uint32_t instr;
+
+	instr = (0b11 << 30); /* 64-bit variant */
+	instr |= (1 << 29) | (1 << 28) | (1 << 27);
+	instr |= (1 << 21) | (1 << 11);
+	instr |= (rn << RN_S) | (rt << RT_S);
+	instr |= (rm << RM_S);
+
+	emitm(stream, instr);
+}
+
+/*
+ * C6.6.178 STR (immediate), Unsigned offset
+ */
+static void
+arm64_str_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rt,
+    uint32_t rn, uint32_t imm12)
+{
+	uint32_t instr;
+
+	instr = (0b11 << 30); /* 64-bit variant */
+	instr |= (1 << 29) | (1 << 28) | (1 << 27);
+	instr |= (1 << 24);
+	instr |= (rn << RN_S) | (rt << RT_S);
+	instr |= (imm12 << IMM12_S);
+
+	emitm(stream, instr);
+}
+
 /* armv7 */
 
 static int16_t
