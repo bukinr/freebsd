@@ -788,484 +788,6 @@ arm64_str_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rt,
 	emitm(stream, instr);
 }
 
-/* armv7 */
-
-static int16_t
-imm8m(uint32_t x)
-{
-	uint32_t rot;
-
-	for (rot = 0; rot < 16; rot++) {
-		if ((x & ~ror32(0xff, 2 * rot)) == 0) {
-			return (rol32(x, 2 * rot) | (rot << 8));
-		}
-	}
-
-	return (-1);
-}
-
-static void
-push(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t reg_list)
-{
-	uint32_t instr;
-
-	instr = (1 << 27);
-	instr |= (ARM_SP << RN_S);
-	instr |= (COND_AL << COND_S);
-	instr |= (WRITE_BACK | PRE_INDEX);
-	instr |= (reg_list);
-
-	emitm(stream, instr);
-}
-
-static void
-pop(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t reg_list)
-{
-	uint32_t instr;
-
-	instr = (1 << 27);
-	instr |= (ARM_SP << RN_S);
-	instr |= (COND_AL << COND_S);
-	instr |= (WRITE_BACK | POST_INDEX | UP_BIT | OP_LOAD);
-	instr |= (reg_list);
-
-	emitm(stream, instr);
-}
-
-static void
-branch(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t cond, uint32_t offs)
-{
-	uint32_t instr;
-
-	instr = (1 << 25) | (1 << 27);
-	instr |= (cond << COND_S);
-	instr |= (offs >> 2);
-
-	emitm(stream, instr);
-}
-
-/* Branch and Exchange (BX) */
-static void
-branch_lx(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t cond, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (1 << 24) | (1 << 21) | (0xfff << 8);
-	instr |= (1 << 4);
-	instr |= (1 << 5); /* link */
-	instr |= (cond << COND_S);
-	instr |= (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-mov_i(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t imm)
-{
-	uint32_t instr;
-
-	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (imm << IMM_S);
-	instr |= IMM_OP;	/* operand 2 is an immediate value */
-
-	emitm(stream, instr);
-}
-
-static void
-movw(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t imm)
-{
-	uint32_t instr;
-
-	instr = ARM_MOVW | (COND_AL << COND_S);
-	instr |= (imm >> 12) << RN_S;
-	instr |= (rd << RD_S) | (imm & 0xfff);
-
-	emitm(stream, instr);
-}
-
-static void
-movt(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t imm)
-{
-	uint32_t instr;
-
-	instr = ARM_MOVT | (COND_AL << COND_S);
-	instr |= (imm >> 12) << RN_S;
-	instr |= (rd << RD_S) | (imm & 0xfff);
-
-	emitm(stream, instr);
-}
-
-static void
-mov(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t val)
-{
-	int imm12;
-
-	printf("%s\n", __func__);
-
-	imm12 = imm8m(val);
-	if (imm12 >= 0) {
-		mov_i(emitm, stream, rd, imm12);
-	} else {
-		printf("to emit MOVW\n");
-		movw(emitm, stream, rd, val & 0xffff);
-
-		if (val > 0xffff) {
-			printf("to emit MOVT\n");
-			movt(emitm, stream, rd, (val >> 16));
-		}
-	}
-}
-
-static void
-mul(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rm, uint32_t rs, uint32_t rn)
-{
-	uint32_t instr;
-
-	/* Rd:=Rm*Rs */
-	instr = (1 << 4) | (1 << 7);
-	instr |= (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rs << RS_S) | (rm << RM_S);
-
-	if (rn > 0) {
-		/* Rd:=Rm*Rs+Rn */
-		instr |= MUL_ACCUMULATE;
-		instr |= (rn << RN_S);
-	}
-
-	emitm(stream, instr);
-}
-
-static void
-tst(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
-    uint32_t val)
-{
-	uint32_t instr;
-	int imm12;
-
-	printf("%s\n", __func__);
-
-	instr = (OPCODE_TST << OPCODE_S) | (COND_AL << COND_S);
-	instr |= COND_SET;
-	instr |= (rn << RN_S);
-
-	imm12 = imm8m(val);
-	if (imm12 >= 0) {
-		printf("%s, imm12 >= 0\n", __func__);
-		instr |= (imm12 << IMM_S);
-		instr |= IMM_OP; /* operand 2 is an immediate value */
-	} else {
-		printf("%s, imm12 < 0\n", __func__);
-		mov(emitm, stream, ARM_R0, val);
-		instr |= (ARM_R0 << RM_S);
-	}
-
-	emitm(stream, instr);
-}
-
-static void
-tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
-    uint32_t rm)
-{
-	uint32_t instr;
-
-	printf("%s\n", __func__);
-
-	instr = (OPCODE_TST << OPCODE_S) | (COND_AL << COND_S);
-	instr |= COND_SET;
-	instr |= (rn << RN_S);
-	instr |= (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-lsl(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rm, uint32_t imm)
-{
-	uint32_t instr;
-
-	if (imm > 31)
-		panic("lsl");
-
-	instr = ARM_LSL_I | (COND_AL << COND_S);
-	instr |= (imm << 7);
-	instr |= (rd << RD_S | rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-lsr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rm, uint32_t imm)
-{
-	uint32_t instr;
-
-	if (imm > 31)
-		panic("lsr");
-
-	instr = ARM_LSR_I | (COND_AL << COND_S);
-	instr |= (imm << 7);
-	instr |= (rd << RD_S | rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-lsl_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rm, uint32_t rs)
-{
-	uint32_t instr;
-
-	instr = ARM_LSL_R | (COND_AL << COND_S);
-	instr |= (rs << RS_S);
-	instr |= (rd << RD_S | rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-lsr_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rm, uint32_t rs)
-{
-	uint32_t instr;
-
-	instr = ARM_LSR_R | (COND_AL << COND_S);
-	instr |= (rs << RS_S);
-	instr |= (rd << RD_S | rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-add(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	int imm12;
-
-	instr = (OPCODE_ADD << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S);
-	instr |= (rn << RN_S);
-
-	imm12 = imm8m(val);
-	if (imm12 >= 0) {
-		instr |= (val << IMM_S);
-		instr |= IMM_OP; /* operand 2 is an immediate value */
-	} else {
-		mov(emitm, stream, ARM_R1, val);
-		instr |= (ARM_R1 << RM_S);
-	}
-
-	emitm(stream, instr);
-}
-
-static void
-sub(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	int imm12;
-
-	instr = (OPCODE_SUB << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S);
-	instr |= (rn << RN_S);
-
-	imm12 = imm8m(val);
-	if (imm12 >= 0) {
-		instr |= (val << IMM_S);
-		instr |= IMM_OP;
-	} else {
-		mov(emitm, stream, ARM_R1, val);
-		instr |= (ARM_R1 << RM_S);
-	}
-
-	emitm(stream, instr);
-}
-
-static void
-orr(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	int imm12;
-
-	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S);
-	instr |= (rn << RN_S);
-
-	imm12 = imm8m(val);
-	if (imm12 >= 0) {
-		instr |= (val << IMM_S);
-		instr |= IMM_OP;
-	} else {
-		mov(emitm, stream, ARM_R1, val);
-		instr |= (ARM_R1 << RM_S);
-	}
-
-	emitm(stream, instr);
-}
-
-static void
-rsb_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-
-	printf("%s\n", __func__);
-
-	instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S | rn << RN_S);
-
-	instr |= (val << IMM_S);
-	instr |= IMM_OP;	/* operand 2 is an immediate value */
-
-	emitm(stream, instr);
-}
-
-static void
-rsb(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	int imm12;
-
-	printf("%s\n", __func__);
-
-	imm12 = imm8m(val);
-	if (imm12 >= 0) {
-		rsb_i(emitm, stream, rd, rn, val);
-	} else {
-		mov(emitm, stream, ARM_R1, val);
-
-		instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
-		instr |= (rd << RD_S | rn << RN_S);
-		instr |= (ARM_R1 << RM_S);
-		emitm(stream, instr);
-	}
-}
-
-static void
-and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-
-	printf("%s\n", __func__);
-
-	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S | rn << RN_S);
-	instr |= (val << IMM_S);
-	instr |= IMM_OP;	/* operand 2 is an immediate value */
-
-	emitm(stream, instr);
-}
-
-static void
-and(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	int imm12;
-
-	printf("%s\n", __func__);
-
-	imm12 = imm8m(val);
-	if (imm12 >= 0) {
-		and_i(emitm, stream, rd, rn, val);
-	} else {
-		mov(emitm, stream, ARM_R1, val);
-
-		instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
-		instr |= (rd << RD_S | rn << RN_S);
-		instr |= (ARM_R1 << RM_S);
-		emitm(stream, instr);
-	}
-}
-
-static void
-mov_r(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (OPCODE_MOV << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-cmp_r(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rn, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (OPCODE_CMP << OPCODE_S) | (COND_AL << COND_S);
-	//instr |= (rd << RD_S) | (rm << RM_S);
-	instr |= (rn << RN_S) | (rm << RM_S);
-	instr |= COND_SET;
-
-	emitm(stream, instr);
-}
-
-static void
-add_r(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rn, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (OPCODE_ADD << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S);
-	instr |= (rn << RN_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-orr_r(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rn, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (OPCODE_ORR << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-rsb_r(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rn, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (OPCODE_RSB << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-and_r(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rn, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (OPCODE_AND << OPCODE_S) | (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rn << RN_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
 static void
 jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
     uint8_t cond1, uint8_t cond2)
@@ -1293,101 +815,6 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 		arm64_branch_cond(emitm, stream, cond2, offs);
 		//arm32 branch(emitm, stream, cond2, offs);
 	}
-}
-
-static void
-str(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rm, uint32_t offs)
-{
-	uint32_t instr;
-
-	instr = (1 << 26);
-	instr |= (COND_AL << COND_S) | WORD_BIT | OP_STORE;
-	instr |= UP_BIT | PRE_INDEX;
-	instr |= (rd << RD_S) | (rm << RM_S);
-
-	if (offs > 0) {
-		if (offs > 0xfff)
-			panic("offset is too big");
-		instr |= offs;
-	}
-
-	emitm(stream, instr);
-}
-
-static void
-ldr(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rm, uint32_t offs)
-{
-	uint32_t instr;
-
-	instr = (1 << 26);
-	instr |= (COND_AL << COND_S) | WORD_BIT | OP_LOAD;
-	instr |= UP_BIT | PRE_INDEX;
-	instr |= (rd << RD_S) | (rm << RM_S);
-
-	if (offs > 0) {
-		if (offs > 0xfff)
-			panic("offset is too big");
-		instr |= offs;
-	}
-
-	emitm(stream, instr);
-}
-
-static void
-ldrb(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (1 << 26);
-	instr |= (COND_AL << COND_S) | BYTE_BIT | OP_LOAD;
-	instr |= UP_BIT | PRE_INDEX;
-	instr |= (rd << RD_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-ldrh(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rn)
-{
-	uint32_t instr;
-
-	instr = (1 << 4) | (1 << 7);
-	instr |= (COND_AL << COND_S) | OP_LOAD;
-	instr |= (BYTE_BIT | UP_BIT | PRE_INDEX);
-	instr |= (SH_UH << SH_S);
-	instr |= (rd << RD_S) | (rn << RN_S);
-
-	emitm(stream, instr);
-}
-
-static void
-rev(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = ARM_REV;
-	instr |= (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rm << RM_S);
-
-	emitm(stream, instr);
-}
-
-static void
-rev16(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rd, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = ARM_REV16;
-	instr |= (COND_AL << COND_S);
-	instr |= (rd << RD_S) | (rm << RM_S);
-
-	emitm(stream, instr);
 }
 
 /*
@@ -1553,8 +980,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//amd64 MOVid(ins->k, EAX);
 
 				if (fmem) {
-					//add(emitm, &stream, ARM_SP, ARM_SP,
-					//    BPF_MEMWORDS * sizeof(uint32_t));
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
+					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				if (fpkt || flen || fmem) {
@@ -1572,12 +999,12 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				arm64_mov_r(emitm, &stream, A64_R(0), REG_A);
 				//mov_r(emitm, &stream, ARM_R0, REG_A);
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				if (fpkt || flen || fmem) {
-					pop(emitm, &stream, reg_list);
+					//pop(emitm, &stream, reg_list);
 				}
 
 				emitm(&stream, ARM_RET);
@@ -1605,8 +1032,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//rev(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+					//   BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//MOVid(ins->k, ESI);
@@ -1651,8 +1080,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 rev16(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+					//   BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//ZEROrd(EAX);
@@ -1691,8 +1122,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 ldrb(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+					//   BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//ZEROrd(EAX);
@@ -1749,8 +1182,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 rev(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+					//   BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//CMPrd(EDI, EDX);
@@ -1804,8 +1239,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 rev16(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+					//   BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//ZEROrd(EAX);
@@ -1853,8 +1290,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 ldrb(emitm, &stream, REG_A, ARM_R0);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+						//   BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//ZEROrd(EAX);
@@ -1900,8 +1339,10 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				//arm32 lsl(emitm, &stream, REG_X, ARM_R1, 2);
 
 				if (fmem) {
-					add(emitm, &stream, ARM_SP, ARM_SP,
+					arm64_add_i(emitm, &stream, A64_SP, A64_SP,
 					    BPF_MEMWORDS * sizeof(uint32_t));
+					//add(emitm, &stream, ARM_SP, ARM_SP,
+					//    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
 				//MOVid(ins->k, ESI);
