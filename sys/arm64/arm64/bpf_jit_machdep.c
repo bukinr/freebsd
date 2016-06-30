@@ -615,8 +615,9 @@ arm64_sub_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 {
 	uint32_t instr;
 
-	instr = (1 << 30) | (1 << 27) | (1 << 25);
-	instr |= (1 << 24) | (1 << 21);
+	instr = (1 << 31); /* 64-bit variant */
+	instr |= (1 << 30) | (1 << 27) | (1 << 25);
+	instr |= (1 << 24);
 	instr |= (rn << RN_S) | (rm << RM_S);
 	instr |= (rd << RD_S);
 
@@ -632,6 +633,9 @@ arm64_sub_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
     uint32_t rn, uint32_t imm12)
 {
 	uint32_t instr;
+
+	if (imm12 > 0xfff)
+		panic("%s: implement me", __func__);
 
 	instr = (1 << 30) | (1 << 28) | (1 << 24);
 	instr |= (rn << RN_S) | (rd << RD_S);
@@ -2006,7 +2010,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_SUB|BPF_X:
 				/* A <- A - X */
 				printf("BPF_ALU|BPF_SUB|BPF_X not tested: checkme\n");
-				rsb_r(emitm, &stream, REG_A, REG_X, REG_A);
+				arm64_sub_r(emitm, &stream, REG_A, REG_X, REG_A);
+				//rsb_r(emitm, &stream, REG_A, REG_X, REG_A);
 				//SUBrd(EDX, EAX);
 				break;
 
@@ -2095,7 +2100,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_SUB|BPF_K:
 				/* A <- A - k */
 				printf("BPF_ALU|BPF_SUB|BPF_K\n");
-				rsb(emitm, &stream, REG_A, REG_A, ins->k);
+				arm64_sub_i(emitm, &stream, REG_A, REG_A, ins->k);
+				//rsb(emitm, &stream, REG_A, REG_A, ins->k);
 				//SUB_EAXi(ins->k);
 				break;
 
@@ -2132,7 +2138,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_AND|BPF_K:
 				/* A <- A & k */
 				printf("BPF_ALU|BPF_AND|BPF_K ins->k 0x%x\n", ins->k);
-				and(emitm, &stream, REG_A, REG_A, ins->k);
+				arm64_and_r(emitm, &stream, REG_A, REG_A, ins->k);
+				//and(emitm, &stream, REG_A, REG_A, ins->k);
 				//ANDid(ins->k, EAX);
 				break;
 
@@ -2163,8 +2170,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_ALU|BPF_NEG:
 				/* A <- -A */
 				printf("BPF_ALU|BPF_NEG\n");
-				/* substruct from zero */
-				rsb(emitm, &stream, REG_A, REG_A, 0);
+				/* substruct from xzr */
+				arm64_sub_r(emitm, &stream, REG_A, A64_R(31), REG_A);
+				//rsb(emitm, &stream, REG_A, REG_A, 0);
 				//NEGd(EAX);
 				break;
 
