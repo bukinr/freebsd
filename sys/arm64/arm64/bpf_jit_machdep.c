@@ -895,8 +895,8 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		if (fmem) {
 			printf("fmem\n");
 			/* Using stack for memory scratch space */
-			//arm32 sub(emitm, &stream, A64_SP, A64_SP,
-			//   BPF_MEMWORDS * sizeof(uint32_t));
+			arm64_sub_i(emitm, &stream, A64_SP, A64_SP,
+			    BPF_MEMWORDS * sizeof(uint32_t));
 		}
 		if (flen) {
 			printf("flen\n");
