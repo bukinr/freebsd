@@ -426,11 +426,6 @@ arm64_cmp_r(emit_func emitm, bpf_bin_stream *stream,
 {
 	uint32_t instr;
 
-	//instr = (OPCODE_CMP << OPCODE_S) | (COND_AL << COND_S);
-	//instr |= (rd << RD_S) | (rm << RM_S);
-	//instr |= (rn << RN_S) | (rm << RM_S);
-	//instr |= COND_SET;
-
 	instr = (1 << 31); /* 64-bit variant */
 	instr |= (1 << 30) | (1 << 29) | (1 << 27);
 	instr |= (1 << 25) | (1 << 24);
@@ -881,7 +876,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	int flags, fret, fpkt, fmem, fjmp, flen;
 	bpf_bin_stream stream;
 	struct bpf_insn *ins;
-	uint32_t reg_list;
+	//uint32_t reg_list;
 	u_int i, pass;
 
 	printf("%s: nins %d\n", __func__, nins);
@@ -922,9 +917,9 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	 */
 	emitm = emit_length;
 
-	reg_list = (1 << REG_A) | (1 << REG_X);
-	reg_list |= (1 << REG_MBUF) | (1 << REG_MBUFLEN);
-	reg_list |= (1 << ARM_LR); /* Used for jit_udiv */
+	//reg_list = (1 << REG_A) | (1 << REG_X);
+	//reg_list |= (1 << REG_MBUF) | (1 << REG_MBUFLEN);
+	//reg_list |= (1 << ARM_LR); /* Used for jit_udiv */
 
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
@@ -937,7 +932,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		if (fmem) {
 			printf("fmem\n");
 			/* Using stack for memory scratch space */
-			//arm32 sub(emitm, &stream, ARM_SP, ARM_SP,
+			//arm32 sub(emitm, &stream, A64_SP, A64_SP,
 			//   BPF_MEMWORDS * sizeof(uint32_t));
 		}
 		if (flen) {
@@ -1191,14 +1186,14 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 			case BPF_LD|BPF_MEM:
 				/* A <- M[k] */
 				printf("BPF_LD|BPF_MEM\n");
-				arm64_ldr(emitm, &stream, REG_A, ARM_SP,
+				arm64_ldr(emitm, &stream, REG_A, A64_SP,
 				    (ins->k * sizeof(uint32_t)));
 				break;
 
 			case BPF_LDX|BPF_MEM:
 				/* X <- M[k] */
 				printf("BPF_LDX|BPF_MEM\n");
-				arm64_ldr(emitm, &stream, REG_X, ARM_SP,
+				arm64_ldr(emitm, &stream, REG_X, A64_SP,
 				    (ins->k * sizeof(uint32_t)));
 				break;
 
