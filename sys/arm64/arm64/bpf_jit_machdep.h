@@ -48,12 +48,6 @@
 /*
  * Instructions assembly parts
  */
-#define	OPC_S		30
-#define	OPC_LDP		0b10
-#define	OPC_STP		0b10
-#define	RT2_S		10
-#define	RT1_S		0
-
 #define	RM_S		16
 #define	RD_S		0
 #define	RT_S		0

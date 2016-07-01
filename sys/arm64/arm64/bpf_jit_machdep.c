@@ -100,19 +100,6 @@ emit_code(bpf_bin_stream *stream, u_int value)
  * pdf, 44134380 bytes
  */
 
-static void
-stp(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t reg_list)
-{
-	uint32_t instr;
-
-	/* Load/store register pair (post-indexed) */
-	instr = (1 << 23) | (1 << 27) | (1 << 29);
-	instr |= (OPC_STP << OPC_S);
-
-	emitm(stream, instr);
-}
-
 /*
  * C6.6.20 B
  * Unconditional branch (immediate), PC-relative offset
@@ -404,37 +391,6 @@ arm64_cmp_r(emit_func emitm, bpf_bin_stream *stream,
 }
 
 /*
- * C6.6.209 TST (immediate)
- * Test bits (immediate), setting the condition flags and
- * discarding the result: Rn AND imm
- */
-static void
-arm64_tst_i(emit_func emitm, bpf_bin_stream *stream,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	uint32_t immr;
-	uint32_t imms;
-	uint32_t sz;
-
-	sz = 64;
-	immr = (unsigned)-(val) % sz;
-	imms = sz - 1 - (val);
-
-	instr = (1 << 31); /* 64-bit variant */
-	instr |= (1 << 30) | (1 << 29);
-	instr |= (1 << 28) | (1 << 25);
-	instr |= (immr << IMMR_S);
-	instr |= (imms << IMMS_S);
-	instr |= (rn << RN_S);
-	instr |= (A64_R(31) << RD_S);	/* discard result */
-	//if (val & (1 << 12))
-	//	instr |= IMM_N;
-
-	emitm(stream, instr);
-}
-
-/*
  * C6.6.210 TST (shifted register)
  * Test bits (shifted register), setting the condition flags and
  * discarding the result: Rn AND shift(Rm, amount)
@@ -451,39 +407,6 @@ arm64_tst_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rn,
 	instr |= (rn << RN_S);
 	instr |= (rm << RM_S);
 	instr |= (A64_R(31) << RD_S);	/* discard result */
-
-	emitm(stream, instr);
-}
-
-/*
- * C6.6.11 AND (immediate)
- * Bitwise AND (immediate): Rd = Rn AND imm
- */
-static void
-arm64_and_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
-    uint32_t rn, uint32_t val)
-{
-	uint32_t instr;
-	uint32_t immr;
-	uint32_t imms;
-
-	if (val > 0xfff)
-		panic("%s: implement me\n", __func__);
-
-	uint32_t sz;
-	sz = 64;
-	immr = (unsigned)-(val) % sz;
-	imms = sz - 1 - (val);
-
-	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
-
-	instr = (1 << 31); /* 64-bit variant */
-	instr |= IMM_N;
-	instr |= (1 << 28) | (1 << 25);
-	instr |= (immr << IMMR_S);
-	instr |= (imms << IMMS_S);
-	instr |= (rn << RN_S);
-	instr |= (rd << RD_S);
 
 	emitm(stream, instr);
 }
@@ -706,24 +629,6 @@ arm64_mul_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	instr |= (1 << 25) | (1 << 24);
 	instr |= (rn << RN_S) | (rd << RD_S);
 	instr |= (rm << RM_S) | (A64_R(31) << RA_S);
-
-	emitm(stream, instr);
-}
-
-/*
- * C6.6.179 STR (register)
- */
-static void
-arm64_str_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rt,
-    uint32_t rn, uint32_t rm)
-{
-	uint32_t instr;
-
-	instr = (0b11 << 30); /* 64-bit variant */
-	instr |= (1 << 29) | (1 << 28) | (1 << 27);
-	instr |= (1 << 21) | (1 << 11);
-	instr |= (rn << RN_S) | (rt << RT_S);
-	instr |= (rm << RM_S);
 
 	emitm(stream, instr);
 }
