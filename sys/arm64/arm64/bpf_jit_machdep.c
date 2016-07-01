@@ -657,9 +657,7 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 		offs = stream->refs[stream->bpf_pc + ins->jt] - \
 		    stream->refs[stream->bpf_pc];
 		//printf("offs 0x%08x\n", offs);
-
 		/* TODO: check if offs fit imm19 */
-
 		arm64_branch_cond(emitm, stream, cond1, offs);
 	}
 
@@ -667,9 +665,7 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 		offs = stream->refs[stream->bpf_pc + ins->jf] - \
 		    stream->refs[stream->bpf_pc];
 		//printf("offs 0x%08x\n", offs);
-
 		/* TODO: check if offs fit imm19 */
-
 		arm64_branch_cond(emitm, stream, cond2, offs);
 	}
 }
@@ -781,10 +777,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
 
-		if (fpkt || flen || fmem) {
-			//arm32 push(emitm, &stream, reg_list);
-		}
-
 		/* Create the procedure header. */
 		if (fmem) {
 			printf("fmem\n");
@@ -823,12 +815,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
-				if (fpkt || flen || fmem) {
-					//pop(emitm, &stream, reg_list);
-				}
-
 				ret(emitm, &stream);
-
 				break;
 
 			case BPF_RET|BPF_A:
@@ -841,12 +828,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 					    BPF_MEMWORDS * sizeof(uint32_t));
 				}
 
-				if (fpkt || flen || fmem) {
-					//pop(emitm, &stream, reg_list);
-				}
-
 				ret(emitm, &stream);
-
 				break;
 
 			case BPF_LD|BPF_W|BPF_ABS:
