@@ -794,6 +794,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 		}
 		if (flen) {
 			printf("flen\n");
+			arm64_mov_r(emitm, &stream, REG_MBUFLEN, A64_R(1));
 		}
 		if (fpkt) {
 			printf("fpkt\n");
