@@ -310,7 +310,6 @@ arm64_ldrh(emit_func emitm, bpf_bin_stream *stream,
 	instr |= (1 << 29) | (1 << 28) | (1 << 27);
 	instr |= (1 << 22);
 	instr |= (1 << 24);
-	//instr |= (1 << 11) | (1 << 10);
 	instr |= (rn << RN_S) | (rt << RT_S);
 	
 	emitm(stream, instr);
@@ -476,14 +475,11 @@ arm64_lsr_i(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	uint32_t instr;
 	uint32_t immr;
 	uint32_t imms;
-	//uint32_t sz;
 
-	//sz = 64;
-	immr = val; //(unsigned)-(val) % sz;
-	imms = 0b111111; //sz - 1 - (val);
+	immr = val;
+	imms = 0b111111;
 
 	printf("immr 0x%08x imms 0x%08x\n", immr, imms);
-	//printf("val 0x%08x, unsigned -val is 0x%08x\n", val, (unsigned)-val);
 
 	instr = (1 << 31); /* 64-bit variant */
 	instr |= IMM_N;
@@ -665,7 +661,6 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 		/* TODO: check if offs fit imm19 */
 
 		arm64_branch_cond(emitm, stream, cond1, offs);
-		//arm32 branch(emitm, stream, cond1, offs);
 	}
 
 	if (ins->jf != 0) {
@@ -676,7 +671,6 @@ jcc(emit_func emitm, bpf_bin_stream *stream, struct bpf_insn *ins,
 		/* TODO: check if offs fit imm19 */
 
 		arm64_branch_cond(emitm, stream, cond2, offs);
-		//arm32 branch(emitm, stream, cond2, offs);
 	}
 }
 
@@ -744,7 +738,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	int flags, fret, fpkt, fmem, fjmp, flen;
 	bpf_bin_stream stream;
 	struct bpf_insn *ins;
-	//uint32_t reg_list;
 	u_int i, pass;
 
 	printf("%s: nins %d\n", __func__, nins);
@@ -784,10 +777,6 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 	 * to create the reference table.
 	 */
 	emitm = emit_length;
-
-	//reg_list = (1 << REG_A) | (1 << REG_X);
-	//reg_list |= (1 << REG_MBUF) | (1 << REG_MBUFLEN);
-	//reg_list |= (1 << ARM_LR); /* Used for jit_udiv */
 
 	for (pass = 0; pass < 2; pass++) {
 		ins = prog;
@@ -1012,7 +1001,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 
 				break;
 
-			case BPF_LDX|BPF_MSH|BPF_B: //implement me for dst port 22
+			case BPF_LDX|BPF_MSH|BPF_B:
 				/* X <- 4*(P[k:1]&0xf) */
 				printf("BPF_LDX|BPF_MSH|BPF_B ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
 				    ins->jt, ins->jf, ins->k);
@@ -1123,7 +1112,7 @@ bpf_jit_compile(struct bpf_insn *prog, u_int nins, size_t *size)
 				jcc(emitm, &stream, ins, COND_EQ, COND_NE);
 				break;
 
-			case BPF_JMP|BPF_JSET|BPF_K: //implement me for dst port 22
+			case BPF_JMP|BPF_JSET|BPF_K:
 				/* pc += (A & k) ? jt : jf */
 				printf("BPF_JMP|BPF_JSET|BPF_K ins->jt 0x%x ins->jf 0x%x ins->k 0x%x\n",
 				    ins->jt, ins->jf, ins->k);
