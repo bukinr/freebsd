@@ -93,41 +93,6 @@ emit_code(bpf_bin_stream *stream, u_int value)
 	stream->cur_ip += 4;
 }
 
-#define	OPC_S		30
-#define	OPC_LDP		0b10
-#define	OPC_STP		0b10
-#define	RT2_S		10
-#define	RT1_S		0
-
-#define	RM_S		16
-#define	RD_S		0
-#define	RT_S		0
-#define	RA_S		10	/* Addend */
-#define	RN_S		5
-#define	IMM6_S		10
-#define	IMM7_S		15
-#define	IMM9_S		12
-#define	IMM12_S		10
-#define	IMM16_S		5
-#define	IMM19_S		5
-#define	IMM26_S		0
-
-#define	MOVE_WIDE_OP_S	29
-#define	MOVE_WIDE_OP_N	0
-#define	MOVE_WIDE_OP_Z	2
-#define	MOVE_WIDE_OP_K	3
-#define	HW_S		21
-
-#define	COND_S	0
-
-#define	SHIFT_LSL	0
-#define	SHIFT_LSR	1
-#define	SHIFT_ASR	10
-#define	SHIFT_S		22
-#define	IMMR_S		16
-#define	IMMS_S		10
-#define	IMM_N		(1 << 22)
-
 /*
  * Manual used:
  * ARM Architecture Reference Manual
