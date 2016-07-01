@@ -96,16 +96,37 @@ emit_code(bpf_bin_stream *stream, u_int value)
 #define	OPC_S		30
 #define	OPC_LDP		0b10
 #define	OPC_STP		0b10
-#define	IMM7_S		15
 #define	RT2_S		10
 #define	RT1_S		0
-#define	RN_S		5
 
-#define	RM_S	16
-#define	RD_S	0
-#define	IMM6_S	10
-#define	RT_S	0
-#define	IMM9_S	12
+#define	RM_S		16
+#define	RD_S		0
+#define	RT_S		0
+#define	RA_S		10	/* Addend */
+#define	RN_S		5
+#define	IMM6_S		10
+#define	IMM7_S		15
+#define	IMM9_S		12
+#define	IMM12_S		10
+#define	IMM16_S		5
+#define	IMM19_S		5
+#define	IMM26_S		0
+
+#define	MOVE_WIDE_OP_S	29
+#define	MOVE_WIDE_OP_N	0
+#define	MOVE_WIDE_OP_Z	2
+#define	MOVE_WIDE_OP_K	3
+#define	HW_S		21
+
+#define	COND_S	0
+
+#define	SHIFT_LSL	0
+#define	SHIFT_LSR	1
+#define	SHIFT_ASR	10
+#define	SHIFT_S		22
+#define	IMMR_S		16
+#define	IMMS_S		10
+#define	IMM_N		(1 << 22)
 
 /*
  * Manual used:
@@ -127,7 +148,6 @@ stp(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
-#define	IMM26_S	0
 /*
  * C6.6.20 B
  * Unconditional branch (immediate), PC-relative offset
@@ -149,12 +169,10 @@ arm64_branch_i(emit_func emitm, bpf_bin_stream *stream,
  * Unconditional branch (register)
  */
 static void
-arm64_branch_r(emit_func emitm, bpf_bin_stream *stream,
+arm64_branch_ret(emit_func emitm, bpf_bin_stream *stream,
     uint32_t rn)
 {
 	uint32_t instr;
-
-#define	RN_S	5
 
 	instr = (1 << 31) | (1 << 30) | (1 << 28);
 	instr |= (1 << 26) | (1 << 25);
@@ -169,11 +187,8 @@ static void
 ret(emit_func emitm, bpf_bin_stream *stream)
 {
 
-	arm64_branch_r(emitm, stream, A64_LR);
+	arm64_branch_ret(emitm, stream, A64_LR);
 }
-
-#define	IMM19_S	5
-#define	COND_S	0
 
 /*
  * C6.6.19 B.cond
@@ -195,13 +210,6 @@ arm64_branch_cond(emit_func emitm, bpf_bin_stream *stream,
 
 	emitm(stream, instr);
 }
-
-#define	MOVE_WIDE_OP_S	29
-#define	MOVE_WIDE_OP_N	0
-#define	MOVE_WIDE_OP_Z	2
-#define	MOVE_WIDE_OP_K	3
-#define	IMM16_S		5
-#define	HW_S		21
 
 /*
  * C6.6.126 MOVK
@@ -269,11 +277,6 @@ arm64_mov_r(emit_func emitm, bpf_bin_stream *stream,
 	emitm(stream, instr);
 }
 
-#define	SHIFT_LSL	0
-#define	SHIFT_LSR	1
-#define	SHIFT_ASR	10
-#define	SHIFT_S		22
-#define	IMM12_S		10
 /*
  * C6.6.4  ADD (immediate)
  * Add (immediate): Rd = Rn + shift(imm)
@@ -434,10 +437,6 @@ arm64_cmp_r(emit_func emitm, bpf_bin_stream *stream,
 
 	emitm(stream, instr);
 }
-
-#define	IMMR_S	16
-#define	IMMS_S	10
-#define	IMM_N	(1 << 22)
 
 /*
  * C6.6.209 TST (immediate)
@@ -727,7 +726,6 @@ arm64_udiv_r(emit_func emitm, bpf_bin_stream *stream, uint32_t rd,
 	emitm(stream, instr);
 }
 
-#define	RA_S	10	/* Addend */
 /*
  * C6.6.133 MUL
  * Multiply: Rd = Rn * Rm
