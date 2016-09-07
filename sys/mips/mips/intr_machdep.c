@@ -224,6 +224,8 @@ cpu_intr(struct trapframe *tf)
 	register_t cause, status;
 	int hard, i, intr;
 
+	//printf(".");
+
 	critical_enter();
 
 	cause = mips_rd_cause();
@@ -237,8 +239,10 @@ cpu_intr(struct trapframe *tf)
 	intr &= (status & MIPS_INT_MASK) >> 8;
 	while ((i = fls(intr)) != 0) {
 		intr &= ~(1 << (i - 1));
+		//printf("intr %d, cpuid %d\n", i, PCPU_GET(cpuid));
 		switch (i) {
-		case 1: case 2:
+		case 1:
+		case 2:
 			/* Software interrupt. */
 			i--; /* Get a 0-offset interrupt. */
 			hard = 0;
@@ -265,6 +269,8 @@ cpu_intr(struct trapframe *tf)
 			printf("stray %s interrupt %d\n", 
 			    hard ? "hard" : "soft", i);
 		}
+		//if (hard == 0)
+		//	printf("got sw intr\n");
 	}
 
 	KASSERT(i == 0, ("all interrupts handled"));

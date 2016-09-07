@@ -116,6 +116,8 @@ mips_ipi_handler(void *arg)
 	u_int	cpu, ipi, ipi_bitmap;
 	int	bit;
 
+	printf("%s\n", __func__);
+
 	cpu = PCPU_GET(cpuid);
 
 	platform_ipi_clear();	/* quiesce the pending ipi interrupt */
@@ -131,6 +133,7 @@ mips_ipi_handler(void *arg)
 		ipi = 1 << bit;
 		ipi_bitmap &= ~ipi;
 		switch (ipi) {
+		printf("ipi %d\n", ipi);
 		case IPI_RENDEZVOUS:
 			CTR0(KTR_SMP, "IPI_RENDEZVOUS");
 			smp_rendezvous_action();
@@ -173,6 +176,8 @@ mips_ipi_handler(void *arg)
 			panic("Unknown IPI 0x%0x on cpu %d", ipi, curcpu);
 		}
 	}
+
+	printf("%s finished\n", __func__);
 
 	return (FILTER_HANDLED);
 }
@@ -327,6 +332,10 @@ smp_init_secondary(u_int32_t cpuid)
 	/* Start per-CPU event timers. */
 	cpu_initclocks_ap();
 
+	uint32_t ipi_irq = platform_ipi_intrnum();
+	cpu_establish_softintr("ipi", mips_ipi_handler, NULL, NULL, ipi_irq,
+			       INTR_TYPE_MISC | INTR_EXCL, NULL);
+
 	/* enter the scheduler */
 	sched_throw(NULL);
 
@@ -346,7 +355,7 @@ release_aps(void *dummy __unused)
 	 * IPI handler
 	 */
 	ipi_irq = platform_ipi_intrnum();
-	cpu_establish_hardintr("ipi", mips_ipi_handler, NULL, NULL, ipi_irq,
+	cpu_establish_softintr("ipi", mips_ipi_handler, NULL, NULL, ipi_irq,
 			       INTR_TYPE_MISC | INTR_EXCL, NULL);
 
 	atomic_store_rel_int(&aps_ready, 1);
