@@ -1,6 +1,14 @@
 /*-
- * Copyright (c) 2004-2010 Juli Mallett <jmallett@FreeBSD.org>
+ * Copyright (c) 2016 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ *
+ * Portions of this software were developed by SRI International and the
+ * University of Cambridge Computer Laboratory under DARPA/AFRL contract
+ * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Portions of this software were developed by the University of Cambridge
+ * Computer Laboratory as part of the CTSRD Project, with support from the
+ * UK Higher Education Innovation Fund (HEIF).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,41 +43,19 @@
  * This function must be implemented in assembly because it is called early
  * in AP boot without a valid stack.
  */
-#if 1
 LEAF(platform_processor_id)
 	.set push
-	//.set mips32r2
+	.set mips32r2
 	mfc0	v0, $15, 1
-	andi	v0, 0xf
 	jr	ra
-	nop
-	nop
-	nop
-	nop
+	andi	v0, 0xf
 	.set pop
 END(platform_processor_id)
-#endif
 
 /*
  * Called on APs to wait until they are told to launch.
  */
 LEAF(malta_ap_wait)
-//1:
-//	j	1b
-//	nop
-
-	li	v0, 1
-1:	ll	t0, malta_ap_boot
-	bne	v0, t0, 1b
-	nop
-
-	move	t0, zero
-	sc	t0, malta_ap_boot
-
-	j	mpentry
-	nop
-
-#if 0
 	jal	platform_processor_id
 	nop
 
@@ -85,6 +71,5 @@ LEAF(malta_ap_wait)
 
 	j	mpentry
 	nop
-#endif
 END(malta_ap_wait)
 #endif
