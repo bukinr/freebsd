@@ -73,8 +73,6 @@
 #include "assym.s"
 
 	.data
-aaaa:
-	.space 8
 #ifdef YAMON
 GLOBAL(fenvp)
 	.space 4			# Assumes mips32?  Is that OK?
@@ -161,42 +159,14 @@ VECTOR(_locore, unknown)
 #endif
 
 #if defined(CPU_MIPS4KC) && defined(SMP)
-
-	
-	PTR_LA	t3, _C_LABEL(aaaa)
-	REG_L	t2, 0(t3)
+	mfc0	t2, $15, 1
+	andi	t2, 0xf
 	beqz	t2, 1f
 	nop
 	j	malta_ap_wait
 	nop
 1:
-	li	t2, 1
-	REG_S	t2, 0(t3)
-
-#if 0
-        mfc0    t2, MIPS_COP_0_PRID
-        srl     t2, t2, 25
-        and     t2, t2, 7
-	beqz	t2, 1f
-	nop
-	j	malta_ap_wait
-	nop
 #endif
-#if 0
-	.set push
-	.set mips32r2
-	rdhwr	t2, $0
-	beqz	t2, 1f
-	nop
-	j	malta_ap_wait
-	nop
-	.set pop
-#endif
-
-2:
-
-#endif
-
 	/*
 	 * Initialize stack and call machine startup.
 	 */
