@@ -159,6 +159,15 @@ VECTOR(_locore, unknown)
 #endif
 
 #if defined(CPU_MIPS4KC) && defined(SMP)
+	.set    push
+	.set    mips32r2
+	.set    noat
+	li	t2, 3
+	move    $1, t2
+	.word   0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
+	.set    pop
+
+	/* Check the CPU ID */
 	mfc0	t2, $15, 1
 	andi	t2, 0xf
 	beqz	t2, 1f

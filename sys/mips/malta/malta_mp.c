@@ -134,7 +134,7 @@ void
 platform_ipi_send(int cpuid)
 {
 
-	printf("%s: fromcpu %d -> tocpu %d\n", __func__, PCPU_GET(cpuid), cpuid);
+	//printf("%s: fromcpu %d -> tocpu %d\n", __func__, PCPU_GET(cpuid), cpuid);
 
 #if 0
 	uint32_t cfg3;
@@ -153,9 +153,6 @@ platform_ipi_send(int cpuid)
 
 	printf("15.3: %x\n", read_c0_register32(15, 3));
 #endif
-
-	write_vpe_c0_vpeconf0(VPECONF0_MVP | VPECONF0_VPA);
-
 	uint32_t reg;
 	uint32_t cause;
 
@@ -188,7 +185,7 @@ platform_ipi_clear(void)
 
 	cpuid = PCPU_GET(cpuid);
 
-	printf("%s: %d\n", __func__, cpuid);
+	//printf("%s: %d\n", __func__, cpuid);
 
 	uint32_t reg;
 	reg = read_c0_register32(13, 0);
@@ -241,7 +238,7 @@ platform_init_ap(int cpuid)
 
 	//printf("%s: %d\n", __func__, cpuid);
 
-	write_vpe_c0_vpeconf0(VPECONF0_MVP | VPECONF0_VPA);
+	//write_vpe_c0_vpeconf0(VPECONF0_MVP | VPECONF0_VPA);
 
 	/*
 	 * Set the exception base.
