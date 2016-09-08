@@ -182,8 +182,6 @@ platform_ipi_send(int cpuid)
 	write_vpe_c0_cause(cause | C_SW1);
 	//cause = read_vpe_c0_cause();
 	//printf("new cause 0x%x\n", cause);
-
-	//while (1);
 }
 
 void
@@ -211,29 +209,15 @@ platform_ipi_clear(void)
 #endif
 }
 
-#if 0
 int
-platform_processor_id(void)
+platform_ipi_hardintr_num(void)
 {
-	uint32_t prid;
 
-	//prid = (mips_rd_prid() >> 25) & 0x7;
-	//prid = read_c0_register32(15, 1) & 0x1f;
-	//prid = mips_rd_ebase() & 0x1f;
-
-	prid = (mips_rd_prid());
-	printf("%x\n", prid);
-
-	return (prid);
-#if 0
-	return (mips_rd_ebase() & 7);
-#endif
-	return (0);
+	return (-1);
 }
-#endif
 
 int
-platform_ipi_intrnum(void)
+platform_ipi_softintr_num(void)
 {
 
 	return (1);
@@ -245,7 +229,6 @@ platform_init_ap(int cpuid)
 	unsigned reg;
 
 	//printf("%s: %d\n", __func__, cpuid);
-
 	//write_vpe_c0_vpeconf0(VPECONF0_MVP | VPECONF0_VPA);
 
 	/*
@@ -268,8 +251,7 @@ platform_init_ap(int cpuid)
 	/*
 	 * Unmask the ipi interrupts.
 	 */
-	//reg = hard_int_mask(platform_ipi_intrnum());
-	reg = soft_int_mask(platform_ipi_intrnum());
+	reg = soft_int_mask(platform_ipi_softintr_num());
 	set_intr_mask(reg);
 }
 
@@ -288,30 +270,8 @@ platform_smp_topo(void)
 {
 
 	return (smp_topo_none());
-#if 0
-	return (0);
-#endif
 }
 
-#if 0
-static void
-malta_core_powerup(void)
-{
-	uint32_t reg;
-
-	reg = readreg(JZ_CGU_BASE + JZ_LPCR);
-	reg &= ~LPCR_PD_SCPU;
-	writereg(JZ_CGU_BASE + JZ_LPCR, reg);
-	do {
-		reg = readreg(JZ_CGU_BASE + JZ_LPCR);
-	} while ((reg & LPCR_SCPUS) != 0);
-}
-#endif
-
-/*
- * Spin up the second code. The code is roughly modeled after
- * similar routine in Linux.
- */
 int
 platform_start_ap(int cpuid)
 {
@@ -320,6 +280,7 @@ platform_start_ap(int cpuid)
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);
+
 	for (;;) {
 		DELAY(1000);
 		if (atomic_cmpset_32(&malta_ap_boot, 0, ~0) != 0) {
@@ -329,39 +290,5 @@ platform_start_ap(int cpuid)
 		printf("Waiting for cpu%d to start\n", cpuid);
 	}
 
-#if 0
-	uint32_t reg, addr;
-
-	if (cpuid >= JZ4780_MAXCPU)
-		return (EINVAL);
-
-	/* Figure out address of mpentry in KSEG1 */
-	addr = MIPS_PHYS_TO_KSEG1(MIPS_KSEG0_TO_PHYS(malta_mpentry));
-	KASSERT((addr & ~JZ_REIM_ENTRY_MASK) == 0,
-	    ("Unaligned mpentry"));
-
-	/* Configure core alternative entry point */
-	reg = mips_rd_xburst_reim();
-	reg &= ~JZ_REIM_ENTRY_MASK;
-	reg |= addr & JZ_REIM_ENTRY_MASK;
-
-	/* Allow this core to get IPIs from one being started */
-	reg |= JZ_REIM_MIRQ0M;
-	mips_wr_xburst_reim(reg);
-
-	/* Force core into reset and enable use of alternate entry point */
-	reg = mips_rd_xburst_core_ctl();
-	reg |= (JZ_CORECTL_SWRST0 << cpuid) | (JZ_CORECTL_RPC0 << cpuid);
-	mips_wr_xburst_core_ctl(reg);
-
-	/* Power the core up */
-	malta_core_powerup();
-
-	/* Take the core out of reset */
-	reg &= ~(JZ_CORECTL_SWRST0 << cpuid);
-	mips_wr_xburst_core_ctl(reg);
-
-	return (0);
-#endif
 	return (0);
 }
