@@ -44,6 +44,7 @@
 
 GLOBAL(malta_mpentry)
 
+#if 0
 	/* Initialize caches */
 	li	t0, MIPS_KSEG0_START
 	ori	t1, t0, CACHE_SIZE
@@ -57,6 +58,7 @@ GLOBAL(malta_mpentry)
 	/* Set TLB page mask */
 	mtc0	zero, MIPS_COP_0_TLB_PG_MASK
 	COP0_SYNC
+#endif
 
 	j	mpentry
 	nop

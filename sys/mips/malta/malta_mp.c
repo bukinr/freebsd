@@ -157,35 +157,28 @@ platform_ipi_send(int cpuid)
 	write_vpe_c0_vpeconf0(VPECONF0_MVP | VPECONF0_VPA);
 
 	uint32_t reg;
-
-	reg = read_c0_register32(1, 1);
-	printf("read reg 0x%08x\n", reg);
-
-	reg &= ~0xff;
-	reg |= cpuid;
-
-	printf("writing tc reg 0x%08x\n", reg);
-	write_c0_register32(1, 1, reg);
-	//ehb();
-
-	reg = read_c0_register32(1, 1);
-	printf("new reg 0x%08x\n", reg);
-
 	uint32_t cause;
 
-	cause = read_vpe_c0_cause();
-	printf("vpe cause 0x%x\n", cause);
+	/* Set thread context */
+	reg = read_c0_register32(1, 1);
+	//printf("read reg 0x%08x\n", reg);
+	reg &= ~0xff;
+	reg |= cpuid;
+	//printf("writing tc reg 0x%08x\n", reg);
+	write_c0_register32(1, 1, reg);
 
+	ehb();
+	//reg = read_c0_register32(1, 1);
+	//printf("new reg 0x%08x\n", reg);
+
+	/* Set cause */
+	cause = read_vpe_c0_cause();
+	//printf("vpe cause 0x%x\n", cause);
 	write_vpe_c0_cause(cause | C_SW1);
-	cause = read_vpe_c0_cause();
-	printf("new cause 0x%x\n", cause);
+	//cause = read_vpe_c0_cause();
+	//printf("new cause 0x%x\n", cause);
 
-#if 0
-	if (cpuid == 0)
-		mips_wr_xburst_mbox0(1);
-	else
-		mips_wr_xburst_mbox1(1);
-#endif
+	//while (1);
 }
 
 void
@@ -199,8 +192,8 @@ platform_ipi_clear(void)
 
 	uint32_t reg;
 	reg = read_c0_register32(13, 0);
-	printf("%s: %d cause 0x%x\n", __func__, cpuid, reg);
-	reg &= ~(1 << 9);
+	//printf("%s: %d cause 0x%x\n", __func__, cpuid, reg);
+	reg &= ~(C_SW1);
 	write_c0_register32(13, 0, reg);
 
 #if 0
@@ -318,15 +311,7 @@ int
 platform_start_ap(int cpuid)
 {
 
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
-	printf("%s:: %d\n", __func__, cpuid);
+	printf("%s: %d\n", __func__, cpuid);
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);

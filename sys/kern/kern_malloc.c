@@ -473,7 +473,7 @@ malloc(unsigned long size, struct malloc_type *mtp, int flags)
 		KASSERT(curthread->td_intr_nesting_level == 0,
 		   ("malloc(M_WAITOK) in interrupt context"));
 	KASSERT(curthread->td_critnest == 0 || SCHEDULER_STOPPED(),
-	    ("malloc: called with spinlock or critical section held, td_critnest %d", curthread->td_critnest));
+	    ("malloc: called with spinlock or critical section held"));
 
 #ifdef DEBUG_MEMGUARD
 	if (memguard_cmp_mtp(mtp, size)) {
