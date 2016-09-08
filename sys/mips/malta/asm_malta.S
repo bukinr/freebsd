@@ -69,7 +69,7 @@ LEAF(malta_ap_wait)
 	beqz	t0, 1b
 	nop
 
-	j	malta_mpentry
+	j	mpentry
 	nop
 END(malta_ap_wait)
 #endif
