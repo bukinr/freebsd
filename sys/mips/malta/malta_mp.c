@@ -48,90 +48,77 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/smp.h>
 
-//#include <mips/ingenic/malta_regs.h>
-//#include <mips/ingenic/malta_cpuregs.h>
+#define	MALTA_MAXCPU	2
 
 unsigned malta_ap_boot = ~0;
 
-void malta_mpentry(void);
+#define	C_SW0		(1 << 8)
+#define	C_SW1		(1 << 9)
+#define	C_IRQ0		(1 << 10)
+#define	C_IRQ1		(1 << 11)
+#define	C_IRQ2		(1 << 12)
+#define	C_IRQ3		(1 << 13)
+#define	C_IRQ4		(1 << 14)
+#define	C_IRQ5		(1 << 15)
 
-#define MALTA_MAXCPU	2
-
-struct mtx mlock;
-
-/*
- * R4x00 interrupt cause bits
- */
-#define C_SW0           ((1) <<  8)
-#define C_SW1           ((1) <<  9)
-#define C_IRQ0          ((1) << 10)
-#define C_IRQ1          ((1) << 11)
-#define C_IRQ2          ((1) << 12)
-#define C_IRQ3          ((1) << 13)
-#define C_IRQ4          ((1) << 14)
-#define C_IRQ5          ((1) << 15)
-
-static inline void ehb(void)
+static inline void
+ehb(void)
 {
-        __asm__ __volatile__(
-        "       .set    mips32r2                                \n"
-        "       ehb                                             \n"
-        "       .set    mips0                                   \n");
+	__asm __volatile(
+	"	.set mips32r2	\n"
+	"	ehb		\n"
+	"	.set mips0	\n");
 }
 
-#define mttc0(rd,sel,v)                                                 \
-({                                                                      \
-        __asm__ __volatile__(                                           \
-        "       .set    push                                    \n"     \
-        "       .set    mips32r2                                \n"     \
-        "       .set    noat                                    \n"     \
-        "       move    $1, %0                                  \n"     \
-        "      # mttc0 %0," #rd ", " #sel "                    \n"     \
-        "       .word   0x41810000 | (" #rd " << 11) | " #sel " \n"     \
-        "       .set    pop                                     \n"     \
-        :                                                               \
-        : "r" (v));                                                     \
+#define mttc0(rd, sel, val)						\
+({									\
+	__asm __volatile(						\
+	"	.set push					\n"	\
+	"	.set mips32r2					\n"	\
+	"	.set noat					\n"	\
+	"	move	$1, %0					\n"	\
+	"	.word 0x41810000 | (" #rd " << 11) | " #sel "	\n"	\
+	"	.set pop					\n"	\
+	:: "r" (val));							\
 })
 
-#define mftc0(rt,sel)                                                   \
-({                                                                      \
-         unsigned long  __res;                                          \
-                                                                        \
-        __asm__ __volatile__(                                           \
-        "       .set    push                                    \n"     \
-        "       .set    mips32r2                                \n"     \
-        "       .set    noat                                    \n"     \
-        "      # mftc0 $1, $" #rt ", " #sel "                  \n"     \
-        "       .word   0x41000800 | (" #rt " << 16) | " #sel " \n"     \
-        "       move    %0, $1                                  \n"     \
-        "       .set    pop                                     \n"     \
-        : "=r" (__res));                                                \
-                                                                        \
-        __res;                                                          \
+#define	mftc0(rt, sel)							\
+({									\
+	unsigned long __res;						\
+									\
+	__asm __volatile(						\
+	"	.set push					\n"	\
+	"	.set mips32r2					\n"	\
+	"	.set noat					\n"	\
+	"	.word 0x41000800 | (" #rt " << 16) | " #sel "	\n"	\
+	"	move	%0, $1					\n"	\
+	"	.set pop					\n"	\
+	: "=r" (__res));						\
+									\
+	 __res;								\
 })
 
-#define write_vpe_c0_cause(val)		mttc0(13, 0, val)
-#define read_vpe_c0_cause()             mftc0(13, 0)
+#define	write_c0_register32(reg, sel, val)				\
+({									\
+	__asm __volatile(						\
+		".set push\n\t"						\
+		".set mips32\n\t"					\
+		"mtc0	%0, $%1, %2\n\t"				\
+		".set pop\n"						\
+	:: "r" (val), "i" (reg), "i" (sel));				\
+})
 
-#define write_c0_register32(reg,  sel, value)                   \
-        __asm__ __volatile__(                                   \
-            ".set       push\n\t"                               \
-            ".set       mips32\n\t"                             \
-            "mtc0       %0, $%1, %2\n\t"                        \
-            ".set       pop\n"                                  \
-        : : "r" (value), "i" (reg), "i" (sel) );
-
-#define read_c0_register32(reg, sel)                            \
-({                                                              \
-         uint32_t __rv;                                         \
-        __asm__ __volatile__(                                   \
-            ".set       push\n\t"                               \
-            ".set       mips32\n\t"                             \
-            "mfc0       %0, $%1, %2\n\t"                        \
-            ".set       pop\n"                                  \
-            : "=r" (__rv) : "i" (reg), "i" (sel) );             \
-        __rv;                                                   \
- })
+#define	read_c0_register32(reg, sel)					\
+({									\
+	uint32_t __retval;						\
+	__asm __volatile(						\
+		".set push\n\t"						\
+		".set mips32\n\t"					\
+		"mfc0	%0, $%1, %2\n\t"				\
+		".set pop\n"						\
+	: "=r" (__retval) : "i" (reg), "i" (sel));			\
+	__retval;							\
+})
 
 void
 platform_ipi_send(int cpuid)
@@ -141,19 +128,19 @@ platform_ipi_send(int cpuid)
 	//printf("%s: fromcpu %d -> tocpu %d\n", __func__, PCPU_GET(cpuid), cpuid);
 
 	/*
-	 * Set thread context
-	 * Note this is not global, so we don't need lock
+	 * Set thread context.
+	 * Note this is not global, so we don't need lock.
 	 */
 	reg = read_c0_register32(1, 1);
-	reg &= ~0xff;
+	reg &= ~(0xff);
 	reg |= cpuid;
 	write_c0_register32(1, 1, reg);
 
 	ehb();
 
 	/* Set cause */
-	reg = read_vpe_c0_cause();
-	write_vpe_c0_cause(reg | C_SW1);
+	reg = mftc0(13, 0);
+	mttc0(13, 0, (reg | C_SW1));
 }
 
 void
@@ -200,7 +187,7 @@ platform_init_ap(int cpuid)
 	/*
 	 * Clear any pending IPIs.
 	 */
-	//platform_ipi_clear();
+	platform_ipi_clear();
 
 	/*
 	 * Unmask the clock and ipi interrupts.
@@ -234,7 +221,7 @@ platform_start_ap(int cpuid)
 {
 	int timeout;
 
-	printf("%s: %d\n", __func__, cpuid);
+	//printf("%s: %d\n", __func__, cpuid);
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);
