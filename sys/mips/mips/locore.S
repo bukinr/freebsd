@@ -161,10 +161,8 @@ VECTOR(_locore, unknown)
 #if defined(CPU_MALTA) && defined(SMP)
 	.set push
 	.set mips32r2
-	/* Enable MVP */
 	jal	enable_mvp
 	nop
-	/* Check the CPU ID. */
 	jal	platform_processor_id
 	nop
 	beqz	v0, 1f
@@ -174,6 +172,7 @@ VECTOR(_locore, unknown)
 	.set pop
 1:
 #endif
+
 	/*
 	 * Initialize stack and call machine startup.
 	 */

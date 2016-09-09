@@ -99,10 +99,10 @@ ehb(void)
 #define	write_c0_register32(reg, sel, val)				\
 ({									\
 	__asm __volatile(						\
-		".set push\n\t"						\
-		".set mips32\n\t"					\
-		"mtc0	%0, $%1, %2\n\t"				\
-		".set pop\n"						\
+	"	.set push					\n"	\
+	"	.set mips32					\n"	\
+	"	mtc0	%0, $%1, %2				\n"	\
+	"	.set pop					\n"	\
 	:: "r" (val), "i" (reg), "i" (sel));				\
 })
 
@@ -110,10 +110,10 @@ ehb(void)
 ({									\
 	uint32_t __retval;						\
 	__asm __volatile(						\
-		".set push\n\t"						\
-		".set mips32\n\t"					\
-		"mfc0	%0, $%1, %2\n\t"				\
-		".set pop\n"						\
+	"	.set push					\n"	\
+	"	.set mips32					\n"	\
+	"	mfc0	%0, $%1, %2				\n"	\
+	"	.set pop					\n"	\
 	: "=r" (__retval) : "i" (reg), "i" (sel));			\
 	__retval;							\
 })
