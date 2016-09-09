@@ -51,6 +51,14 @@ __FBSDID("$FreeBSD$");
 //#include <mips/ingenic/malta_regs.h>
 //#include <mips/ingenic/malta_cpuregs.h>
 
+unsigned malta_ap_boot = ~0;
+
+void malta_mpentry(void);
+
+#define MALTA_MAXCPU	2
+
+struct mtx mlock;
+
 /*
  * R4x00 interrupt cause bits
  */
@@ -125,13 +133,6 @@ static inline void ehb(void)
         __rv;                                                   \
  })
 
-
-unsigned malta_ap_boot = ~0;
-
-void malta_mpentry(void);
-
-#define MALTA_MAXCPU	2
-
 void
 platform_ipi_send(int cpuid)
 {
@@ -139,7 +140,10 @@ platform_ipi_send(int cpuid)
 
 	//printf("%s: fromcpu %d -> tocpu %d\n", __func__, PCPU_GET(cpuid), cpuid);
 
-	/* Set thread context */
+	/*
+	 * Set thread context
+	 * Note this is not global, so we don't need lock
+	 */
 	reg = read_c0_register32(1, 1);
 	reg &= ~0xff;
 	reg |= cpuid;
@@ -183,33 +187,29 @@ platform_ipi_softintr_num(void)
 void
 platform_init_ap(int cpuid)
 {
-	unsigned reg;
+	unsigned clock_int_mask;
+	unsigned ipi_intr_mask;
 
 	//printf("%s: %d\n", __func__, cpuid);
-	//write_vpe_c0_vpeconf0(VPECONF0_MVP | VPECONF0_VPA);
 
 	/*
 	 * Set the exception base.
 	 */
 	mips_wr_ebase(0x80000000);
 
-#if 0
 	/*
 	 * Clear any pending IPIs.
 	 */
-	mips_wr_xburst_core_sts(~(JZ_CORESTS_MIRQ0P << cpuid));
-
-	/* Allow IPI mbox for this core */
-	reg = mips_rd_xburst_reim();
-	reg |= (JZ_REIM_MIRQ0M << cpuid);
-	mips_wr_xburst_reim(reg);
-#endif
+	//platform_ipi_clear();
 
 	/*
-	 * Unmask the ipi interrupts.
+	 * Unmask the clock and ipi interrupts.
 	 */
-	reg = soft_int_mask(platform_ipi_softintr_num());
-	set_intr_mask(reg);
+	ipi_intr_mask = soft_int_mask(platform_ipi_softintr_num());
+	clock_int_mask = hard_int_mask(5);
+	set_intr_mask(ipi_intr_mask | clock_int_mask);
+
+	mips_wbflush();
 }
 
 void
@@ -232,20 +232,25 @@ platform_smp_topo(void)
 int
 platform_start_ap(int cpuid)
 {
+	int timeout;
 
 	printf("%s: %d\n", __func__, cpuid);
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);
 
-	for (;;) {
+	printf("Waiting for cpu%d to start\n", cpuid);
+
+	timeout = 100;
+	do {
 		DELAY(1000);
 		if (atomic_cmpset_32(&malta_ap_boot, 0, ~0) != 0) {
 			printf("CPU %d started\n", cpuid);
 			return (0);
 		}
-		printf("Waiting for cpu%d to start\n", cpuid);
-	}
+	} while (timeout--);
+
+	printf("CPU %d failed to start\n", cpuid);
 
 	return (0);
 }
