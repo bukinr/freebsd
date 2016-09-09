@@ -167,9 +167,9 @@ VECTOR(_locore, unknown)
 	.word	0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
 
 	/* Check the CPU ID. */
-	mfc0	t2, $15, 1
-	andi	t2, 0x1f
-	beqz	t2, 1f
+	jal	platform_processor_id
+	nop
+	beqz	v0, 1f
 	nop
 	j	malta_ap_wait
 	nop

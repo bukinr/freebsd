@@ -48,7 +48,7 @@ LEAF(platform_processor_id)
 	.set mips32r2
 	mfc0	v0, $15, 1
 	jr	ra
-	andi	v0, 0xf
+	andi	v0, 0x1f
 	.set pop
 END(platform_processor_id)
 
