@@ -161,11 +161,9 @@ VECTOR(_locore, unknown)
 #if defined(CPU_MALTA) && defined(SMP)
 	.set push
 	.set mips32r2
-	.set noat
-	li	t2, 3
-	move	$1, t2
-	.word	0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
-
+	/* Enable MVP */
+	jal	enable_mvp
+	nop
 	/* Check the CPU ID. */
 	jal	platform_processor_id
 	nop

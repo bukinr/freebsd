@@ -36,6 +36,8 @@
 
 #include <machine/asm.h>
 
+#define	VPECONF0_MVP	(1 << 1)
+
 	.set noreorder
 
 #ifdef SMP
@@ -52,6 +54,17 @@ LEAF(platform_processor_id)
 	.set pop
 END(platform_processor_id)
 
+LEAF(enable_mvp)
+	.set push
+	.set mips32r2
+	.set noat
+	li	t2, (VPECONF0_MVP)
+	move	$1, t2
+	jr	ra
+	.word	0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
+	.set pop
+END(enable_mvp)
+
 /*
  * Called on APs to wait until they are told to launch.
  */
@@ -59,7 +72,8 @@ LEAF(malta_ap_wait)
 	jal	platform_processor_id
 	nop
 
-1:	ll	t0, malta_ap_boot
+1:
+	ll	t0, malta_ap_boot
 	bne	v0, t0, 1b
 	nop
 

@@ -51,9 +51,6 @@ __FBSDID("$FreeBSD$");
 //#include <mips/ingenic/malta_regs.h>
 //#include <mips/ingenic/malta_cpuregs.h>
 
-#define	VPECONF0_VPA	(1 << 0)
-#define	VPECONF0_MVP	(1 << 1)
-
 /*
  * R4x00 interrupt cause bits
  */
