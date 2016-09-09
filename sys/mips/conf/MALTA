@@ -10,6 +10,4 @@ machine		mips mipsel	# Malta supports both, so it isn't in std.malta
 
 options         SMP
 
-makeoptions     ARCH_FLAGS="-march=mips32r2"
- 
 makeoptions	KERNLOADADDR=0x80100000
