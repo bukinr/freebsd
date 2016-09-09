@@ -70,7 +70,7 @@ ehb(void)
 	"	.set mips0	\n");
 }
 
-#define mttc0(rd, sel, val)						\
+#define	mttc0(rd, sel, val)						\
 ({									\
 	__asm __volatile(						\
 	"	.set push					\n"	\
@@ -85,7 +85,6 @@ ehb(void)
 #define	mftc0(rt, sel)							\
 ({									\
 	unsigned long __res;						\
-									\
 	__asm __volatile(						\
 	"	.set push					\n"	\
 	"	.set mips32r2					\n"	\
@@ -94,7 +93,6 @@ ehb(void)
 	"	move	%0, $1					\n"	\
 	"	.set pop					\n"	\
 	: "=r" (__res));						\
-									\
 	 __res;								\
 })
 
@@ -125,8 +123,6 @@ platform_ipi_send(int cpuid)
 {
 	uint32_t reg;
 
-	//printf("%s: fromcpu %d -> tocpu %d\n", __func__, PCPU_GET(cpuid), cpuid);
-
 	/*
 	 * Set thread context.
 	 * Note this is not global, so we don't need lock.
@@ -147,10 +143,6 @@ void
 platform_ipi_clear(void)
 {
 	uint32_t reg;
-
-	//int cpuid;
-	//cpuid = PCPU_GET(cpuid);
-	//printf("%s: %d\n", __func__, cpuid);
 
 	reg = mips_rd_cause();
 	reg &= ~(C_SW1);
@@ -174,10 +166,8 @@ platform_ipi_softintr_num(void)
 void
 platform_init_ap(int cpuid)
 {
-	unsigned clock_int_mask;
-	unsigned ipi_intr_mask;
-
-	//printf("%s: %d\n", __func__, cpuid);
+	uint32_t clock_int_mask;
+	uint32_t ipi_intr_mask;
 
 	/*
 	 * Set the exception base.
@@ -220,8 +210,6 @@ int
 platform_start_ap(int cpuid)
 {
 	int timeout;
-
-	//printf("%s: %d\n", __func__, cpuid);
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);
