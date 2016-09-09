@@ -105,9 +105,6 @@ static inline void ehb(void)
 #define write_vpe_c0_cause(val)		mttc0(13, 0, val)
 #define read_vpe_c0_cause()             mftc0(13, 0)
 
-#define read_vpe_c0_vpeconf0()          mftc0(1, 2)
-#define write_vpe_c0_vpeconf0(val)      mttc0(1, 2, val)
-
 #define write_c0_register32(reg,  sel, value)                   \
         __asm__ __volatile__(                                   \
             ".set       push\n\t"                               \
@@ -138,72 +135,35 @@ void malta_mpentry(void);
 void
 platform_ipi_send(int cpuid)
 {
+	uint32_t reg;
 
 	//printf("%s: fromcpu %d -> tocpu %d\n", __func__, PCPU_GET(cpuid), cpuid);
 
-#if 0
-	uint32_t cfg3;
-	cfg3 = mips_rd_config3();
-	printf("cfg3: %x\n", cfg3);
-
-	uint64_t *vaddr;
-	//uint32_t ofs = 0x1bdc0000; /* gic base */
-	uint32_t ofs = 0x1fbf8000; /* gcr base */
-
-	vaddr = (uint64_t *)(MIPS_PHYS_TO_KSEG0(ofs));
-	printf("vaddr 0x%016lx\n", (uint64_t)vaddr);
-	printf("gic sh config: %lx\n", *(vaddr + 0x0));
-	printf("gic sh+8 config: %lx\n", *(vaddr + 0x08));
-	printf("gic sh+80 config: %lx\n", *(vaddr + 0x80));
-
-	printf("15.3: %x\n", read_c0_register32(15, 3));
-#endif
-	uint32_t reg;
-	uint32_t cause;
-
 	/* Set thread context */
 	reg = read_c0_register32(1, 1);
-	//printf("read reg 0x%08x\n", reg);
 	reg &= ~0xff;
 	reg |= cpuid;
-	//printf("writing tc reg 0x%08x\n", reg);
 	write_c0_register32(1, 1, reg);
 
 	ehb();
-	//reg = read_c0_register32(1, 1);
-	//printf("new reg 0x%08x\n", reg);
 
 	/* Set cause */
-	cause = read_vpe_c0_cause();
-	//printf("vpe cause 0x%x\n", cause);
-	write_vpe_c0_cause(cause | C_SW1);
-	//cause = read_vpe_c0_cause();
-	//printf("new cause 0x%x\n", cause);
+	reg = read_vpe_c0_cause();
+	write_vpe_c0_cause(reg | C_SW1);
 }
 
 void
 platform_ipi_clear(void)
 {
-	int cpuid;
+	uint32_t reg;
 
-	cpuid = PCPU_GET(cpuid);
-
+	//int cpuid;
+	//cpuid = PCPU_GET(cpuid);
 	//printf("%s: %d\n", __func__, cpuid);
 
-	uint32_t reg;
-	reg = read_c0_register32(13, 0);
-	//printf("%s: %d cause 0x%x\n", __func__, cpuid, reg);
+	reg = mips_rd_cause();
 	reg &= ~(C_SW1);
-	write_c0_register32(13, 0, reg);
-
-#if 0
-	int cpuid = PCPU_GET(cpuid);
-	uint32_t action;
-
-	action = (cpuid == 0) ? mips_rd_xburst_mbox0() : mips_rd_xburst_mbox1();
-	KASSERT(action == 1, ("CPU %d: unexpected IPIs: %#x", cpuid, action));
-	mips_wr_xburst_core_sts(~(JZ_CORESTS_MIRQ0P << cpuid));
-#endif
+	mips_wr_cause(reg);
 }
 
 int
