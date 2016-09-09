@@ -159,21 +159,21 @@ VECTOR(_locore, unknown)
 #endif
 
 #if defined(CPU_MALTA) && defined(SMP)
-	.set    push
-	.set    mips32r2
-	.set    noat
+	.set push
+	.set mips32r2
+	.set noat
 	li	t2, 3
-	move    $1, t2
-	.word   0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
+	move	$1, t2
+	.word	0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
 
-	/* Check the CPU ID */
+	/* Check the CPU ID. */
 	mfc0	t2, $15, 1
 	andi	t2, 0xf
 	beqz	t2, 1f
 	nop
 	j	malta_ap_wait
 	nop
-	.set    pop
+	.set pop
 1:
 #endif
 	/*
