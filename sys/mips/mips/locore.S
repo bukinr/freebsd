@@ -168,7 +168,7 @@ VECTOR(_locore, unknown)
 
 	/* Check the CPU ID. */
 	mfc0	t2, $15, 1
-	andi	t2, 0xf
+	andi	t2, 0x1f
 	beqz	t2, 1f
 	nop
 	j	malta_ap_wait
