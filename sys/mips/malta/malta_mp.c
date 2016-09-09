@@ -170,11 +170,6 @@ platform_init_ap(int cpuid)
 	uint32_t ipi_intr_mask;
 
 	/*
-	 * Set the exception base.
-	 */
-	mips_wr_ebase(0x80000000);
-
-	/*
 	 * Clear any pending IPIs.
 	 */
 	platform_ipi_clear();
