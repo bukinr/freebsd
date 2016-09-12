@@ -249,7 +249,7 @@ platform_start_ap(int cpuid)
 	/* Unhalt CPU core */
 	mttc0(2, 4, 0);
 
-	/* Enable VPE */
+	/* Activate VPE */
 	reg = mftc0(1, 2);
 	reg |= (CP0VPEC0_VPA);
 	mttc0(1, 2, reg);

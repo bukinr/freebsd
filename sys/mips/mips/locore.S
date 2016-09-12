@@ -163,7 +163,7 @@ VECTOR(_locore, unknown)
 	.set mips32r2
 	jal	malta_enable_mvp
 	nop
-	jal	malta_enable_vpa
+	jal	malta_activate_vpe
 	nop
 	jal	platform_processor_id
 	nop

@@ -66,7 +66,7 @@ LEAF(malta_enable_mvp)
 	.set pop
 END(malta_enable_mvp)
 
-LEAF(malta_enable_vpa)
+LEAF(malta_activate_vpe)
 	.set push
 	.set mips32r2
 	mfc0	t2, $1, 2
@@ -75,7 +75,7 @@ LEAF(malta_enable_vpa)
 	jr	ra
 	nop
 	.set pop
-END(malta_enable_vpa)
+END(malta_activate_vpe)
 
 /*
  * Called on APs to wait until they are told to launch.
