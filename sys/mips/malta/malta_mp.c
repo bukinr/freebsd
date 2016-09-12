@@ -49,7 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 
 #define	MALTA_MAXCPU	2
-#define	CP0VPEC0_VPA	(1 << 0)
+#define	VPECONF0_VPA	(1 << 0)
 #define	MVPCONTROL_VPC	(1 << 1)
 #define	TCSTATUS_A	(1 << 13)
 
@@ -251,7 +251,7 @@ platform_start_ap(int cpuid)
 
 	/* Activate VPE */
 	reg = mftc0(1, 2);
-	reg |= (CP0VPEC0_VPA);
+	reg |= (VPECONF0_VPA);
 	mttc0(1, 2, reg);
 
 	/* Out of configuration */
