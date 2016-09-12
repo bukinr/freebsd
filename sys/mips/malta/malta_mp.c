@@ -243,7 +243,7 @@ platform_start_ap(int cpuid)
 
 	/* Enable thread */
 	reg = mftc0(2, 1);
-	reg |= TCSTATUS_A;
+	reg |= (TCSTATUS_A);
 	mttc0(2, 1, reg);
 
 	/* Unhalt CPU core */
