@@ -61,36 +61,18 @@ unsigned malta_ap_boot = ~0;
 #define	C_IRQ4		(1 << 14)
 #define	C_IRQ5		(1 << 15)
 
-static inline void __raw_evpe(void)
- {
-         __asm__ __volatile__(
-         "       .set    push                                            \n"
-         "       .set    noreorder                                       \n"
-         "       .set    noat                                            \n"
-         "       .set    mips32r2                                        \n"
-         "       .word   0x41600021              # evpe                  \n"
-         "       ehb                                                     \n"
-         "       .set    pop                                             \n");
- }
-
-static inline unsigned int dvpe(void)
- {
-         int res = 0;
- 
-         __asm__ __volatile__(
-         "       .set    push                                            \n"
-         "       .set    noreorder                                       \n"
-         "       .set    noat                                            \n"
-         "       .set    mips32r2                                        \n"
-         "       .word   0x41610001              # dvpe $1               \n"
-         "       move    %0, $1                                          \n"
-         "       ehb                                                     \n"
-         "       .set    pop                                             \n"
-         : "=r" (res));
- 
-//        instruction_hazard();
-         return res;
- }
+static inline void
+vpe_enable(void)
+{
+	__asm __volatile(
+	"	.set push			\n"
+	"	.set noreorder			\n"
+	"	.set noat			\n"
+	"	.set mips32r2			\n"
+	"	.word	0x41600021	# evpe	\n"
+	"	ehb				\n"
+	"	.set pop			\n");
+}
 
 static inline void
 ehb(void)
@@ -243,10 +225,6 @@ platform_start_ap(int cpuid)
 	int timeout;
 	uint32_t reg;
 
-	//disable VPE
-	dvpe();
-	//do { } while (0);
-
 	//MVPCONTROL_VPC
 	//write_c0_register32(0, 1, (1 << 1));
 
@@ -288,7 +266,7 @@ platform_start_ap(int cpuid)
 	reg = read_c0_register32(0, 1);
 	reg &= ~(1 << 1);
 	write_c0_register32(0, 1, reg);
-	__raw_evpe();
+	vpe_enable();
 
 	/* current core */
 	/* Set CP0VPEC0_VPA */
