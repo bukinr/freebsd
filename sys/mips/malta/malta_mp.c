@@ -156,7 +156,7 @@ platform_ipi_send(int cpuid)
 
 	/* Set cause */
 	reg = mftc0(13, 0);
-	reg |= C_SW1;
+	reg |= (C_SW1);
 	mttc0(13, 0, reg);
 }
 
