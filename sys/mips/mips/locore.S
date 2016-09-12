@@ -161,9 +161,9 @@ VECTOR(_locore, unknown)
 #if defined(CPU_MALTA) && defined(SMP)
 	.set push
 	.set mips32r2
-	jal	enable_mvp
+	jal	malta_enable_mvp
 	nop
-	jal	enable_vpa
+	jal	malta_enable_vpa
 	nop
 	jal	platform_processor_id
 	nop

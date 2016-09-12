@@ -55,7 +55,7 @@ LEAF(platform_processor_id)
 	.set pop
 END(platform_processor_id)
 
-LEAF(enable_mvp)
+LEAF(malta_enable_mvp)
 	.set push
 	.set mips32r2
 	.set noat
@@ -64,9 +64,9 @@ LEAF(enable_mvp)
 	jr	ra
 	.word	0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
 	.set pop
-END(enable_mvp)
+END(malta_enable_mvp)
 
-LEAF(enable_vpa)
+LEAF(malta_enable_vpa)
 	.set push
 	.set mips32r2
 	mfc0	t2, $1, 2
@@ -75,15 +75,7 @@ LEAF(enable_vpa)
 	jr	ra
 	nop
 	.set pop
-END(enable_vpa)
-
-LEAF(malta_configure_cpu)
-	.set push
-	.set mips32r2
-	jr	ra
-	nop
-	.set pop
-END(malta_configure_cpu)
+END(malta_enable_vpa)
 
 /*
  * Called on APs to wait until they are told to launch.
