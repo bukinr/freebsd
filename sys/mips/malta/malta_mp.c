@@ -230,8 +230,8 @@ platform_smp_topo(void)
 int
 platform_start_ap(int cpuid)
 {
-	int timeout;
 	uint32_t reg;
+	int timeout;
 
 	/* Enter into configuration */
 	reg = read_c0_register32(0, 1);
@@ -240,25 +240,25 @@ platform_start_ap(int cpuid)
 
 	set_thread_context(cpuid);
 
-	/* restart entry */
-	//reg = mftc0(2, 3);
-	//printf("cpu%d tc_restart 0x%x\n", cpuid, reg);
-	//reg = 0x80000000;
-	//mttc0(2, 3, reg);
+	/*
+	 * Hint: how to set entry point.
+	 * reg = 0x80000000;
+	 * mttc0(2, 3, reg);
+	 */
 
-	/* TCSTATUS_A */
+#define	TCSTATUS_A	(1 << 13)
+
+	/* Enable thread */
 	reg = mftc0(2, 1);
-	printf("cpu%d tc_status %d\n", cpuid, reg);
-	mttc0(2, 1, reg | (1 << 13));
-	reg = mftc0(2, 1);
-	printf("cpu%d tc_status %d\n", cpuid, reg);
+	reg |= TCSTATUS_A;
+	mttc0(2, 1, reg);
 
 	/* Unhalt CPU core */
 	mttc0(2, 4, 0);
 
 	/* Enable VPE */
 	reg = mftc0(1, 2);
-	reg |= 1;
+	reg |= (CP0VPEC0_VPA);
 	mttc0(1, 2, reg);
 
 	/* Out of configuration */
@@ -269,7 +269,6 @@ platform_start_ap(int cpuid)
 	vpe_enable();
 
 	/* current core */
-	/* Set CP0VPEC0_VPA */
 	reg = read_c0_register32(1, 2);
 	reg |= CP0VPEC0_VPA;
 	write_c0_register32(1, 2, reg);
