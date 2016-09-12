@@ -37,6 +37,7 @@
 #include <machine/asm.h>
 
 #define	VPECONF0_MVP	(1 << 1)
+#define	CP0VPEC0_VPA	(1 << 0)
 
 	.set noreorder
 
@@ -64,6 +65,25 @@ LEAF(enable_mvp)
 	.word	0x41810000 | (1 << 11) | 2	# mttc0 t2, $1, 2
 	.set pop
 END(enable_mvp)
+
+LEAF(enable_vpa)
+	.set push
+	.set mips32r2
+	mfc0	t2, $1, 2
+	or	t2, t2, (CP0VPEC0_VPA)
+	mtc0	t2, $1, 2
+	jr	ra
+	nop
+	.set pop
+END(enable_vpa)
+
+LEAF(malta_configure_cpu)
+	.set push
+	.set mips32r2
+	jr	ra
+	nop
+	.set pop
+END(malta_configure_cpu)
 
 /*
  * Called on APs to wait until they are told to launch.

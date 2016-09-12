@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #define	MALTA_MAXCPU	2
 #define	CP0VPEC0_VPA	(1 << 0)
 #define	MVPCONTROL_VPC	(1 << 1)
+#define	TCSTATUS_A	(1 << 13)
 
 unsigned malta_ap_boot = ~0;
 
@@ -188,12 +189,6 @@ platform_init_ap(int cpuid)
 {
 	uint32_t clock_int_mask;
 	uint32_t ipi_intr_mask;
-	int reg;
-
-	/* Enable VPE */
-	reg = read_c0_register32(1, 2);
-	reg |= CP0VPEC0_VPA;
-	write_c0_register32(1, 2, reg);
 
 	/*
 	 * Clear any pending IPIs.
@@ -246,8 +241,6 @@ platform_start_ap(int cpuid)
 	 * mttc0(2, 3, reg);
 	 */
 
-#define	TCSTATUS_A	(1 << 13)
-
 	/* Enable thread */
 	reg = mftc0(2, 1);
 	reg |= TCSTATUS_A;
@@ -267,11 +260,6 @@ platform_start_ap(int cpuid)
 	write_c0_register32(0, 1, reg);
 
 	vpe_enable();
-
-	/* current core */
-	reg = read_c0_register32(1, 2);
-	reg |= CP0VPEC0_VPA;
-	write_c0_register32(1, 2, reg);
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);

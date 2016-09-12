@@ -163,6 +163,8 @@ VECTOR(_locore, unknown)
 	.set mips32r2
 	jal	enable_mvp
 	nop
+	jal	enable_vpa
+	nop
 	jal	platform_processor_id
 	nop
 	beqz	v0, 1f
