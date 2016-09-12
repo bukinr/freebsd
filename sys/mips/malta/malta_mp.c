@@ -65,7 +65,7 @@ unsigned malta_ap_boot = ~0;
 #define	C_IRQ5		(1 << 15)
 
 static inline void
-vpe_enable(void)
+evpe(void)
 {
 	__asm __volatile(
 	"	.set push			\n"
@@ -259,7 +259,7 @@ platform_start_ap(int cpuid)
 	reg &= ~(MVPCONTROL_VPC);
 	write_c0_register32(0, 1, reg);
 
-	vpe_enable();
+	evpe();
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);
