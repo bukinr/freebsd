@@ -61,6 +61,37 @@ unsigned malta_ap_boot = ~0;
 #define	C_IRQ4		(1 << 14)
 #define	C_IRQ5		(1 << 15)
 
+static inline void __raw_evpe(void)
+ {
+         __asm__ __volatile__(
+         "       .set    push                                            \n"
+         "       .set    noreorder                                       \n"
+         "       .set    noat                                            \n"
+         "       .set    mips32r2                                        \n"
+         "       .word   0x41600021              # evpe                  \n"
+         "       ehb                                                     \n"
+         "       .set    pop                                             \n");
+ }
+
+static inline unsigned int dvpe(void)
+ {
+         int res = 0;
+ 
+         __asm__ __volatile__(
+         "       .set    push                                            \n"
+         "       .set    noreorder                                       \n"
+         "       .set    noat                                            \n"
+         "       .set    mips32r2                                        \n"
+         "       .word   0x41610001              # dvpe $1               \n"
+         "       move    %0, $1                                          \n"
+         "       ehb                                                     \n"
+         "       .set    pop                                             \n"
+         : "=r" (res));
+ 
+//        instruction_hazard();
+         return res;
+ }
+
 static inline void
 ehb(void)
 {
@@ -168,6 +199,11 @@ platform_init_ap(int cpuid)
 {
 	uint32_t clock_int_mask;
 	uint32_t ipi_intr_mask;
+	int reg;
+
+	/* Set CP0VPEC0_VPA */
+	reg = read_c0_register32(1, 2);
+	write_c0_register32(1, 2, (reg | 1));
 
 	/*
 	 * Clear any pending IPIs.
@@ -205,6 +241,59 @@ int
 platform_start_ap(int cpuid)
 {
 	int timeout;
+	uint32_t reg;
+
+	//disable VPE
+	dvpe();
+	//do { } while (0);
+
+	//MVPCONTROL_VPC
+	//write_c0_register32(0, 1, (1 << 1));
+
+	//settc
+	reg = read_c0_register32(1, 1);
+	reg &= ~(0xff);
+	reg |= cpuid;
+	write_c0_register32(1, 1, reg);
+
+	ehb();
+
+	/* restart entry */
+	reg = mftc0(2, 3);
+	printf("cpu%d tc_restart 0x%x\n", cpuid, reg);
+	reg = 0x80000000;
+	mttc0(2, 3, reg);
+
+	/* TCSTATUS_A */
+	reg = mftc0(2, 1);
+	printf("cpu%d tc_status %d\n", cpuid, reg);
+	mttc0(2, 1, reg | (1 << 13));
+	reg = mftc0(2, 1);
+	printf("cpu%d tc_status %d\n", cpuid, reg);
+
+	/* Unhalt */
+	reg = mftc0(2, 4);
+	printf("cpu%d halt %d\n", cpuid, reg);
+	mttc0(2, 4, 0);
+
+	/* Enable VPE */
+	reg = mftc0(1, 2);
+	printf("cpu%d vpeconf0 %d\n", cpuid, reg);
+	mttc0(1, 2, (reg | 1));
+
+	reg = mftc0(2, 4);
+	printf("cpu%d halt %d\n", cpuid, reg);
+
+	//clear MVPCONTROL_VPC
+	reg = read_c0_register32(0, 1);
+	reg &= ~(1 << 1);
+	write_c0_register32(0, 1, reg);
+	__raw_evpe();
+
+	/* current core */
+	/* Set CP0VPEC0_VPA */
+	reg = read_c0_register32(1, 2);
+	write_c0_register32(1, 2, (reg | 1));
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);
