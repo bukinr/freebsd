@@ -49,6 +49,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 
 #define	MALTA_MAXCPU	2
+#define	CP0VPEC0_VPA	(1 << 0)
+#define	MVPCONTROL_VPC	(1 << 1)
 
 unsigned malta_ap_boot = ~0;
 
@@ -131,25 +133,30 @@ ehb(void)
 	__retval;							\
 })
 
-void
-platform_ipi_send(int cpuid)
+static void
+set_thread_context(int cpuid)
 {
 	uint32_t reg;
 
-	/*
-	 * Set thread context.
-	 * Note this is not global, so we don't need lock.
-	 */
 	reg = read_c0_register32(1, 1);
 	reg &= ~(0xff);
 	reg |= cpuid;
 	write_c0_register32(1, 1, reg);
 
 	ehb();
+}
+
+void
+platform_ipi_send(int cpuid)
+{
+	uint32_t reg;
+
+	set_thread_context(cpuid);
 
 	/* Set cause */
 	reg = mftc0(13, 0);
-	mttc0(13, 0, (reg | C_SW1));
+	reg |= C_SW1;
+	mttc0(13, 0, reg);
 }
 
 void
@@ -183,9 +190,10 @@ platform_init_ap(int cpuid)
 	uint32_t ipi_intr_mask;
 	int reg;
 
-	/* Set CP0VPEC0_VPA */
+	/* Enable VPE */
 	reg = read_c0_register32(1, 2);
-	write_c0_register32(1, 2, (reg | 1));
+	reg |= CP0VPEC0_VPA;
+	write_c0_register32(1, 2, reg);
 
 	/*
 	 * Clear any pending IPIs.
@@ -225,22 +233,18 @@ platform_start_ap(int cpuid)
 	int timeout;
 	uint32_t reg;
 
-	//MVPCONTROL_VPC
-	//write_c0_register32(0, 1, (1 << 1));
+	/* Enter into configuration */
+	reg = read_c0_register32(0, 1);
+	reg |= (MVPCONTROL_VPC);
+	write_c0_register32(0, 1, reg);
 
-	//settc
-	reg = read_c0_register32(1, 1);
-	reg &= ~(0xff);
-	reg |= cpuid;
-	write_c0_register32(1, 1, reg);
-
-	ehb();
+	set_thread_context(cpuid);
 
 	/* restart entry */
-	reg = mftc0(2, 3);
-	printf("cpu%d tc_restart 0x%x\n", cpuid, reg);
-	reg = 0x80000000;
-	mttc0(2, 3, reg);
+	//reg = mftc0(2, 3);
+	//printf("cpu%d tc_restart 0x%x\n", cpuid, reg);
+	//reg = 0x80000000;
+	//mttc0(2, 3, reg);
 
 	/* TCSTATUS_A */
 	reg = mftc0(2, 1);
@@ -249,29 +253,26 @@ platform_start_ap(int cpuid)
 	reg = mftc0(2, 1);
 	printf("cpu%d tc_status %d\n", cpuid, reg);
 
-	/* Unhalt */
-	reg = mftc0(2, 4);
-	printf("cpu%d halt %d\n", cpuid, reg);
+	/* Unhalt CPU core */
 	mttc0(2, 4, 0);
 
 	/* Enable VPE */
 	reg = mftc0(1, 2);
-	printf("cpu%d vpeconf0 %d\n", cpuid, reg);
-	mttc0(1, 2, (reg | 1));
+	reg |= 1;
+	mttc0(1, 2, reg);
 
-	reg = mftc0(2, 4);
-	printf("cpu%d halt %d\n", cpuid, reg);
-
-	//clear MVPCONTROL_VPC
+	/* Out of configuration */
 	reg = read_c0_register32(0, 1);
-	reg &= ~(1 << 1);
+	reg &= ~(MVPCONTROL_VPC);
 	write_c0_register32(0, 1, reg);
+
 	vpe_enable();
 
 	/* current core */
 	/* Set CP0VPEC0_VPA */
 	reg = read_c0_register32(1, 2);
-	write_c0_register32(1, 2, (reg | 1));
+	reg |= CP0VPEC0_VPA;
+	write_c0_register32(1, 2, reg);
 
 	if (atomic_cmpset_32(&malta_ap_boot, ~0, cpuid) == 0)
 		return (-1);
