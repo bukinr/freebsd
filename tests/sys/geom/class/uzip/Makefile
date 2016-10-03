@@ -25,7 +25,7 @@ ${UZIMAGE}: ${IMAGE} ${ZIMAGE}
 	printf "FreeBSD$$\n#\n\n" >> ${.TARGET}
 	uuencode ${ZIMAGE} ${ZIMAGE} >>${.TARGET}
 
-${PACKAGE}FILES+=		conf.sh \
+${PACKAGE}FILES+=		conf.sh 1_eb.img.uzip.uue \
 				${UZIMAGE}
 
 FILESGROUPS+=	etalon
