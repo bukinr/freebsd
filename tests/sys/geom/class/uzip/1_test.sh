@@ -4,9 +4,9 @@
 testsdir=$(dirname $0)
 . $testsdir/conf.sh
 
-# Check host endiannes
+# Check host endianness
 endian=$(echo I | tr -d "[:space:]" | od -to2 | head -n1 | awk '{print $2}' | cut -c6)
-if [ "$endian" == "0" ]; then
+if [ $endian -eq 0 ]; then
 	UUE=$testsdir/1_eb.img.uzip.uue
 else
 	UUE=$testsdir/1.img.uzip.uue
