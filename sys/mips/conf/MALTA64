@@ -8,13 +8,17 @@ include		"std.MALTA"
  
 machine		mips mips64el	# Malta supports both, so it isn't in std.malta
  
-#options	INET6
+options	INET6
 #options 	SMP
 
 #device		re
 #device		em
 #device		igb
 #device		pcn
+
+device		sysvmsg
+device		sysvshm
+options		VIMAGE
 
 device		miibus
 device		le

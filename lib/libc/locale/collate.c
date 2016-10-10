@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 
+#include <sys/endian.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -160,7 +161,7 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 
 	if ((info->directive_count < 1) ||
 	    (info->directive_count >= COLL_WEIGHTS_MAX) ||
-	    ((chains = info->chain_count) < 0)) {
+	    ((chains = le32toh(info->chain_count)) < 0)) {
 		(void) munmap(map, sbuf.st_size);
 		errno = EINVAL;
 		return (_LDP_ERROR);
@@ -168,9 +169,9 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 
 	i = (sizeof (collate_char_t) * (UCHAR_MAX + 1)) +
 	    (sizeof (collate_chain_t) * chains) +
-	    (sizeof (collate_large_t) * info->large_count);
+	    (sizeof (collate_large_t) * le32toh(info->large_count));
 	for (z = 0; z < info->directive_count; z++) {
-		i += sizeof (collate_subst_t) * info->subst_count[z];
+		i += sizeof (collate_subst_t) * le32toh(info->subst_count[z]);
 	}
 	if (i != (sbuf.st_size - (TMP - map))) {
 		(void) munmap(map, sbuf.st_size);
@@ -183,9 +184,9 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 	TMP += sizeof (collate_char_t) * (UCHAR_MAX + 1);
 
 	for (z = 0; z < info->directive_count; z++) {
-		if (info->subst_count[z] > 0) {
+		if (le32toh(info->subst_count[z]) > 0) {
 			table->subst_table[z] = (void *)TMP;
-			TMP += info->subst_count[z] * sizeof (collate_subst_t);
+			TMP += le32toh(info->subst_count[z]) * sizeof (collate_subst_t);
 		} else {
 			table->subst_table[z] = NULL;
 		}
@@ -196,7 +197,7 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 		TMP += chains * sizeof (collate_chain_t);
 	} else
 		table->chain_pri_table = NULL;
-	if (info->large_count > 0)
+	if (le32toh(info->large_count) > 0)
 		table->large_pri_table = (void *)TMP;
 	else
 		table->large_pri_table = NULL;
@@ -209,7 +210,7 @@ static const int32_t *
 substsearch(struct xlocale_collate *table, const wchar_t key, int pass)
 {
 	const collate_subst_t *p;
-	int n = table->info->subst_count[pass];
+	int n = le32toh(table->info->subst_count[pass]);
 
 	if (n == 0)
 		return (NULL);
@@ -221,7 +222,8 @@ substsearch(struct xlocale_collate *table, const wchar_t key, int pass)
 		return (NULL);
 
 	p = table->subst_table[pass] + (key & ~COLLATE_SUBST_PRIORITY);
-	assert(p->key == key);
+	assert(le32toh(p->key) == key);
+
 	return (p->pri);
 }
 
@@ -229,7 +231,7 @@ static collate_chain_t *
 chainsearch(struct xlocale_collate *table, const wchar_t *key, int *len)
 {
 	int low = 0;
-	int high = table->info->chain_count - 1;;
+	int high = le32toh(table->info->chain_count) - 1;;
 	int next, compar, l;
 	collate_chain_t *p;
 	collate_chain_t *tab = table->chain_pri_table;
@@ -240,7 +242,7 @@ chainsearch(struct xlocale_collate *table, const wchar_t *key, int *len)
 	while (low <= high) {
 		next = (low + high) / 2;
 		p = tab + next;
-		compar = *key - *p->str;
+		compar = le32toh(*key) - le16toh(*p->str);
 		if (compar == 0) {
 			l = wcsnlen(p->str, COLLATE_STR_LEN);
 			compar = wcsncmp(key, p->str, l);
@@ -261,7 +263,7 @@ static collate_large_t *
 largesearch(struct xlocale_collate *table, const wchar_t key)
 {
 	int low = 0;
-	int high = table->info->large_count - 1;
+	int high = le32toh(table->info->large_count) - 1;
 	int next, compar;
 	collate_large_t *p;
 	collate_large_t *tab = table->large_pri_table;
@@ -272,7 +274,7 @@ largesearch(struct xlocale_collate *table, const wchar_t key)
 	while (low <= high) {
 		next = (low + high) / 2;
 		p = tab + next;
-		compar = key - p->val;
+		compar = key - le32toh(p->val);
 		if (compar == 0)
 			return (p);
 		if (compar > 0)
@@ -339,7 +341,7 @@ _collate_lookup(struct xlocale_collate *table, const wchar_t *t, int *len,
 		 */
 		*pri = table->char_pri_table[*t].pri[which];
 
-	} else if ((table->info->large_count > 0) &&
+	} else if ((le32toh(table->info->large_count) > 0) &&
 	    ((match = largesearch(table, *t)) != NULL)) {
 
 		/*
@@ -355,7 +357,7 @@ _collate_lookup(struct xlocale_collate *table, const wchar_t *t, int *len,
 			/* Mask off sign bit to prevent ordering confusion. */
 			*pri = (*t & COLLATE_MAX_PRIORITY);
 		} else {
-			*pri = table->info->undef_pri[which];
+			*pri = le32toh(table->info->undef_pri[which]);
 		}
 		/* No substitutions for undefined characters! */
 		return;
@@ -373,7 +375,7 @@ _collate_lookup(struct xlocale_collate *table, const wchar_t *t, int *len,
 	 * to be substituted be unique for that level.  The localedef
 	 * code ensures this for us.
 	 */
-	if ((sptr = substsearch(table, *pri, which)) != NULL) {
+	if ((sptr = substsearch(table, le32toh(*pri), which)) != NULL) {
 		if ((*pri = *sptr) > 0) {
 			sptr++;
 			*state = *sptr ? sptr : NULL;
@@ -518,7 +520,7 @@ static int
 xfrm(struct xlocale_collate *table, unsigned char *p, int pri, int pass)
 {
 	/* we use unsigned to ensure zero fill on right shift */
-	uint32_t val = (uint32_t)table->info->pri_count[pass];
+	uint32_t val = le32toh((uint32_t)table->info->pri_count[pass]);
 	int nc = 0;
 
 	while (val) {
@@ -678,7 +680,7 @@ __collate_equiv_value(locale_t locale, const wchar_t *str, size_t len)
 		e = -1;
 		if (*str <= UCHAR_MAX)
 			e = table->char_pri_table[*str].pri[0];
-		else if (table->info->large_count > 0) {
+		else if (le32toh(table->info->large_count) > 0) {
 			collate_large_t *match_large;
 			match_large = largesearch(table, *str);
 			if (match_large)
@@ -688,7 +690,7 @@ __collate_equiv_value(locale_t locale, const wchar_t *str, size_t len)
 			return (1);
 		return (e > 0 ? e : 0);
 	}
-	if (table->info->chain_count > 0) {
+	if (le32toh(table->info->chain_count) > 0) {
 		wchar_t name[COLLATE_STR_LEN];
 		collate_chain_t *match_chain;
 		int clen;

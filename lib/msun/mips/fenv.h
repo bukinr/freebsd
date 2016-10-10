@@ -64,159 +64,22 @@ extern const fenv_t	__fe_dfl_env;
 #define _FPUSW_SHIFT	16
 #define	_ENABLE_MASK	(FE_ALL_EXCEPT << _FPUSW_SHIFT)
 
-#ifdef	ARM_HARD_FLOAT
-#define	__rfs(__fpsr)	__asm __volatile("rfs %0" : "=r" (*(__fpsr)))
-#define	__wfs(__fpsr)	__asm __volatile("wfs %0" : : "r" (__fpsr))
-#else
-#define __rfs(__fpsr)
-#define __wfs(__fpsr)
-#endif
-
-__fenv_static inline int
-feclearexcept(int __excepts)
-{
-	fexcept_t __fpsr;
-
-	__rfs(&__fpsr);
-	__fpsr &= ~__excepts;
-	__wfs(__fpsr);
-	return (0);
-}
-
-__fenv_static inline int
-fegetexceptflag(fexcept_t *__flagp, int __excepts)
-{
-	fexcept_t __fpsr;
-
-	__rfs(&__fpsr);
-	*__flagp = __fpsr & __excepts;
-	return (0);
-}
-
-__fenv_static inline int
-fesetexceptflag(const fexcept_t *__flagp, int __excepts)
-{
-	fexcept_t __fpsr;
-
-	__rfs(&__fpsr);
-	__fpsr &= ~__excepts;
-	__fpsr |= *__flagp & __excepts;
-	__wfs(__fpsr);
-	return (0);
-}
-
-__fenv_static inline int
-feraiseexcept(int __excepts)
-{
-	fexcept_t __ex = __excepts;
-
-	fesetexceptflag(&__ex, __excepts);	/* XXX */
-	return (0);
-}
-
-__fenv_static inline int
-fetestexcept(int __excepts)
-{
-	fexcept_t __fpsr;
-
-	__rfs(&__fpsr);
-	return (__fpsr & __excepts);
-}
-
-__fenv_static inline int
-fegetround(void)
-{
-
-	/*
-	 * Apparently, the rounding mode is specified as part of the
-	 * instruction format on ARM, so the dynamic rounding mode is
-	 * indeterminate.  Some FPUs may differ.
-	 */
-	return (-1);
-}
-
-__fenv_static inline int
-fesetround(int __round)
-{
-
-	return (-1);
-}
-
-__fenv_static inline int
-fegetenv(fenv_t *__envp)
-{
-
-	__rfs(__envp);
-	return (0);
-}
-
-__fenv_static inline int
-feholdexcept(fenv_t *__envp)
-{
-	fenv_t __env;
-
-	__rfs(&__env);
-	*__envp = __env;
-	__env &= ~(FE_ALL_EXCEPT | _ENABLE_MASK);
-	__wfs(__env);
-	return (0);
-}
-
-__fenv_static inline int
-fesetenv(const fenv_t *__envp)
-{
-
-	__wfs(*__envp);
-	return (0);
-}
-
-__fenv_static inline int
-feupdateenv(const fenv_t *__envp)
-{
-	fexcept_t __fpsr;
-
-	__rfs(&__fpsr);
-	__wfs(*__envp);
-	feraiseexcept(__fpsr & FE_ALL_EXCEPT);
-	return (0);
-}
-
+int feclearexcept(int __excepts);
+int fegetexceptflag(fexcept_t *__flagp, int __excepts);
+int fesetexceptflag(const fexcept_t *__flagp, int __excepts);
+int feraiseexcept(int __excepts);
+int fetestexcept(int __excepts);
+int fegetround(void);
+int fesetround(int __round);
+int fegetenv(fenv_t *__envp);
+int feholdexcept(fenv_t *__envp);
+int fesetenv(const fenv_t *__envp);
+int feupdateenv(const fenv_t *__envp);
 #if __BSD_VISIBLE
-
-/* We currently provide no external definitions of the functions below. */
-
-static inline int
-feenableexcept(int __mask)
-{
-	fenv_t __old_fpsr, __new_fpsr;
-
-	__rfs(&__old_fpsr);
-	__new_fpsr = __old_fpsr | (__mask & FE_ALL_EXCEPT) << _FPUSW_SHIFT;
-	__wfs(__new_fpsr);
-	return ((__old_fpsr >> _FPUSW_SHIFT) & FE_ALL_EXCEPT);
-}
-
-static inline int
-fedisableexcept(int __mask)
-{
-	fenv_t __old_fpsr, __new_fpsr;
-
-	__rfs(&__old_fpsr);
-	__new_fpsr = __old_fpsr & ~((__mask & FE_ALL_EXCEPT) << _FPUSW_SHIFT);
-	__wfs(__new_fpsr);
-	return ((__old_fpsr >> _FPUSW_SHIFT) & FE_ALL_EXCEPT);
-}
-
-static inline int
-fegetexcept(void)
-{
-	fenv_t __fpsr;
-
-	__rfs(&__fpsr);
-	return ((__fpsr & _ENABLE_MASK) >> _FPUSW_SHIFT);
-}
-
-#endif /* __BSD_VISIBLE */
+int feenableexcept(int __mask);
+int fedisableexcept(int __mask);
+int fegetexcept(void);
+#endif
 
 __END_DECLS
 
