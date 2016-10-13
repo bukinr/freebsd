@@ -231,7 +231,7 @@ static collate_chain_t *
 chainsearch(struct xlocale_collate *table, const wchar_t *key, int *len)
 {
 	int low = 0;
-	int high = le32toh(table->info->chain_count) - 1;;
+	int high = le32toh(table->info->chain_count) - 1;
 	int next, compar, l;
 	collate_chain_t *p;
 	collate_chain_t *tab = table->chain_pri_table;
@@ -242,7 +242,7 @@ chainsearch(struct xlocale_collate *table, const wchar_t *key, int *len)
 	while (low <= high) {
 		next = (low + high) / 2;
 		p = tab + next;
-		compar = le32toh(*key) - le16toh(*p->str);
+		compar = *key - le16toh(*p->str);
 		if (compar == 0) {
 			l = wcsnlen(p->str, COLLATE_STR_LEN);
 			compar = wcsncmp(key, p->str, l);
@@ -339,7 +339,7 @@ _collate_lookup(struct xlocale_collate *table, const wchar_t *t, int *len,
 		 * Character is a small (8-bit) character.
 		 * We just look these up directly for speed.
 		 */
-		*pri = table->char_pri_table[*t].pri[which];
+		*pri = le32toh(table->char_pri_table[*t].pri[which]);
 
 	} else if ((le32toh(table->info->large_count) > 0) &&
 	    ((match = largesearch(table, *t)) != NULL)) {
@@ -347,7 +347,7 @@ _collate_lookup(struct xlocale_collate *table, const wchar_t *t, int *len,
 		/*
 		 * Character was found in the extended table.
 		 */
-		*pri = match->pri.pri[which];
+		*pri = le32toh(match->pri.pri[which]);
 
 	} else {
 		/*
@@ -375,10 +375,10 @@ _collate_lookup(struct xlocale_collate *table, const wchar_t *t, int *len,
 	 * to be substituted be unique for that level.  The localedef
 	 * code ensures this for us.
 	 */
-	if ((sptr = substsearch(table, le32toh(*pri), which)) != NULL) {
-		if ((*pri = *sptr) > 0) {
+	if ((sptr = substsearch(table, *pri, which)) != NULL) {
+		if ((*pri = le32toh(*sptr)) > 0) {
 			sptr++;
-			*state = *sptr ? sptr : NULL;
+			*state = le32toh(*sptr) ? sptr : NULL;
 		}
 	}
 
