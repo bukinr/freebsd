@@ -32,6 +32,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <strings.h>
+#include <stdio.h>
 
 #include "math_private.h"
 
@@ -54,6 +55,7 @@ _scan_nan(uint32_t *words, int num_words, const char *s)
 	int bitpos;	/* index into words (in bits) */
 
 	bzero(words, num_words * sizeof(uint32_t));
+	printf("nw %d\n", num_words);
 
 	/* Allow a leading '0x'. (It's expected, but redundant.) */
 	if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
@@ -64,14 +66,10 @@ _scan_nan(uint32_t *words, int num_words, const char *s)
 		;
 
 	/* Scan backwards, filling in the bits in words[] as we go. */
-#if _BYTE_ORDER == _LITTLE_ENDIAN
 	for (bitpos = 0; bitpos < 32 * num_words; bitpos += 4) {
-#else
-	for (bitpos = 32 * num_words - 4; bitpos >= 0; bitpos -= 4) {
-#endif
 		if (--si < 0)
 			break;
-		words[bitpos / 32] |= digittoint(s[si]) << (bitpos % 32);
+		words[(num_words - 1)] |= digittoint(s[si]) << (bitpos % 32);
 	}
 }
 
