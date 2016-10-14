@@ -134,7 +134,12 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 	paddr = BREAKPOINT_INSTR;
 	piod.piod_op = PIOD_WRITE_I;
 	piod.piod_offs = (void *)caddr;
+#if BYTE_ORDER == BIG_ENDIAN
+	piod.piod_addr = (char *)(&paddr + 1) - BREAKPOINT_INSTR_SZ;
+#else
 	piod.piod_addr = &paddr;
+#endif
+
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
 		DPRINTF("ERROR: couldn't write instruction at address 0x%"
