@@ -6,10 +6,10 @@ testsdir=$(dirname $0)
 
 # Check host endianness
 ret=$(echo I | tr -d "[:space:]" | od -to2 | head -n1 | awk '{print $2}' | cut -c6)
-if [ "$ret" == "1" ]; then
+if [ "$ret" = "1" ]; then
 	# Little endian
 	UUE=$testsdir/1_endian_little.img.uzip.uue
-elif [ "$ret" == "0" ]; then
+elif [ "$ret" = "0" ]; then
 	# Big endian
 	UUE=$testsdir/1_endian_big.img.uzip.uue
 else
