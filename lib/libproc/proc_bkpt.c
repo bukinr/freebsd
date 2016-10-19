@@ -56,7 +56,11 @@ __FBSDID("$FreeBSD$");
 #define	BREAKPOINT_INSTR	0xe7ffffff	/* bkpt */
 #define	BREAKPOINT_INSTR_SZ	4
 #elif defined(__mips__)
+#if (defined(__mips_n64) || defined(__mips_o64)) && BYTE_ORDER == BIG_ENDIAN
+#define	BREAKPOINT_INSTR	0xd00000000UL	/* break */
+#else
 #define	BREAKPOINT_INSTR	0xd	/* break */
+#endif
 #define	BREAKPOINT_INSTR_SZ	4
 #elif defined(__powerpc__)
 #define	BREAKPOINT_INSTR	0x7fe00008	/* trap */
@@ -134,12 +138,7 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 	paddr = BREAKPOINT_INSTR;
 	piod.piod_op = PIOD_WRITE_I;
 	piod.piod_offs = (void *)caddr;
-#if BYTE_ORDER == BIG_ENDIAN
-	piod.piod_addr = (char *)(&paddr + 1) - BREAKPOINT_INSTR_SZ;
-#else
 	piod.piod_addr = &paddr;
-#endif
-
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
 		DPRINTF("ERROR: couldn't write instruction at address 0x%"
