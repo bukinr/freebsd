@@ -410,7 +410,6 @@ g_eli_auth_run(struct g_eli_worker *wr, struct bio *bp)
 	off_t dstoff;
 	u_char *p, *data, *auth, *authkey, *plaindata;
 	int error;
-	int val;
 
 	G_ELI_LOGREQ(3, bp, "%s", __func__);
 
@@ -445,7 +444,9 @@ g_eli_auth_run(struct g_eli_worker *wr, struct bio *bp)
 		size += sizeof(*crde) * nsec;
 		size += sizeof(*crda) * nsec;
 		size += G_ELI_AUTH_SECKEYLEN * nsec;
-		size += sizeof(uintptr_t); /* space for alignment */
+#if defined(__mips_n64) || defined(__mips_o64)
+		size += sizeof(uintptr_t);	/* Space for alignment. */
+#endif
 		data = malloc(size, M_ELI, M_WAITOK);
 		bp->bio_driver2 = data;
 		p = data + encr_secsize * nsec;
@@ -453,10 +454,9 @@ g_eli_auth_run(struct g_eli_worker *wr, struct bio *bp)
 	bp->bio_inbed = 0;
 	bp->bio_children = nsec;
 
-	/* Align the pointer */
-	val = (uintptr_t)p & (sizeof(uintptr_t) - 1);
-	if (val)
-		p += (sizeof(uintptr_t) - val);
+#if defined(__mips_n64) || defined(__mips_o64)
+	p = (char *)roundup((uintptr_t)p, sizeof(uintptr_t));
+#endif
 
 	for (i = 1; i <= nsec; i++, dstoff += encr_secsize) {
 		crp = (struct cryptop *)p;	p += sizeof(*crp);

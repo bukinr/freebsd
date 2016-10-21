@@ -248,7 +248,9 @@ struct g_eli_metadata {
 	uint8_t		md_salt[G_ELI_SALTLEN]; /* Salt. */
 			/* Encrypted master key (IV-key, Data-key, HMAC). */
 	uint8_t		md_mkeys[G_ELI_MAXMKEYS * G_ELI_MKEYLEN];
-	uint8_t		unused;		/* Alignment */
+#if defined(__mips_n64) || defined(__mips_o64)
+	uint8_t		unused[1];	/* Alignment for MD5. */
+#endif
 	u_char		md_hash[16];	/* MD5 hash. */
 } __packed;
 #ifndef _OpenSSL_
