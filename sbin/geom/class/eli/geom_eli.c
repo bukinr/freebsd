@@ -666,7 +666,11 @@ static void
 eli_init(struct gctl_req *req)
 {
 	struct g_eli_metadata md;
+#if defined(__mips_n64) || defined(__mips_o64)
 	unsigned char sector[sizeof(struct g_eli_metadata)] __aligned(4);
+#else
+	unsigned char sector[sizeof(struct g_eli_metadata)];
+#endif
 	unsigned char key[G_ELI_USERKEYLEN];
 	char backfile[MAXPATHLEN];
 	const char *str, *prov;
