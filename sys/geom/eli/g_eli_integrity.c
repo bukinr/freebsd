@@ -444,9 +444,7 @@ g_eli_auth_run(struct g_eli_worker *wr, struct bio *bp)
 		size += sizeof(*crde) * nsec;
 		size += sizeof(*crda) * nsec;
 		size += G_ELI_AUTH_SECKEYLEN * nsec;
-#if defined(__mips_n64) || defined(__mips_o64)
 		size += sizeof(uintptr_t);	/* Space for alignment. */
-#endif
 		data = malloc(size, M_ELI, M_WAITOK);
 		bp->bio_driver2 = data;
 		p = data + encr_secsize * nsec;

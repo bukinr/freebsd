@@ -248,9 +248,6 @@ struct g_eli_metadata {
 	uint8_t		md_salt[G_ELI_SALTLEN]; /* Salt. */
 			/* Encrypted master key (IV-key, Data-key, HMAC). */
 	uint8_t		md_mkeys[G_ELI_MAXMKEYS * G_ELI_MKEYLEN];
-#if defined(__mips_n64) || defined(__mips_o64)
-	uint8_t		unused[1];	/* Alignment for MD5. */
-#endif
 	u_char		md_hash[16];	/* MD5 hash. */
 } __packed;
 #ifndef _OpenSSL_
@@ -292,6 +289,7 @@ eli_metadata_encode_v1v2v3v4v5v6v7(struct g_eli_metadata *md, u_char **datap)
 static __inline void
 eli_metadata_encode(struct g_eli_metadata *md, u_char *data)
 {
+	uint32_t hash[4];
 	MD5_CTX ctx;
 	u_char *p;
 
@@ -323,12 +321,14 @@ eli_metadata_encode(struct g_eli_metadata *md, u_char *data)
 	}
 	MD5Init(&ctx);
 	MD5Update(&ctx, data, p - data);
-	MD5Final(md->md_hash, &ctx);
+	MD5Final((void *)hash, &ctx);
+	bcopy(hash, md->md_hash, sizeof(md->md_hash));
 	bcopy(md->md_hash, p, sizeof(md->md_hash));
 }
 static __inline int
 eli_metadata_decode_v0(const u_char *data, struct g_eli_metadata *md)
 {
+	uint32_t hash[4];
 	MD5_CTX ctx;
 	const u_char *p;
 
@@ -344,7 +344,8 @@ eli_metadata_decode_v0(const u_char *data, struct g_eli_metadata *md)
 	bcopy(p, md->md_mkeys, sizeof(md->md_mkeys)); p += sizeof(md->md_mkeys);
 	MD5Init(&ctx);
 	MD5Update(&ctx, data, p - data);
-	MD5Final(md->md_hash, &ctx);
+	MD5Final((void *)hash, &ctx);
+	bcopy(hash, md->md_hash, sizeof(md->md_hash));
 	if (bcmp(md->md_hash, p, 16) != 0)
 		return (EINVAL);
 	return (0);
@@ -353,6 +354,7 @@ eli_metadata_decode_v0(const u_char *data, struct g_eli_metadata *md)
 static __inline int
 eli_metadata_decode_v1v2v3v4v5v6v7(const u_char *data, struct g_eli_metadata *md)
 {
+	uint32_t hash[4];
 	MD5_CTX ctx;
 	const u_char *p;
 
@@ -369,7 +371,8 @@ eli_metadata_decode_v1v2v3v4v5v6v7(const u_char *data, struct g_eli_metadata *md
 	bcopy(p, md->md_mkeys, sizeof(md->md_mkeys)); p += sizeof(md->md_mkeys);
 	MD5Init(&ctx);
 	MD5Update(&ctx, data, p - data);
-	MD5Final(md->md_hash, &ctx);
+	MD5Final((void *)hash, &ctx);
+	bcopy(hash, md->md_hash, sizeof(md->md_hash));
 	if (bcmp(md->md_hash, p, 16) != 0)
 		return (EINVAL);
 	return (0);
