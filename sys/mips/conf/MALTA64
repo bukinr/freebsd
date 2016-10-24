@@ -20,10 +20,11 @@ device		sysvmsg
 device		sysvshm
 options		VIMAGE
 
+#device		geom_eli
+#device		crypto
+
 device		miibus
 device		le
-
-#device		crypto
 
 makeoptions	ARCH_FLAGS="-march=mips64 -mabi=64"
  

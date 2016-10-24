@@ -170,6 +170,7 @@ testd(double x, double y, double expected_rem, int expected_quo)
 
 	q = random();
 	rem = remainder(x, y);
+	printf("rem is %ld expected %ld\n", rem, expected_rem);
 	assert(rem == expected_rem);
 	assert(!signbit(rem) == !signbit(expected_rem));
 	rem = remquo(x, y, &q);
