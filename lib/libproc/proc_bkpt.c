@@ -56,11 +56,7 @@ __FBSDID("$FreeBSD$");
 #define	BREAKPOINT_INSTR	0xe7ffffff	/* bkpt */
 #define	BREAKPOINT_INSTR_SZ	4
 #elif defined(__mips__)
-#if (defined(__mips_n64) || defined(__mips_o64)) && BYTE_ORDER == BIG_ENDIAN
-#define	BREAKPOINT_INSTR	0xd00000000UL	/* break */
-#else
 #define	BREAKPOINT_INSTR	0xd	/* break */
-#endif
 #define	BREAKPOINT_INSTR_SZ	4
 #elif defined(__powerpc__)
 #define	BREAKPOINT_INSTR	0x7fe00008	/* trap */
@@ -71,6 +67,8 @@ __FBSDID("$FreeBSD$");
 #else
 #error "Add support for your architecture"
 #endif
+
+typedef uint32_t instr_t;
 
 static int
 proc_stop(struct proc_handle *phdl)
@@ -96,8 +94,9 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
     unsigned long *saved)
 {
 	struct ptrace_io_desc piod;
-	unsigned long paddr, caddr;
+	unsigned long caddr;
 	int ret = 0, stopped;
+	instr_t instr;
 
 	*saved = 0;
 	if (phdl->status == PS_DEAD || phdl->status == PS_UNDEAD ||
@@ -119,10 +118,10 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 	 * Read the original instruction.
 	 */
 	caddr = address;
-	paddr = 0;
+	instr = 0;
 	piod.piod_op = PIOD_READ_I;
 	piod.piod_offs = (void *)caddr;
-	piod.piod_addr = &paddr;
+	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
 		DPRINTF("ERROR: couldn't read instruction at address 0x%"
@@ -130,15 +129,15 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 		ret = -1;
 		goto done;
 	}
-	*saved = paddr;
+	*saved = instr;
 	/*
 	 * Write a breakpoint instruction to that address.
 	 */
 	caddr = address;
-	paddr = BREAKPOINT_INSTR;
+	instr = BREAKPOINT_INSTR;
 	piod.piod_op = PIOD_WRITE_I;
 	piod.piod_offs = (void *)caddr;
-	piod.piod_addr = &paddr;
+	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
 		DPRINTF("ERROR: couldn't write instruction at address 0x%"
@@ -160,8 +159,9 @@ proc_bkptdel(struct proc_handle *phdl, uintptr_t address,
     unsigned long saved)
 {
 	struct ptrace_io_desc piod;
-	unsigned long paddr, caddr;
+	unsigned long caddr;
 	int ret = 0, stopped;
+	instr_t instr;
 
 	if (phdl->status == PS_DEAD || phdl->status == PS_UNDEAD ||
 	    phdl->status == PS_IDLE) {
@@ -182,10 +182,10 @@ proc_bkptdel(struct proc_handle *phdl, uintptr_t address,
 	 * Overwrite the breakpoint instruction that we setup previously.
 	 */
 	caddr = address;
-	paddr = saved;
+	instr = saved;
 	piod.piod_op = PIOD_WRITE_I;
 	piod.piod_offs = (void *)caddr;
-	piod.piod_addr = &paddr;
+	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
 		DPRINTF("ERROR: couldn't write instruction at address 0x%"

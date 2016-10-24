@@ -56,6 +56,12 @@ __FBSDID("$FreeBSD$");
 #include "un-namespace.h"
 #include "printflocal.h"
 
+#ifdef	NL_ARGMAX
+#define	MAX_POSARG	NL_ARGMAX
+#else
+#define	MAX_POSARG	1024
+#endif
+
 /*
  * Type ids for argument type table.
  */
@@ -298,7 +304,7 @@ reswitch:	switch (ch) {
 			do {
 				n = 10 * n + to_digit(ch);
 				/* Detect overflow */
-				if (n > NL_ARGMAX) {
+				if (n > MAX_POSARG) {
 					error = -1;
 					goto error;
 				}
@@ -491,7 +497,7 @@ reswitch:	switch (ch) {
 			do {
 				n = 10 * n + to_digit(ch);
 				/* Detect overflow */
-				if (n > NL_ARGMAX) {
+				if (n > MAX_POSARG) {
 					error = -1;
 					goto error;
 				}
