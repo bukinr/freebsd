@@ -297,13 +297,13 @@ reswitch:	switch (ch) {
 			n = 0;
 			do {
 				n = 10 * n + to_digit(ch);
+				/* Detect overflow */
+				if (n > NL_ARGMAX) {
+					error = -1;
+					goto error;
+				}
 				ch = *fmt++;
 			} while (is_digit(ch));
-			/* Detect overflow */
-			if (n > NL_ARGMAX) {
-				error = -1;
-				goto error;
-			}
 			if (ch == '$') {
 				types.nextarg = n;
 				goto rflag;
@@ -490,13 +490,13 @@ reswitch:	switch (ch) {
 			n = 0;
 			do {
 				n = 10 * n + to_digit(ch);
+				/* Detect overflow */
+				if (n > NL_ARGMAX) {
+					error = -1;
+					goto error;
+				}
 				ch = *fmt++;
 			} while (is_digit(ch));
-			/* Detect overflow */
-			if (n > NL_ARGMAX) {
-				error = -1;
-				goto error;
-			}
 			if (ch == '$') {
 				types.nextarg = n;
 				goto rflag;
