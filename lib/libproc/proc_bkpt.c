@@ -68,6 +68,12 @@ __FBSDID("$FreeBSD$");
 #error "Add support for your architecture"
 #endif
 
+/*
+ * Use 4-bytes holder for breakpoint instruction on all the platforms.
+ * Works for x86 as well until it is endian-little platform.
+ * (We are coping one byte only on x86 from this 4-bytes piece of
+ * memory).
+ */
 typedef uint32_t instr_t;
 
 static int
