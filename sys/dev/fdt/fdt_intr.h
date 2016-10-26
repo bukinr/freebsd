@@ -1,9 +1,9 @@
 /*-
- * Copyright (c) 2012 SRI International
+ * Copyright (c) 2016 Andrew Turner <andrew@FreeBSD.org>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
  * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,31 +30,15 @@
  * $FreeBSD$
  */
 
-#include <sys/cdefs.h>
-#include <sys/types.h>
+#ifndef _FDT_INTR_H_
+#define	_FDT_INTR_H_
 
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#define	FDT_INTR_EDGE_RISING	1
+#define	FDT_INTR_EDGE_FALLING	2
+#define	FDT_INTR_LEVEL_HIGH	4
+#define	FDT_INTR_LEVEL_LOW	8
+#define	FDT_INTR_LOW_MASK	(FDT_INTR_EDGE_FALLING | FDT_INTR_LEVEL_LOW)
+#define	FDT_INTR_EDGE_MASK	(FDT_INTR_EDGE_RISING | FDT_INTR_EDGE_FALLING)
+#define	FDT_INTR_MASK		0xf
 
-#include "util.h"
-
-char *
-flags_to_string(u_long flags, const char *def)
-{
-	char *str;
-
-	str = fflagstostr(flags);
-	if (*str == '\0') {
-		free(str);
-		str = strdup(def);
-	}
-	return (str);
-}
-
-int
-string_to_flags(char **stringp, u_long *setp, u_long *clrp)
-{
-
-	return strtofflags(stringp, setp, clrp);
-}
+#endif /* _FDT_INTR_H_ */
