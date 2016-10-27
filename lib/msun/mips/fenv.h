@@ -39,11 +39,21 @@ typedef	__uint32_t	fenv_t;
 typedef	__uint32_t	fexcept_t;
 
 /* Exception flags */
+#ifdef SOFTFLOAT
+#define	_FPUSW_SHIFT	16
 #define	FE_INVALID	0x0001
 #define	FE_DIVBYZERO	0x0002
 #define	FE_OVERFLOW	0x0004
 #define	FE_UNDERFLOW	0x0008
 #define	FE_INEXACT	0x0010
+#else
+#define	_FCSR_CAUSE_SHIFT	10
+#define	FE_INVALID	0x0040
+#define	FE_DIVBYZERO	0x0020
+#define	FE_OVERFLOW	0x0010
+#define	FE_UNDERFLOW	0x0008
+#define	FE_INEXACT	0x0004
+#endif
 #define	FE_ALL_EXCEPT	(FE_DIVBYZERO | FE_INEXACT | \
 			 FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW)
 
@@ -61,9 +71,15 @@ extern const fenv_t	__fe_dfl_env;
 #define	FE_DFL_ENV	(&__fe_dfl_env)
 
 /* We need to be able to map status flag positions to mask flag positions */
-#define _FPUSW_SHIFT	16
-#define	_ENABLE_MASK	(FE_ALL_EXCEPT << _FPUSW_SHIFT)
+#define	_ENABLE_SHIFT	5
+#define	_ENABLE_MASK	(FE_ALL_EXCEPT << _ENABLE_SHIFT)
 
+#ifndef	SOFTFLOAT
+#define	__cfc1(__fpsr)	__asm __volatile("cfc1 %0, $31" : "=r" (*(__fpsr)))
+#define	__ctc1(__fpsr)	__asm __volatile("ctc1 %0, $31" :: "r" (__fpsr))
+#endif
+
+#ifdef SOFTFLOAT
 int feclearexcept(int __excepts);
 int fegetexceptflag(fexcept_t *__flagp, int __excepts);
 int fesetexceptflag(const fexcept_t *__flagp, int __excepts);
@@ -75,11 +91,186 @@ int fegetenv(fenv_t *__envp);
 int feholdexcept(fenv_t *__envp);
 int fesetenv(const fenv_t *__envp);
 int feupdateenv(const fenv_t *__envp);
+#else
+__fenv_static inline int
+feclearexcept(int __excepts)
+{
+	fexcept_t fcsr;
+
+	__excepts &= FE_ALL_EXCEPT;
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	fcsr &= ~(__excepts | (__excepts << _FCSR_CAUSE_SHIFT));
+	__asm __volatile("ctc1 %0, $31" :: "r" (fcsr));
+
+	return (0);
+}
+
+__fenv_static inline int
+fegetexceptflag(fexcept_t *__flagp, int __excepts)
+{
+	fexcept_t fcsr;
+
+	__excepts &= FE_ALL_EXCEPT;
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	*__flagp = fcsr & __excepts;
+
+	return (0);
+}
+
+__fenv_static inline int
+fesetexceptflag(const fexcept_t *__flagp, int __excepts)
+{
+	fexcept_t fcsr;
+
+	__excepts &= FE_ALL_EXCEPT;
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	fcsr &= ~__excepts;
+	fcsr |= *__flagp & __excepts;
+	__asm __volatile("ctc1 %0, $31" : : "r" (fcsr));
+
+	return (0);
+}
+
+__fenv_static inline int
+feraiseexcept(int __excepts)
+{
+	fexcept_t fcsr;
+
+	__excepts &= FE_ALL_EXCEPT;
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	fcsr |= __excepts | (__excepts << _FCSR_CAUSE_SHIFT);
+	__asm __volatile("ctc1 %0, $31" :: "r" (fcsr));
+
+	return (0);
+}
+
+__fenv_static inline int
+fetestexcept(int __excepts)
+{
+	fexcept_t fcsr;
+
+	__excepts &= FE_ALL_EXCEPT;
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+
+	return (fcsr & __excepts);
+}
+
+__fenv_static inline int
+fegetround(void)
+{
+	fexcept_t fcsr;
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+
+	return (fcsr & _ROUND_MASK);
+}
+
+__fenv_static inline int
+fesetround(int __round)
+{
+	fexcept_t fcsr;
+
+	if (__round & ~_ROUND_MASK)
+		return (-1);
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	fcsr &= ~_ROUND_MASK;
+	fcsr |= __round;
+	__asm __volatile("ctc1 %0, $31" : : "r" (fcsr));
+
+	return (0);
+}
+
+__fenv_static inline int
+fegetenv(fenv_t *__envp)
+{
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (*__envp));
+
+	return (0);
+}
+
+__fenv_static inline int
+feholdexcept(fenv_t *__envp)
+{
+	fexcept_t fcsr;
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (*__envp));
+	fcsr = *__envp;
+	fcsr &= ~(FE_ALL_EXCEPT | _ENABLE_MASK);
+	__asm __volatile("ctc1 %0, $31" : : "r" (fcsr));
+
+	return (0);
+}
+
+__fenv_static inline int
+fesetenv(const fenv_t *__envp)
+{
+
+	__asm __volatile("ctc1 %0, $31" : : "r" (*__envp));
+
+	return (0);
+}
+
+__fenv_static inline int
+feupdateenv(const fenv_t *__envp)
+{
+	fexcept_t fcsr;
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	fesetenv(__envp);
+	feraiseexcept(fcsr);
+
+	return (0);
+}
+#endif /* !SOFTFLOAT */
+
 #if __BSD_VISIBLE
+
+/* We currently provide no external definitions of the functions below. */
+
+#ifdef SOFTFLOAT
 int feenableexcept(int __mask);
 int fedisableexcept(int __mask);
 int fegetexcept(void);
-#endif
+#else
+static inline int
+feenableexcept(int __mask)
+{
+	fenv_t __old_fpsr, __new_fpsr;
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (__old_fpsr));
+	__new_fpsr = __old_fpsr | (__mask & FE_ALL_EXCEPT) << _ENABLE_SHIFT;
+	__asm __volatile("ctc1 %0, $31" : : "r" (__new_fpsr));
+
+	return ((__old_fpsr >> _ENABLE_SHIFT) & FE_ALL_EXCEPT);
+}
+
+static inline int
+fedisableexcept(int __mask)
+{
+	fenv_t __old_fpsr, __new_fpsr;
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (__old_fpsr));
+	__new_fpsr = __old_fpsr & ~((__mask & FE_ALL_EXCEPT) << _ENABLE_SHIFT);
+	__asm __volatile("ctc1 %0, $31" : : "r" (__new_fpsr));
+
+	return ((__old_fpsr >> _ENABLE_SHIFT) & FE_ALL_EXCEPT);
+}
+
+static inline int
+fegetexcept(void)
+{
+	fexcept_t fcsr;
+
+	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+
+	return ((fcsr & _ENABLE_MASK) >> _ENABLE_SHIFT);
+}
+
+#endif /* !SOFTFLOAT */
+
+#endif /* __BSD_VISIBLE */
 
 __END_DECLS
 

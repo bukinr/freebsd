@@ -5,8 +5,8 @@
 options 	YAMON
 
 # Don't build any modules yet.
-#makeoptions	MODULES_OVERRIDE=""
-makeoptions	WITHOUT_MODULES="netfpga10g ipwfw	ispfw	iwifw	iwmfw	iwnfw	mwlfw	otusfw	ralfw	rtwnfw	urtwnfw	wpifw usb usb/rsufw"
+makeoptions	MODULES_OVERRIDE=""
+#makeoptions	WITHOUT_MODULES="netfpga10g ipwfw	ispfw	iwifw	iwmfw	iwnfw	mwlfw	otusfw	ralfw	rtwnfw	urtwnfw	wpifw usb usb/rsufw"
 
 options 	TICK_USE_YAMON_FREQ=defined
 #options 	TICK_USE_MALTA_RTC=defined

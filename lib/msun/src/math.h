@@ -52,7 +52,7 @@ extern const union __nan_un {
 #define	FP_ILOGB0	(-__INT_MAX)
 #define	FP_ILOGBNAN	__INT_MAX
 
-#if defined(__MATH_BUILTIN_CONSTANTS) && !defined(__mips__)
+#ifdef __MATH_BUILTIN_CONSTANTS
 #define	HUGE_VALF	__builtin_huge_valf()
 #define	HUGE_VALL	__builtin_huge_vall()
 #define	INFINITY	__builtin_inff()

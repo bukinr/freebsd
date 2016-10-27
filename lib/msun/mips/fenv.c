@@ -39,6 +39,7 @@
  */
 const fenv_t __fe_dfl_env = 0;
 
+#ifdef	SOFTFLOAT
 #define __set_env(env, flags, mask, rnd) env = ((flags)                 \
                                                 | (mask)<<_FPUSW_SHIFT  \
                                                 | (rnd) << 24)
@@ -47,6 +48,7 @@ const fenv_t __fe_dfl_env = 0;
                                                 & FE_ALL_EXCEPT)
 #define __env_round(env)                (((env) >> 24) & _ROUND_MASK)
 #include "fenv-softfloat.h"
+#endif
 
 extern inline int feclearexcept(int __excepts);
 extern inline int fegetexceptflag(fexcept_t *__flagp, int __excepts);

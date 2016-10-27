@@ -415,7 +415,11 @@ LEAF(MipsSwitchFPState)
 	.set push
 	.set hardfloat
 	mfc0	t1, MIPS_COP_0_STATUS	# Save old SR
-	li	t0, MIPS_SR_COP_1_BIT	# enable the coprocessor
+#if defined(__mips_n64)
+	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR	# enable the coprocessor
+#else
+	or	t0, t1, MIPS_SR_COP_1_BIT 		# enable the coprocessor
+#endif
 	mtc0	t0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
 
@@ -540,7 +544,11 @@ LEAF(MipsSaveCurFPState)
 	.set hardfloat
 	PTR_L	a0, TD_PCB(a0)			# get pointer to pcb for thread
 	mfc0	t1, MIPS_COP_0_STATUS		# Disable interrupts and
-	li	t0, MIPS_SR_COP_1_BIT		#  enable the coprocessor
+#if defined(__mips_n64)
+	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR		#  enable the coprocessor
+#else
+	or	t0, t1, MIPS_SR_COP_1_BIT 			#  enable the coprocessor
+#endif
 	mtc0	t0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
 	GET_CPU_PCPU(a1)

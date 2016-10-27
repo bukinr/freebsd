@@ -216,6 +216,9 @@ mips_init(unsigned long memsize, uint64_t ememsize)
 	if (boothowto & RB_KDB)
 		kdb_enter(KDB_WHY_BOOTFLAGS, "Boot flags requested debugger");
 #endif
+#if 0
+	boothowto |= RB_SINGLE;
+#endif
 }
 
 /*

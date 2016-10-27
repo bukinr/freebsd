@@ -15,6 +15,7 @@ options	INET6
 #device		em
 #device		igb
 #device		pcn
+#options		CPU_HAVEFPU
 
 device		sysvmsg
 device		sysvshm
