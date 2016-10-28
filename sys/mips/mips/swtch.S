@@ -415,12 +415,14 @@ LEAF(MipsSwitchFPState)
 	.set push
 	.set hardfloat
 	mfc0	t1, MIPS_COP_0_STATUS	# Save old SR
+	HAZARD_DELAY
 #if defined(__mips_n64)
 	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR	# enable the coprocessor
 #else
 	or	t0, t1, MIPS_SR_COP_1_BIT 		# enable the coprocessor
 #endif
 	mtc0	t0, MIPS_COP_0_STATUS
+	HAZARD_DELAY
 	ITLBNOPFIX
 
 	beq	a0, zero, 1f		# skip save if NULL pointer
@@ -544,12 +546,14 @@ LEAF(MipsSaveCurFPState)
 	.set hardfloat
 	PTR_L	a0, TD_PCB(a0)			# get pointer to pcb for thread
 	mfc0	t1, MIPS_COP_0_STATUS		# Disable interrupts and
+	HAZARD_DELAY
 #if defined(__mips_n64)
 	or	t0, t1, MIPS_SR_COP_1_BIT | MIPS_SR_FR		#  enable the coprocessor
 #else
 	or	t0, t1, MIPS_SR_COP_1_BIT 			#  enable the coprocessor
 #endif
 	mtc0	t0, MIPS_COP_0_STATUS
+	HAZARD_DELAY
 	ITLBNOPFIX
 	GET_CPU_PCPU(a1)
 	PTR_S	zero, PC_FPCURTHREAD(a1)	# indicate state has been saved
