@@ -20,6 +20,13 @@ __RCSID("$NetBSD: flt_rounds.c,v 1.5 2005/12/24 23:10:08 perry Exp $");
 #include "softfloat.h"
 #endif
 
+static const int map[] = {
+	1,	/* round to nearest */
+	0,	/* round to zero */
+	2,	/* round to positive infinity */
+	3	/* round to negative infinity */
+};
+
 int
 __flt_rounds()
 {
@@ -31,16 +38,5 @@ __flt_rounds()
 	__asm __volatile("cfc1 %0,$31" : "=r" (mode));
 #endif
 
-	switch (mode & 0x3) {
-	case FE_TOWARDZERO:
-		return (0);
-	case FE_TONEAREST:
-		return (1);
-	case FE_UPWARD:
-		return (2);
-	case FE_DOWNWARD:
-		return (3);
-	}
-
-	return (-1);
+	return map[mode & 0x03];
 }
