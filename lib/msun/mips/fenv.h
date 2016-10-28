@@ -75,8 +75,8 @@ extern const fenv_t	__fe_dfl_env;
 #define	_ENABLE_MASK	(FE_ALL_EXCEPT << _ENABLE_SHIFT)
 
 #ifndef	SOFTFLOAT
-#define	__cfc1(__fpsr)	__asm __volatile("cfc1 %0, $31" : "=r" (*(__fpsr)))
-#define	__ctc1(__fpsr)	__asm __volatile("ctc1 %0, $31" :: "r" (__fpsr))
+#define	__cfc1(__fcsr)	__asm __volatile("cfc1 %0, $31" : "=r" (__fcsr))
+#define	__ctc1(__fcsr)	__asm __volatile("ctc1 %0, $31" :: "r" (__fcsr))
 #endif
 
 #ifdef SOFTFLOAT
@@ -98,9 +98,9 @@ feclearexcept(int __excepts)
 	fexcept_t fcsr;
 
 	__excepts &= FE_ALL_EXCEPT;
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 	fcsr &= ~(__excepts | (__excepts << _FCSR_CAUSE_SHIFT));
-	__asm __volatile("ctc1 %0, $31" :: "r" (fcsr));
+	__ctc1(fcsr);
 
 	return (0);
 }
@@ -111,7 +111,7 @@ fegetexceptflag(fexcept_t *__flagp, int __excepts)
 	fexcept_t fcsr;
 
 	__excepts &= FE_ALL_EXCEPT;
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 	*__flagp = fcsr & __excepts;
 
 	return (0);
@@ -123,10 +123,10 @@ fesetexceptflag(const fexcept_t *__flagp, int __excepts)
 	fexcept_t fcsr;
 
 	__excepts &= FE_ALL_EXCEPT;
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 	fcsr &= ~__excepts;
 	fcsr |= *__flagp & __excepts;
-	__asm __volatile("ctc1 %0, $31" : : "r" (fcsr));
+	__ctc1(fcsr);
 
 	return (0);
 }
@@ -137,9 +137,9 @@ feraiseexcept(int __excepts)
 	fexcept_t fcsr;
 
 	__excepts &= FE_ALL_EXCEPT;
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 	fcsr |= __excepts | (__excepts << _FCSR_CAUSE_SHIFT);
-	__asm __volatile("ctc1 %0, $31" :: "r" (fcsr));
+	__ctc1(fcsr);
 
 	return (0);
 }
@@ -150,7 +150,7 @@ fetestexcept(int __excepts)
 	fexcept_t fcsr;
 
 	__excepts &= FE_ALL_EXCEPT;
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 
 	return (fcsr & __excepts);
 }
@@ -160,7 +160,7 @@ fegetround(void)
 {
 	fexcept_t fcsr;
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 
 	return (fcsr & _ROUND_MASK);
 }
@@ -173,10 +173,10 @@ fesetround(int __round)
 	if (__round & ~_ROUND_MASK)
 		return (-1);
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 	fcsr &= ~_ROUND_MASK;
 	fcsr |= __round;
-	__asm __volatile("ctc1 %0, $31" : : "r" (fcsr));
+	__ctc1(fcsr);
 
 	return (0);
 }
@@ -185,7 +185,7 @@ __fenv_static inline int
 fegetenv(fenv_t *__envp)
 {
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (*__envp));
+	__cfc1(*__envp);
 
 	return (0);
 }
@@ -195,10 +195,10 @@ feholdexcept(fenv_t *__envp)
 {
 	fexcept_t fcsr;
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (*__envp));
-	fcsr = *__envp;
+	__cfc1(fcsr);
+	*__envp = fcsr;
 	fcsr &= ~(FE_ALL_EXCEPT | _ENABLE_MASK);
-	__asm __volatile("ctc1 %0, $31" : : "r" (fcsr));
+	__ctc1(fcsr);
 
 	return (0);
 }
@@ -207,7 +207,7 @@ __fenv_static inline int
 fesetenv(const fenv_t *__envp)
 {
 
-	__asm __volatile("ctc1 %0, $31" : : "r" (*__envp));
+	__ctc1(*__envp);
 
 	return (0);
 }
@@ -217,7 +217,7 @@ feupdateenv(const fenv_t *__envp)
 {
 	fexcept_t fcsr;
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 	fesetenv(__envp);
 	feraiseexcept(fcsr);
 
@@ -237,25 +237,25 @@ int fegetexcept(void);
 static inline int
 feenableexcept(int __mask)
 {
-	fenv_t __old_fpsr, __new_fpsr;
+	fenv_t __old_fcsr, __new_fcsr;
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (__old_fpsr));
-	__new_fpsr = __old_fpsr | (__mask & FE_ALL_EXCEPT) << _ENABLE_SHIFT;
-	__asm __volatile("ctc1 %0, $31" : : "r" (__new_fpsr));
+	__cfc1(__old_fcsr);
+	__new_fcsr = __old_fcsr | (__mask & FE_ALL_EXCEPT) << _ENABLE_SHIFT;
+	__ctc1(__new_fcsr);
 
-	return ((__old_fpsr >> _ENABLE_SHIFT) & FE_ALL_EXCEPT);
+	return ((__old_fcsr >> _ENABLE_SHIFT) & FE_ALL_EXCEPT);
 }
 
 static inline int
 fedisableexcept(int __mask)
 {
-	fenv_t __old_fpsr, __new_fpsr;
+	fenv_t __old_fcsr, __new_fcsr;
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (__old_fpsr));
-	__new_fpsr = __old_fpsr & ~((__mask & FE_ALL_EXCEPT) << _ENABLE_SHIFT);
-	__asm __volatile("ctc1 %0, $31" : : "r" (__new_fpsr));
+	__cfc1(__old_fcsr);
+	__new_fcsr = __old_fcsr & ~((__mask & FE_ALL_EXCEPT) << _ENABLE_SHIFT);
+	__ctc1(__new_fcsr);
 
-	return ((__old_fpsr >> _ENABLE_SHIFT) & FE_ALL_EXCEPT);
+	return ((__old_fcsr >> _ENABLE_SHIFT) & FE_ALL_EXCEPT);
 }
 
 static inline int
@@ -263,7 +263,7 @@ fegetexcept(void)
 {
 	fexcept_t fcsr;
 
-	__asm __volatile("cfc1 %0, $31" : "=r" (fcsr));
+	__cfc1(fcsr);
 
 	return ((fcsr & _ENABLE_MASK) >> _ENABLE_SHIFT);
 }
