@@ -59,7 +59,7 @@ __FBSDID("$FreeBSD$");
 #ifdef	NL_ARGMAX
 #define	MAX_POSARG	NL_ARGMAX
 #else
-#define	MAX_POSARG	1024
+#define	MAX_POSARG	65536
 #endif
 
 /*
