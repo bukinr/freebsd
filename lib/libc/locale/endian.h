@@ -37,9 +37,9 @@
 #include <sys/endian.h>
 
 /*
- * We assume locale files used on EB machine were generated
- * on EL machine (e.g. during cross build on amd64 host),
- * so convert it to host endianness.
+ * We assume locale files were generated on EL machine
+ * (e.g. during cross build on amd64 host), but used on EB
+ * machine (e.g. MIPS64EB), so convert it to host endianness.
  */
 
 #if BYTE_ORDER == BIG_ENDIAN && defined(__mips__)
