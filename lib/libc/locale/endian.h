@@ -40,6 +40,9 @@
  * We assume locale files were generated on EL machine
  * (e.g. during cross build on amd64 host), but used on EB
  * machine (e.g. MIPS64EB), so convert it to host endianness.
+ *
+ * TODO: detect host endianness on the build machine and use
+ * correct macros here.
  */
 
 #if BYTE_ORDER == BIG_ENDIAN && defined(__mips__)
