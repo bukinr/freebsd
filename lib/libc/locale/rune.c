@@ -38,7 +38,6 @@ static char sccsid[] = "@(#)rune.c	8.1 (Berkeley) 6/4/93";
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <sys/endian.h>
 #include "namespace.h"
 #include <arpa/inet.h>
 #include <errno.h>
@@ -53,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include "un-namespace.h"
 
+#include "endian.h"
 #include "runefile.h"
 
 _RuneLocale *
@@ -108,29 +108,29 @@ _Read_RuneMagi(const char *fname)
 	}
 
 	runetype_ext_ranges = (_FileRuneEntry *)variable;
-	variable = runetype_ext_ranges + le32toh(frl->runetype_ext_nranges);
+	variable = runetype_ext_ranges + CVT(frl->runetype_ext_nranges);
 	if (variable > lastp) {
 		goto invalid;
 	}
 
 	maplower_ext_ranges = (_FileRuneEntry *)variable;
-	variable = maplower_ext_ranges + le32toh(frl->maplower_ext_nranges);
+	variable = maplower_ext_ranges + CVT(frl->maplower_ext_nranges);
 	if (variable > lastp) {
 		goto invalid;
 	}
 
 	mapupper_ext_ranges = (_FileRuneEntry *)variable;
-	variable = mapupper_ext_ranges + le32toh(frl->mapupper_ext_nranges);
+	variable = mapupper_ext_ranges + CVT(frl->mapupper_ext_nranges);
 	if (variable > lastp) {
 		goto invalid;
 	}
 
 	frr = runetype_ext_ranges;
-	for (x = 0; x < le32toh(frl->runetype_ext_nranges); ++x) {
+	for (x = 0; x < CVT(frl->runetype_ext_nranges); ++x) {
 		uint32_t *types;
 
-		if (le32toh(frr[x].map) == 0) {
-			int len = le32toh(frr[x].max) - le32toh(frr[x].min) + 1;
+		if (CVT(frr[x].map) == 0) {
+			int len = CVT(frr[x].max) - CVT(frr[x].min) + 1;
 			types = variable;
 			variable = types + len;
 			runetype_ext_len += len;
@@ -140,7 +140,7 @@ _Read_RuneMagi(const char *fname)
 		}
 	}
 
-	if ((char *)variable + le32toh(frl->variable_len) > (char *)lastp) {
+	if ((char *)variable + CVT(frl->variable_len) > (char *)lastp) {
 		goto invalid;
 	}
 
@@ -148,10 +148,10 @@ _Read_RuneMagi(const char *fname)
 	 * Convert from disk format to host format.
 	 */
 	data = malloc(sizeof(_RuneLocale) +
-	    (le32toh(frl->runetype_ext_nranges) + le32toh(frl->maplower_ext_nranges) +
-	    le32toh(frl->mapupper_ext_nranges)) * sizeof(_RuneEntry) +
+	    (CVT(frl->runetype_ext_nranges) + CVT(frl->maplower_ext_nranges) +
+	    CVT(frl->mapupper_ext_nranges)) * sizeof(_RuneEntry) +
 	    runetype_ext_len * sizeof(*rr->__types) +
-	    le32toh(frl->variable_len));
+	    CVT(frl->variable_len));
 	if (data == NULL) {
 		saverr = errno;
 		munmap(fdata, sb.st_size);
@@ -165,15 +165,15 @@ _Read_RuneMagi(const char *fname)
 	memcpy(rl->__magic, _RUNE_MAGIC_1, sizeof(rl->__magic));
 	memcpy(rl->__encoding, frl->encoding, sizeof(rl->__encoding));
 
-	rl->__variable_len = le32toh(frl->variable_len);
-	rl->__runetype_ext.__nranges = le32toh(frl->runetype_ext_nranges);
-	rl->__maplower_ext.__nranges = le32toh(frl->maplower_ext_nranges);
-	rl->__mapupper_ext.__nranges = le32toh(frl->mapupper_ext_nranges);
+	rl->__variable_len = CVT(frl->variable_len);
+	rl->__runetype_ext.__nranges = CVT(frl->runetype_ext_nranges);
+	rl->__maplower_ext.__nranges = CVT(frl->maplower_ext_nranges);
+	rl->__mapupper_ext.__nranges = CVT(frl->mapupper_ext_nranges);
 
 	for (x = 0; x < _CACHED_RUNES; ++x) {
-		rl->__runetype[x] = le32toh(frl->runetype[x]);
-		rl->__maplower[x] = le32toh(frl->maplower[x]);
-		rl->__mapupper[x] = le32toh(frl->mapupper[x]);
+		rl->__runetype[x] = CVT(frl->runetype[x]);
+		rl->__maplower[x] = CVT(frl->maplower[x]);
+		rl->__mapupper[x] = CVT(frl->mapupper[x]);
 	}
 
 	rl->__runetype_ext.__ranges = (_RuneEntry *)rl->__variable;
@@ -188,15 +188,15 @@ _Read_RuneMagi(const char *fname)
 	rl->__variable = rl->__mapupper_ext.__ranges +
 	    rl->__mapupper_ext.__nranges;
 
-	variable = mapupper_ext_ranges + le32toh(frl->mapupper_ext_nranges);
+	variable = mapupper_ext_ranges + CVT(frl->mapupper_ext_nranges);
 	frr = runetype_ext_ranges;
 	rr = rl->__runetype_ext.__ranges;
 	for (x = 0; x < rl->__runetype_ext.__nranges; ++x) {
 		uint32_t *types;
 
-		rr[x].__min = le32toh(frr[x].min);
-		rr[x].__max = le32toh(frr[x].max);
-		rr[x].__map = le32toh(frr[x].map);
+		rr[x].__min = CVT(frr[x].min);
+		rr[x].__max = CVT(frr[x].max);
+		rr[x].__map = CVT(frr[x].map);
 		if (rr[x].__map == 0) {
 			int len = rr[x].__max - rr[x].__min + 1;
 			types = variable;
@@ -212,17 +212,17 @@ _Read_RuneMagi(const char *fname)
 	frr = maplower_ext_ranges;
 	rr = rl->__maplower_ext.__ranges;
 	for (x = 0; x < rl->__maplower_ext.__nranges; ++x) {
-		rr[x].__min = le32toh(frr[x].min);
-		rr[x].__max = le32toh(frr[x].max);
-		rr[x].__map = le32toh(frr[x].map);
+		rr[x].__min = CVT(frr[x].min);
+		rr[x].__max = CVT(frr[x].max);
+		rr[x].__map = CVT(frr[x].map);
 	}
 
 	frr = mapupper_ext_ranges;
 	rr = rl->__mapupper_ext.__ranges;
 	for (x = 0; x < rl->__mapupper_ext.__nranges; ++x) {
-		rr[x].__min = le32toh(frr[x].min);
-		rr[x].__max = le32toh(frr[x].max);
-		rr[x].__map = le32toh(frr[x].map);
+		rr[x].__min = CVT(frr[x].min);
+		rr[x].__max = CVT(frr[x].max);
+		rr[x].__map = CVT(frr[x].map);
 	}
 
 	memcpy(rl->__variable, variable, rl->__variable_len);
