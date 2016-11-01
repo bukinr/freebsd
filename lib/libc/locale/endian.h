@@ -46,7 +46,7 @@
  */
 
 #if BYTE_ORDER == BIG_ENDIAN && defined(__mips__)
-#define	CVT(x)	le32toh(x)
+#define	BSWAP(x)	le32toh(x)
 #else
-#define	CVT(x)	x
+#define	BSWAP(x)	x
 #endif
