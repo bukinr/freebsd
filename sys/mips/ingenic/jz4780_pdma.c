@@ -54,11 +54,12 @@ __FBSDID("$FreeBSD$");
 
 struct jz4780_pdma_softc {
 	device_t		dev;
-	struct resource		*res[1];
+	struct resource		*res[2];
 };
 
 static struct resource_spec jz4780_pdma_spec[] = {
-	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
+	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ SYS_RES_IRQ,		0,	RF_ACTIVE },
 	{ -1, 0 }
 };
 
@@ -73,7 +74,7 @@ jz4780_pdma_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (!ofw_bus_is_compatible(dev, "ingenic,jz4780-pdma"))
+	if (!ofw_bus_is_compatible(dev, "ingenic,jz4780-dma"))
 		return (ENXIO);
 
 	device_set_desc(dev, "Ingenic JZ4780 PDMA Controller");
