@@ -35,6 +35,7 @@
 #define	PDMA_DTA(n)	(0x04 + 0x20 * n)	/* Channel n Target Address */
 #define	PDMA_DTC(n)	(0x08 + 0x20 * n)	/* Channel n Transfer Count */
 #define	PDMA_DRT(n)	(0x0C + 0x20 * n)	/* Channel n Request Source */
+#define	 DRT_AUTO	(1 << 3)		/* Auto-request. */
 #define	PDMA_DCS(n)	(0x10 + 0x20 * n)	/* Channel n Control/Status */
 #define	PDMA_DCM(n)	(0x14 + 0x20 * n)	/* Channel n Command */
 #define	PDMA_DDA(n)	(0x18 + 0x20 * n)	/* Channel n Descriptor Address */

@@ -12,6 +12,7 @@ mips/ingenic/jz4780_gpio.c	standard
 mips/ingenic/jz4780_machdep.c	standard
 mips/ingenic/jz4780_pinctrl.c	standard
 mips/ingenic/jz4780_timer.c	standard
+mips/ingenic/jz4780_aic.c	standard
 mips/ingenic/jz4780_pdma.c	standard
 
 # Custom interface between pinctrl and gpio

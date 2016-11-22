@@ -52,14 +52,11 @@ __FBSDID("$FreeBSD$");
 
 #include <mips/ingenic/jz4780_aic.h>
 
-struct dma_device {
-	device_t		dev;
-};
-
 struct jz4780_aic_softc {
 	device_t		dev;
 	struct resource		*res[1];
-	struct dma_device	dd;
+	bus_space_tag_t		bst;
+	bus_space_handle_t	bsh;
 };
 
 static struct resource_spec jz4780_aic_spec[] = {
@@ -90,18 +87,27 @@ static int
 jz4780_aic_attach(device_t dev)
 {
 	struct jz4780_aic_softc *sc;
-	struct dma_device *dd;
+	uint32_t reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-
-	dd = &sc->dd;
-	dd->dev = dev;
 
 	if (bus_alloc_resources(dev, jz4780_aic_spec, sc->res)) {
 		device_printf(dev, "could not allocate resources for device\n");
 		return (ENXIO);
 	}
+
+	/* Memory interface */
+	sc->bst = rman_get_bustag(sc->res[0]);
+	sc->bsh = rman_get_bushandle(sc->res[0]);
+
+	/* Configure AIC */
+
+	reg = READ4(sc, AICFR);
+	reg |= (AICFR_BCKD); /* BIT_CLK is generated internally and
+				driven out to the CODEC. */
+	reg |= (AICFR_ENB);  /* Enable the controller. */
+	WRITE4(sc, AICFR, reg);
 
 	return (0);
 }
