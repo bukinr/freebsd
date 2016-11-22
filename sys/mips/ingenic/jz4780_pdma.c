@@ -60,6 +60,9 @@ struct jz4780_pdma_softc {
 	device_t		dev;
 	struct resource		*res[2];
 	struct dma_device	dd;
+	bus_space_tag_t		bst;
+	bus_space_handle_t	bsh;
+	void			*ih;
 };
 
 static struct resource_spec jz4780_pdma_spec[] = {
@@ -71,6 +74,14 @@ static struct resource_spec jz4780_pdma_spec[] = {
 static int jz4780_pdma_probe(device_t dev);
 static int jz4780_pdma_attach(device_t dev);
 static int jz4780_pdma_detach(device_t dev);
+
+static void
+pdma_intr(void *arg)
+{
+	struct jz4780_pdma_softc *sc;
+
+	sc = arg;
+}
 
 static int
 jz4780_pdma_probe(device_t dev)
@@ -92,17 +103,31 @@ jz4780_pdma_attach(device_t dev)
 {
 	struct jz4780_pdma_softc *sc;
 	struct dma_device *dd;
+	int err;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-
-	dd = &sc->dd;
-	dd->dev = dev;
 
 	if (bus_alloc_resources(dev, jz4780_pdma_spec, sc->res)) {
 		device_printf(dev, "could not allocate resources for device\n");
 		return (ENXIO);
 	}
+
+	/* Memory interface */
+	sc->bst = rman_get_bustag(sc->res[0]);
+	sc->bsh = rman_get_bushandle(sc->res[0]);
+
+	/* Setup interrupt handler */
+	err = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC | INTR_MPSAFE,
+	    NULL, pdma_intr, sc, &sc->ih);
+	if (err) {
+		device_printf(dev, "Unable to alloc interrupt resource.\n");
+		return (ENXIO);
+	}
+
+	/* Configure DMA device */
+	dd = &sc->dd;
+	dd->dev = dev;
 
 	return (0);
 }
