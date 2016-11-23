@@ -43,6 +43,7 @@
 
 /* Global Control Registers */
 #define	PDMA_DMAC	0x1000	/* DMA Control */
+#define	 DMAC_DMAE	(1 << 0) /* Enable DMA. */
 #define	PDMA_DIRQP	0x1004	/* DMA Interrupt Pending */
 #define	PDMA_DDB	0x1008	/* DMA Doorbell */
 #define	PDMA_DDS	0x100C	/* DMA Doorbell Set */

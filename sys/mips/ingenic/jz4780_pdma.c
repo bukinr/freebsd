@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_pdma.h>
 
 struct dma_device {
@@ -81,6 +82,8 @@ pdma_intr(void *arg)
 	struct jz4780_pdma_softc *sc;
 
 	sc = arg;
+
+	printf("%s\n", __func__);
 }
 
 static int
@@ -104,6 +107,7 @@ jz4780_pdma_attach(device_t dev)
 	struct jz4780_pdma_softc *sc;
 	struct dma_device *dd;
 	int err;
+	int reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -128,6 +132,10 @@ jz4780_pdma_attach(device_t dev)
 	/* Configure DMA device */
 	dd = &sc->dd;
 	dd->dev = dev;
+
+	reg = READ4(sc, PDMA_DMAC);
+	reg |= (DMAC_DMAE);
+	WRITE4(sc, PDMA_DMAC, reg);
 
 	return (0);
 }

@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/sound/chip.h>
 #include <mixer_if.h>
 
+#include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_aic.h>
 
 #define	AIC_NCHANNELS		1
@@ -669,10 +670,18 @@ aic_attach(device_t dev)
 
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
-	reg |= (AICFR_BCKD); /* BIT_CLK is generated internally and
-				driven out to the CODEC. */
-	reg |= (AICFR_ENB);  /* Enable the controller. */
+	reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and
+				   driven out to the CODEC. */
+	reg |= (AICFR_ENB);	/* Enable the controller. */
+	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
+	reg |= (AICFR_ICDC);	/* Internal CODEC. */
 	WRITE4(sc, AICFR, reg);
+
+	reg = READ4(sc, AICCR);
+	reg |= (AICCR_CHANNEL_2);
+	reg |= (AICCR_TDMS);
+	reg |= (AICCR_ERPL);
+	WRITE4(sc, AICCR, reg);
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 
