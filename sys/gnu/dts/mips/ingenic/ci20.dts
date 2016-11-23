@@ -14,7 +14,7 @@
 	};
 
 	chosen {
-		stdout-path = &uart4;
+		stdout-path = &uart0;
 	};
 
 	memory {
