@@ -30,26 +30,17 @@
  * $FreeBSD$
  */
 
-#define	AICFR		0x00	/* AIC Configuration Register */
-#define	 AICFR_ICDC	(1 << 5) /* Internal CODEC used. */
-#define	 AICFR_AUSEL	(1 << 4) /* Audio Unit Select */
-#define	 AICFR_BCKD	(1 << 2) /* BIT_CLK Direction. */
-#define	 AICFR_ENB	(1 << 0) /* Enable AIC Controller. */
-#define	AICCR		0x04	/* AIC Common Control Register */
-#define	 AICCR_TFLUSH		(1 << 8) /* Transmit FIFO Flush. */
-#define	 AICCR_RFLUSH		(1 << 7) /* Receive FIFO Flush. */
-#define	 AICCR_CHANNEL_S	24
-#define	 AICCR_CHANNEL_M	(0x7 << AICCR_CHANNEL_S)
-#define	 AICCR_CHANNEL_2	(0x1 << AICCR_CHANNEL_S) /* 2 channels, stereo */
-#define	 AICCR_TDMS		(1 << 14) /* Transmit DMA enable. */
-#define	 AICCR_ERPL		(1 << 1) /* Enable Playing Back function. */
-#define	I2SCR		0x10	/* AIC I2S/MSB-justified Control */
-#define	AICSR		0x14	/* AIC FIFO Status Register Register */
-#define	I2SDIV		0x30	/* AIC I2S/MSB-justified Clock Divider Register */
-#define	AICDR		0x34	/* AIC FIFO Data Port Register */
-#define	SPENA		0x80	/* SPDIF Enable Register */
-#define	SPCTRL		0x84	/* SPDIF Control Register */
-#define	SPSTATE		0x88	/* SPDIF Status Register */
-#define	SPCFG1		0x8C	/* SPDIF Configure 1 Register */
-#define	SPCFG2		0x90	/* SPDIF Configure 2 Register */
-#define	SPFIFO		0x94	/* SPDIF FIFO Register */
+enum dmax_direction {
+	DMA_MEM_TO_MEM,
+	DMA_MEM_TO_DEV,
+	DMA_DEV_TO_MEM,
+	DMA_DEV_TO_DEV,
+};
+
+struct dmax_user_config {
+	enum dmax_direction	dir;
+	uintptr_t		src_start;
+	uintptr_t		dst_start;
+	bool			src_incr;
+	bool			dst_incr;
+};

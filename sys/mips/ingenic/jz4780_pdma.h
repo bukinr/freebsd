@@ -38,6 +38,8 @@
 #define	 DRT_AUTO	(1 << 3)		/* Auto-request. */
 #define	PDMA_DCS(n)	(0x10 + 0x20 * n)	/* Channel n Control/Status */
 #define	PDMA_DCM(n)	(0x14 + 0x20 * n)	/* Channel n Command */
+#define	 DCM_SAI	(1 << 23) /* Source Address Increment. */
+#define	 DCM_DAI	(1 << 22) /* Destination Address Increment. */
 #define	PDMA_DDA(n)	(0x18 + 0x20 * n)	/* Channel n Descriptor Address */
 #define	PDMA_DSD(n)	(0x1C + 0x20 * n)	/* Channel n Stride Difference */
 

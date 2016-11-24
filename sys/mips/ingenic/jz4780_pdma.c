@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <dev/dmax/dmax.h>
+
 #include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_pdma.h>
 

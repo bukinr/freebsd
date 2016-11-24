@@ -433,11 +433,17 @@ static int
 aic_start(struct sc_pcminfo *scp)
 {
 	struct aic_softc *sc;
-	//int reg;
+	int reg;
 
 	sc = scp->sc;
 
 	device_printf(scp->dev, "%s\n", __func__);
+
+	reg = READ4(sc, AICCR);
+	//reg |= (AICCR_CHANNEL_2);
+	reg |= (AICCR_TDMS);
+	reg |= (AICCR_ERPL);
+	WRITE4(sc, AICCR, reg);
 
 #if 0
 	if (sdma_configure(sc->sdma_channel, sc->conf) != 0) {
@@ -679,8 +685,9 @@ aic_attach(device_t dev)
 
 	reg = READ4(sc, AICCR);
 	reg |= (AICCR_CHANNEL_2);
-	reg |= (AICCR_TDMS);
-	reg |= (AICCR_ERPL);
+	reg |= (AICCR_TFLUSH | AICCR_RFLUSH);
+	//reg |= (AICCR_TDMS);
+	//reg |= (AICCR_ERPL);
 	WRITE4(sc, AICCR, reg);
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
