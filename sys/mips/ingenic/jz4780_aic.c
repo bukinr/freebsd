@@ -72,6 +72,7 @@ struct aic_softc {
 	bus_dmamap_t		dma_map;
 	bus_addr_t		buf_base_phys;
 	uint32_t		*buf_base;
+	uintptr_t		aic_paddr;
 	int			dma_size;
 	struct aic_rate		*sr;
 	struct xdma_channel_config conf;
@@ -401,6 +402,11 @@ setup_dma(struct sc_pcminfo *scp)
 	conf =  &sc->conf;
 
 	conf->dst_incr = 0;
+	conf->src_incr = 0;
+	conf->direction = DMA_MEM_TO_DEV;
+	conf->src_start = sc->buf_base_phys;
+	conf->dst_start = (sc->aic_paddr + AICDR);
+	printf("dst_start is %x\n", conf->dst_start);
 
 #if 0
 	conf->ih = aic_dma_intr;
@@ -637,6 +643,7 @@ aic_attach(device_t dev)
 	/* Memory interface */
 	sc->bst = rman_get_bustag(sc->res[0]);
 	sc->bsh = rman_get_bushandle(sc->res[0]);
+	sc->aic_paddr = rman_get_start(sc->res[0]);
 
 	/* Setup PCM */
 	scp = malloc(sizeof(struct sc_pcminfo), M_DEVBUF, M_NOWAIT | M_ZERO);

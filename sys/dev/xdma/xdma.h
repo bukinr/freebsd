@@ -38,7 +38,7 @@ enum xdma_direction {
 };
 
 struct xdma_channel_config {
-	enum xdma_direction	dir;
+	enum xdma_direction	direction;
 	uintptr_t		src_start;
 	uintptr_t		dst_start;
 	bool			src_incr;
