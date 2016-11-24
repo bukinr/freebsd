@@ -55,3 +55,10 @@ __FBSDID("$FreeBSD$");
 #include <dev/xdma/xdma.h>
 
 MALLOC_DEFINE(M_DMAX, "xdma", "xDMA framework");
+
+int
+xdma_channel_configure(struct xdma_channel_config *conf)
+{
+
+	return (0);
+}

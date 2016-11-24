@@ -44,3 +44,5 @@ struct xdma_channel_config {
 	bool			src_incr;
 	bool			dst_incr;
 };
+
+int xdma_channel_configure(struct xdma_channel_config *);
