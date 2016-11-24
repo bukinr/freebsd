@@ -52,6 +52,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 #endif
 
-#include <dev/dmax/dmax.h>
+#include <dev/xdma/xdma.h>
 
-MALLOC_DEFINE(M_DMAX, "dmax", "DMA eXchange framework");
+MALLOC_DEFINE(M_DMAX, "xdma", "xDMA framework");

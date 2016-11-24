@@ -54,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/sound/chip.h>
 #include <mixer_if.h>
 
+#include <dev/xdma/xdma.h>
+
 #include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_aic.h>
 
@@ -72,6 +74,7 @@ struct aic_softc {
 	uint32_t		*buf_base;
 	int			dma_size;
 	struct aic_rate		*sr;
+	struct xdma_channel_config conf;
 };
 
 /* Channel registers */
@@ -105,6 +108,7 @@ static struct resource_spec aic_spec[] = {
 static int aic_probe(device_t dev);
 static int aic_attach(device_t dev);
 static int aic_detach(device_t dev);
+static int setup_dma(struct sc_pcminfo *scp);
 
 struct aic_rate {
         uint32_t speed;
@@ -313,9 +317,7 @@ aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 
 	sndbuf_resize(ch->buffer, sc->dma_size / blocksize, blocksize);
 
-#if 0
 	setup_dma(scp);
-#endif
 
 	return (sndbuf_getblksz(ch->buffer));
 }
@@ -333,7 +335,7 @@ aic_dma_intr(void *arg, int chn)
 	scp = arg;
 	ch = &scp->chan[0];
 	sc = scp->sc;
-	conf = sc->conf;
+	conf = &sc->conf;
 
 	bufsize = sndbuf_getsize(ch->buffer);
 
@@ -384,19 +386,23 @@ find_sdma_controller(struct aic_softc *sc)
 
 	return (0);
 };
+#endif
 
 static int
 setup_dma(struct sc_pcminfo *scp)
 {
-	struct sdma_conf *conf;
-	struct sc_chinfo *ch;
+	struct xdma_channel_config *conf;
 	struct aic_softc *sc;
-	int fmt;
+	struct sc_chinfo *ch;
+	//int fmt;
 
 	ch = &scp->chan[0];
 	sc = scp->sc;
-	conf = sc->conf;
+	conf =  &sc->conf;
 
+	conf->dst_incr = 0;
+
+#if 0
 	conf->ih = aic_dma_intr;
 	conf->ih_user = scp;
 	conf->saddr = sc->buf_base_phys;
@@ -424,10 +430,10 @@ setup_dma(struct sc_pcminfo *scp)
 		device_printf(sc->dev, "Unknown format\n");
 		return (-1);
 	}
+#endif
 
 	return (0);
 }
-#endif
 
 static int
 aic_start(struct sc_pcminfo *scp)

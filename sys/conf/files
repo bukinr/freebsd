@@ -1401,7 +1401,6 @@ dev/dcons/dcons.c		optional dcons
 dev/dcons/dcons_crom.c		optional dcons_crom
 dev/dcons/dcons_os.c		optional dcons
 dev/de/if_de.c			optional de pci
-dev/dmax/dmax.c			optional dmax
 dev/dme/if_dme.c		optional dme
 dev/dpt/dpt_eisa.c		optional dpt eisa
 dev/dpt/dpt_pci.c		optional dpt pci
@@ -3215,6 +3214,7 @@ wpi.fw			optional wpifw					\
 	compile-with	"${NORMAL_FW}"					\
 	no-obj no-implicit-rule						\
 	clean		"wpi.fw"
+dev/xdma/xdma.c			optional xdma
 dev/xe/if_xe.c			optional xe
 dev/xe/if_xe_pccard.c		optional xe pccard
 dev/xen/balloon/balloon.c	optional xenhvm

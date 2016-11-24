@@ -30,15 +30,15 @@
  * $FreeBSD$
  */
 
-enum dmax_direction {
+enum xdma_direction {
 	DMA_MEM_TO_MEM,
 	DMA_MEM_TO_DEV,
 	DMA_DEV_TO_MEM,
 	DMA_DEV_TO_DEV,
 };
 
-struct dmax_user_config {
-	enum dmax_direction	dir;
+struct xdma_channel_config {
+	enum xdma_direction	dir;
 	uintptr_t		src_start;
 	uintptr_t		dst_start;
 	bool			src_incr;
