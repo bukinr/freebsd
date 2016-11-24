@@ -30,6 +30,9 @@
  * $FreeBSD$
  */
 
+#ifndef _DEV_EXTRES_XDMA_H_
+#define _DEV_EXTRES_XDMA_H_
+
 enum xdma_direction {
 	DMA_MEM_TO_MEM,
 	DMA_MEM_TO_DEV,
@@ -45,4 +48,8 @@ struct xdma_channel_config {
 	bool			dst_incr;
 };
 
-int xdma_channel_configure(struct xdma_channel_config *);
+//int xdma_channel_configure(device_t dev, struct xdma_channel_config *);
+int xdma_test(device_t dev);
+device_t xdma_get(device_t dev, const char *prop);
+
+#endif /* !_DEV_EXTRES_XDMA_H_ */

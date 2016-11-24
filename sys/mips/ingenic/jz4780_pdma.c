@@ -55,11 +55,13 @@ __FBSDID("$FreeBSD$");
 #include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_pdma.h>
 
+#include "xdma_if.h"
+
 struct dma_device {
 	device_t		dev;
 };
 
-struct jz4780_pdma_softc {
+struct pdma_softc {
 	device_t		dev;
 	struct resource		*res[2];
 	struct dma_device	dd;
@@ -68,20 +70,20 @@ struct jz4780_pdma_softc {
 	void			*ih;
 };
 
-static struct resource_spec jz4780_pdma_spec[] = {
+static struct resource_spec pdma_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE },
 	{ -1, 0 }
 };
 
-static int jz4780_pdma_probe(device_t dev);
-static int jz4780_pdma_attach(device_t dev);
-static int jz4780_pdma_detach(device_t dev);
+static int pdma_probe(device_t dev);
+static int pdma_attach(device_t dev);
+static int pdma_detach(device_t dev);
 
 static void
 pdma_intr(void *arg)
 {
-	struct jz4780_pdma_softc *sc;
+	struct pdma_softc *sc;
 
 	sc = arg;
 
@@ -89,7 +91,7 @@ pdma_intr(void *arg)
 }
 
 static int
-jz4780_pdma_probe(device_t dev)
+pdma_probe(device_t dev)
 {
 
 	if (!ofw_bus_status_okay(dev))
@@ -104,9 +106,9 @@ jz4780_pdma_probe(device_t dev)
 }
 
 static int
-jz4780_pdma_attach(device_t dev)
+pdma_attach(device_t dev)
 {
-	struct jz4780_pdma_softc *sc;
+	struct pdma_softc *sc;
 	struct dma_device *dd;
 	int err;
 	int reg;
@@ -114,7 +116,7 @@ jz4780_pdma_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
-	if (bus_alloc_resources(dev, jz4780_pdma_spec, sc->res)) {
+	if (bus_alloc_resources(dev, pdma_spec, sc->res)) {
 		device_printf(dev, "could not allocate resources for device\n");
 		return (ENXIO);
 	}
@@ -131,6 +133,13 @@ jz4780_pdma_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	phandle_t xref, node;
+
+	node = ofw_bus_get_node(dev);
+	xref = OF_xref_from_node(node);
+	OF_device_register_xref(xref, dev);
+
+
 	/* Configure DMA device */
 	dd = &sc->dd;
 	dd->dev = dev;
@@ -143,32 +152,44 @@ jz4780_pdma_attach(device_t dev)
 }
 
 static int
-jz4780_pdma_detach(device_t dev)
+pdma_detach(device_t dev)
 {
-	struct jz4780_pdma_softc *sc;
+	struct pdma_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	bus_release_resources(dev, jz4780_pdma_spec, sc->res);
+	bus_release_resources(dev, pdma_spec, sc->res);
 
 	return (0);
 }
 
-static device_method_t jz4780_pdma_methods[] = {
+static int
+pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static device_method_t pdma_methods[] = {
 	/* Device interface */
-	DEVMETHOD(device_probe,		jz4780_pdma_probe),
-	DEVMETHOD(device_attach,	jz4780_pdma_attach),
-	DEVMETHOD(device_detach,	jz4780_pdma_detach),
+	DEVMETHOD(device_probe,			pdma_probe),
+	DEVMETHOD(device_attach,		pdma_attach),
+	DEVMETHOD(device_detach,		pdma_detach),
+
+	/* xDMA Interface */
+	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
+
 	DEVMETHOD_END
 };
 
-static driver_t jz4780_pdma_driver = {
+static driver_t pdma_driver = {
 	"pdma",
-	jz4780_pdma_methods,
-	sizeof(struct jz4780_pdma_softc),
+	pdma_methods,
+	sizeof(struct pdma_softc),
 };
 
-static devclass_t jz4780_pdma_devclass;
+static devclass_t pdma_devclass;
 
-DRIVER_MODULE(jz4780_pdma, simplebus, jz4780_pdma_driver,
-    jz4780_pdma_devclass, 0, 0);
+EARLY_DRIVER_MODULE(pdma, simplebus, pdma_driver, pdma_devclass, 0, 0, BUS_PASS_INTERRUPT+BUS_PASS_ORDER_LAST);

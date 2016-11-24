@@ -3215,6 +3215,7 @@ wpi.fw			optional wpifw					\
 	no-obj no-implicit-rule						\
 	clean		"wpi.fw"
 dev/xdma/xdma.c			optional xdma
+dev/xdma/xdma_if.m		optional xdma
 dev/xe/if_xe.c			optional xe
 dev/xe/if_xe_pccard.c		optional xe pccard
 dev/xen/balloon/balloon.c	optional xenhvm

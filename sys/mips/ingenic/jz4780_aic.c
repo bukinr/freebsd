@@ -395,6 +395,8 @@ setup_dma(struct sc_pcminfo *scp)
 	struct xdma_channel_config *conf;
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
+	device_t dma_dev_tx;
+	device_t dma_dev_rx;
 	int fmt;
 
 	ch = &scp->chan[0];
@@ -411,7 +413,9 @@ setup_dma(struct sc_pcminfo *scp)
 
 	printf("dst_start is %x\n", conf->dst_start);
 
-	xdma_channel_configure(conf);
+	//xdma_channel_configure(conf);
+	dma_dev_tx = xdma_get(sc->dev, "tx");
+	dma_dev_rx = xdma_get(sc->dev, "rx");
 
 #if 0
 	conf->ih = aic_dma_intr;

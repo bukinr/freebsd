@@ -1291,6 +1291,7 @@ done:
 int
 clk_get_by_ofw_index(device_t dev, phandle_t cnode, int idx, clk_t *clk)
 {
+
 	return (clk_get_by_ofw_index_prop(dev, cnode, "clocks", idx, clk));
 }
 

@@ -54,11 +54,132 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/xdma/xdma.h>
 
+#include <xdma_if.h>
+
 MALLOC_DEFINE(M_DMAX, "xdma", "xDMA framework");
 
-int
+#if 0
+static int
 xdma_channel_configure(struct xdma_channel_config *conf)
 {
 
 	return (0);
 }
+#endif
+
+int
+xdma_test(device_t dev)
+{
+	phandle_t node;
+	int error;
+	int ndmas;
+	int idx;
+
+	node = ofw_bus_get_node(dev);
+	error = ofw_bus_parse_xref_list_get_length(node, "dmas", "#dma-cells", &ndmas);
+	printf("ndmas %d\n", ndmas);
+
+	error = ofw_bus_find_string_index(node, "dma-names", "tx", &idx);
+	printf("tx dma idx %d\n", idx);
+
+	error = ofw_bus_find_string_index(node, "dma-names", "rx", &idx);
+	printf("rx dma idx %d\n", idx);
+
+	phandle_t parent, *cells;
+	device_t dma_dev;
+	int ncells;
+
+	printf("get dmas \n");
+
+	error = ofw_bus_parse_xref_list_alloc(node, "dmas", "#dma-cells", idx,
+	    &parent, &ncells, &cells);
+	if (error != 0) {
+		printf("Cant get dma\n");
+		return (-1);
+	}
+
+	printf("get dev \n");
+	dma_dev = OF_device_from_xref(parent);
+	if (dma_dev == NULL) {
+		printf("failed to get dma dev\n");
+		return (-1);
+	}
+
+	struct xdma_channel_config conf;
+	printf("call xdma_chan_conf\n");
+
+	XDMA_CHANNEL_CONFIGURE(dma_dev, &conf);
+
+	return (0);
+}
+
+device_t
+xdma_get(device_t dev, const char *prop)
+{
+	phandle_t parent, *cells;
+	device_t dma_dev;
+	phandle_t node;
+	int ncells;
+	int error;
+	int ndmas;
+	int idx;
+
+	node = ofw_bus_get_node(dev);
+	error = ofw_bus_parse_xref_list_get_length(node, "dmas", "#dma-cells", &ndmas);
+	if (error) {
+		printf("failed\n");
+		return (NULL);
+	}
+	printf("ndmas %d\n", ndmas);
+	if (ndmas == 0) {
+		printf("failed\n");
+		return (NULL);
+	}
+
+	error = ofw_bus_find_string_index(node, "dma-names", prop, &idx);
+	if (error != 0) {
+		printf("failed\n");
+		return (NULL);
+	}
+	printf("dma idx %d\n", idx);
+	printf("get dmas \n");
+
+	error = ofw_bus_parse_xref_list_alloc(node, "dmas", "#dma-cells", idx,
+	    &parent, &ncells, &cells);
+	if (error != 0) {
+		printf("Cant get dma\n");
+		return (NULL);
+	}
+	printf("ncells is %d\n", ncells);
+	if (ncells >= 1)
+		printf("cells[0] %d, cells[1] %d, cells[2] %d\n", cells[0], cells[1], cells[2]);
+
+	printf("get dev \n");
+	dma_dev = OF_device_from_xref(parent);
+	if (dma_dev == NULL) {
+		printf("failed to get dma dev\n");
+		return (NULL);
+	}
+
+	return (dma_dev);
+}
+
+#if 0
+int
+xdma_get_by_ofw_name(device_t dev, phandle_t cnode, const char *name, clk_t *clk)
+{
+        int rv, idx;
+
+        if (cnode <= 0)
+                cnode = ofw_bus_get_node(dev);
+        if (cnode <= 0) {
+                device_printf(dev, "%s called on not ofw based device\n",
+                 __func__);
+                return (ENXIO);
+        }
+        rv = ofw_bus_find_string_index(cnode, "clock-names", name, &idx);
+        if (rv != 0)
+                return (rv);
+        return (clk_get_by_ofw_index(dev, cnode, idx, clk));
+}
+#endif
