@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/sound/chip.h>
 #include <mixer_if.h>
 
+#include <dev/extres/clk/clk.h>
 #include <dev/xdma/xdma.h>
 
 #include <mips/ingenic/jz4780_common.h>
@@ -74,6 +75,7 @@ struct aic_softc {
 	uint32_t		*buf_base;
 	uintptr_t		aic_paddr;
 	int			dma_size;
+	clk_t			clk;
 	struct aic_rate		*sr;
 	struct xdma_channel_config conf;
 };
@@ -318,8 +320,6 @@ aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 
 	sndbuf_resize(ch->buffer, sc->dma_size / blocksize, blocksize);
 
-	setup_dma(scp);
-
 	return (sndbuf_getblksz(ch->buffer));
 }
 
@@ -393,9 +393,9 @@ static int
 setup_dma(struct sc_pcminfo *scp)
 {
 	struct xdma_channel_config *conf;
+	xdma_device_t xdma_dev;
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
-	xdma_device_t xdma_dev_tx;
 	int fmt;
 
 	ch = &scp->chan[0];
@@ -411,12 +411,16 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->dst_start = (sc->aic_paddr + AICDR);
 	conf->period_len = sndbuf_getblksz(ch->buffer);
 	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
-	conf->word_len = 24;
+
+	if (fmt & AFMT_16BIT) {
+		conf->word_len = 16;
+	} else
+		panic("here\n");
 
 	printf("dst_start is %x\n", conf->dst_start);
 
-	xdma_dev_tx = xdma_get(sc->dev, "tx");
-	xdma_prepare(xdma_dev_tx, conf);
+	xdma_dev = xdma_get(sc->dev, "tx");
+	xdma_prepare(xdma_dev, conf);
 
 #if 0
 	conf->ih = aic_dma_intr;
@@ -461,11 +465,18 @@ aic_start(struct sc_pcminfo *scp)
 
 	device_printf(scp->dev, "%s\n", __func__);
 
+	setup_dma(scp);
+
+	/* Enable DMA */
 	reg = READ4(sc, AICCR);
 	//reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
 	WRITE4(sc, AICCR, reg);
+
+	reg = READ4(sc, AICFR);
+	reg |= (AICFR_ENB);	/* Enable the controller. */
+	WRITE4(sc, AICFR, reg);
 
 #if 0
 	if (sdma_configure(sc->sdma_channel, sc->conf) != 0) {
@@ -566,7 +577,7 @@ aicchan_getptr(kobj_t obj, void *data)
 }
 
 static uint32_t aic_pfmt[] = {
-	SND_FORMAT(AFMT_S24_LE, 2, 0),
+	SND_FORMAT(AFMT_S16_LE, 2, 0),
 	0
 };
 
@@ -697,11 +708,18 @@ aic_attach(device_t dev)
 
 	bzero(sc->buf_base, sc->dma_size);
 
+	err = clk_get_by_ofw_name(sc->dev, 0, "i2s", &sc->clk);
+	if (err == 0) {
+		printf("i2s clk found. enable\n");
+		err = clk_enable(sc->clk);
+	}
+	if (err != 0)
+		printf("failed to enable clk\n");
+
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
 	reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and
 				   driven out to the CODEC. */
-	reg |= (AICFR_ENB);	/* Enable the controller. */
 	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
 	reg |= (AICFR_ICDC);	/* Internal CODEC. */
 	WRITE4(sc, AICFR, reg);

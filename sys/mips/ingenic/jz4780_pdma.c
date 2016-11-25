@@ -44,6 +44,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <sys/rman.h>
 
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/pmap.h>
+
 #include <machine/bus.h>
 
 #include <dev/fdt/fdt_common.h>
@@ -180,7 +185,11 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 	struct pdma_channel *chan;
 	struct pdma_hwdesc *desc;
 	struct pdma_data *data;
+	struct pdma_softc *sc;
+	int reg;
 	int i;
+
+	sc = device_get_softc(dev);
 
 	printf("%s: desc num %d, period_len %d\n", __func__,
 	    conf->hwdesc_num, conf->period_len);
@@ -192,7 +201,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 
 	for (i = 0; i < conf->hwdesc_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
-			desc[i].dsa = conf->src_start;
+			desc[i].dsa = vtophys(conf->src_start);
 			desc[i].dta = conf->dst_start;
 			desc[i].drt = data->tx;
 			desc[i].dcm = DCM_TIE;
@@ -205,6 +214,14 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 			desc[i].dcm |= DCM_LINK;
 		}
 	}
+
+	printf("descriptor address %x phys %x\n", (uint32_t)desc, (uint32_t)vtophys(desc));
+	WRITE4(sc, PDMA_DDA(0), vtophys(desc));
+
+	WRITE4(sc, PDMA_DDS, (1 << 0)); /* chan 0 */
+
+	reg = DCS_DES8 | DCS_CTE;
+	WRITE4(sc, PDMA_DCS(0), reg);
 
 	return (0);
 }
