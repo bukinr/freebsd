@@ -187,25 +187,6 @@ xdma_control(xdma_device_t xdma_dev, int command)
 	default:
 		break;
 	}
+
 	return (0);
 }
-
-#if 0
-int
-xdma_get_by_ofw_name(device_t dev, phandle_t cnode, const char *name, clk_t *clk)
-{
-        int rv, idx;
-
-        if (cnode <= 0)
-                cnode = ofw_bus_get_node(dev);
-        if (cnode <= 0) {
-                device_printf(dev, "%s called on not ofw based device\n",
-                 __func__);
-                return (ENXIO);
-        }
-        rv = ofw_bus_find_string_index(cnode, "clock-names", name, &idx);
-        if (rv != 0)
-                return (rv);
-        return (clk_get_by_ofw_index(dev, cnode, idx, clk));
-}
-#endif
