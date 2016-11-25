@@ -34,10 +34,10 @@
 #define _DEV_EXTRES_XDMA_H_
 
 enum xdma_direction {
-	DMA_MEM_TO_MEM,
-	DMA_MEM_TO_DEV,
-	DMA_DEV_TO_MEM,
-	DMA_DEV_TO_DEV,
+	XDMA_MEM_TO_MEM,
+	XDMA_MEM_TO_DEV,
+	XDMA_DEV_TO_MEM,
+	XDMA_DEV_TO_DEV,
 };
 
 struct xdma_device {

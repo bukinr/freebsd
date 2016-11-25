@@ -180,7 +180,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 	struct pdma_channel *chan;
 	struct pdma_hwdesc *desc;
 	struct pdma_data *data;
-	data = &chan->data;
+	int i;
 
 	printf("%s: desc num %d, period_len %d\n", __func__,
 	    conf->hwdesc_num, conf->period_len);
@@ -195,15 +195,14 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 			desc[i].dsa = conf->src_start;
 			desc[i].dta = conf->dst_start;
 			desc[i].drt = data->tx;
-			desc[i].dcm = DCM_TIE | DCM_LINK;
+			desc[i].dcm = DCM_TIE;
 
 			/* TODO: dehardcode */
 			desc[i].dtc = conf->period_len / 16;
 			desc[i].dcm |= DCM_TSZ_16 | DCM_DP_2 | DCM_SP_2;
 		}
 		if (i != (conf->hwdesc_num - 1)) {
-			/* Set address to next descriptor */
-			desc[i].dtc |=
+			desc[i].dcm |= DCM_LINK;
 		}
 	}
 

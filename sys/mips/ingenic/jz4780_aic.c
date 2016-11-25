@@ -406,7 +406,7 @@ setup_dma(struct sc_pcminfo *scp)
 
 	conf->dst_incr = 0;
 	conf->src_incr = 0;
-	conf->direction = DMA_MEM_TO_DEV;
+	conf->direction = XDMA_MEM_TO_DEV;
 	conf->src_start = sc->buf_base_phys;
 	conf->dst_start = (sc->aic_paddr + AICDR);
 	conf->period_len = sndbuf_getblksz(ch->buffer);
