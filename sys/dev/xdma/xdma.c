@@ -177,7 +177,18 @@ xdma_get(device_t dev, const char *prop)
 
 	return (xdma_dev);
 }
+int
+xdma_control(xdma_device_t xdma_dev, int command)
+{
 
+	switch(command) {
+	case XDMA_CMD_START:
+		break;
+	default:
+		break;
+	}
+	return (0);
+}
 
 #if 0
 int

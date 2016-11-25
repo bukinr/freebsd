@@ -40,6 +40,11 @@ enum xdma_direction {
 	XDMA_DEV_TO_DEV,
 };
 
+enum xdma_command {
+	XDMA_CMD_START,
+	XDMA_CMD_STOP,
+};
+
 struct xdma_device {
 	device_t dma_dev;
 	void *data;
@@ -58,8 +63,9 @@ struct xdma_channel_config {
 	int			word_len;
 };
 
+xdma_device_t xdma_get(device_t dev, const char *prop);
 int xdma_prepare(xdma_device_t xdma_dev, struct xdma_channel_config *conf);
 int xdma_test(device_t dev);
-xdma_device_t xdma_get(device_t dev, const char *prop);
+int xdma_control(xdma_device_t xdma_dev, int command);
 
 #endif /* !_DEV_EXTRES_XDMA_H_ */
