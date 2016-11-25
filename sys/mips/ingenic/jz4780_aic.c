@@ -395,8 +395,7 @@ setup_dma(struct sc_pcminfo *scp)
 	struct xdma_channel_config *conf;
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
-	xdma_device_t dma_dev_tx;
-	xdma_device_t dma_dev_rx;
+	xdma_device_t xdma_dev_tx;
 	int fmt;
 
 	ch = &scp->chan[0];
@@ -410,12 +409,14 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->direction = DMA_MEM_TO_DEV;
 	conf->src_start = sc->buf_base_phys;
 	conf->dst_start = (sc->aic_paddr + AICDR);
+	conf->period_len = sndbuf_getblksz(ch->buffer);
+	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
+	conf->word_len = 24;
 
 	printf("dst_start is %x\n", conf->dst_start);
 
-	//xdma_channel_configure(conf);
-	dma_dev_tx = xdma_get(sc->dev, "tx");
-	dma_dev_rx = xdma_get(sc->dev, "rx");
+	xdma_dev_tx = xdma_get(sc->dev, "tx");
+	xdma_prepare(xdma_dev_tx, conf);
 
 #if 0
 	conf->ih = aic_dma_intr;

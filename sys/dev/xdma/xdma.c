@@ -58,14 +58,14 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_XDMA, "xdma", "xDMA framework");
 
-#if 0
-static int
-xdma_channel_configure(struct xdma_channel_config *conf)
+int
+xdma_prepare(xdma_device_t xdma_dev, struct xdma_channel_config *conf)
 {
+
+	XDMA_CHANNEL_CONFIGURE(xdma_dev->dma_dev, conf);
 
 	return (0);
 }
-#endif
 
 int
 xdma_test(device_t dev)

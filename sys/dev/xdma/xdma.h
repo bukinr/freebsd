@@ -53,9 +53,12 @@ struct xdma_channel_config {
 	uintptr_t		dst_start;
 	bool			src_incr;
 	bool			dst_incr;
+	int			period_len;
+	int			hwdesc_num;
+	int			word_len;
 };
 
-//int xdma_channel_configure(device_t dev, struct xdma_channel_config *);
+int xdma_prepare(xdma_device_t xdma_dev, struct xdma_channel_config *conf);
 int xdma_test(device_t dev);
 xdma_device_t xdma_get(device_t dev, const char *prop);
 

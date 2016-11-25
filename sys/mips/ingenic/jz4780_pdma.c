@@ -151,7 +151,6 @@ pdma_attach(device_t dev)
 	xref = OF_xref_from_node(node);
 	OF_device_register_xref(xref, dev);
 
-
 	/* Configure DMA device */
 	dd = &sc->dd;
 	dd->dev = dev;
@@ -178,8 +177,35 @@ pdma_detach(device_t dev)
 static int
 pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 {
+	struct pdma_channel *chan;
+	struct pdma_hwdesc *desc;
+	struct pdma_data *data;
+	data = &chan->data;
 
-	printf("%s\n", __func__);
+	printf("%s: desc num %d, period_len %d\n", __func__,
+	    conf->hwdesc_num, conf->period_len);
+
+	chan = &pdma_channels[0];
+	data = &chan->data;
+
+	desc = malloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc), M_DEVBUF, M_WAITOK | M_ZERO);
+
+	for (i = 0; i < conf->hwdesc_num; i++) {
+		if (conf->direction == XDMA_MEM_TO_DEV) {
+			desc[i].dsa = conf->src_start;
+			desc[i].dta = conf->dst_start;
+			desc[i].drt = data->tx;
+			desc[i].dcm = DCM_TIE | DCM_LINK;
+
+			/* TODO: dehardcode */
+			desc[i].dtc = conf->period_len / 16;
+			desc[i].dcm |= DCM_TSZ_16 | DCM_DP_2 | DCM_SP_2;
+		}
+		if (i != (conf->hwdesc_num - 1)) {
+			/* Set address to next descriptor */
+			desc[i].dtc |=
+		}
+	}
 
 	return (0);
 }
