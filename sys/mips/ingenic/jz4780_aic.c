@@ -395,8 +395,8 @@ setup_dma(struct sc_pcminfo *scp)
 	struct xdma_channel_config *conf;
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
-	device_t dma_dev_tx;
-	device_t dma_dev_rx;
+	xdma_device_t dma_dev_tx;
+	xdma_device_t dma_dev_rx;
 	int fmt;
 
 	ch = &scp->chan[0];

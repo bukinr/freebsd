@@ -172,6 +172,18 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 	return (0);
 }
 
+static int
+pdma_data(device_t dev, phandle_t *cells, int ncells, void *data)
+{
+
+	printf("%s: ncells is %d\n", __func__, ncells);
+	if (ncells >= 1)
+		printf("cells[0] %d, cells[1] %d, cells[2] %d\n",
+		    cells[0], cells[1], cells[2]);
+
+	return (0);
+}
+
 static device_method_t pdma_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,			pdma_probe),
@@ -180,6 +192,7 @@ static device_method_t pdma_methods[] = {
 
 	/* xDMA Interface */
 	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
+	DEVMETHOD(xdma_data,			pdma_data),
 
 	DEVMETHOD_END
 };

@@ -31,6 +31,13 @@
 #
 
 #include <machine/bus.h>
+
+#ifdef FDT
+#include <dev/fdt/fdt_common.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#endif
+
 #include <dev/xdma/xdma.h>
 
 INTERFACE xdma;
@@ -59,3 +66,10 @@ METHOD int channel_configure {
 	device_t dev;
 	struct xdma_channel_config *conf;
 } DEFAULT xdma_channel_configure;
+
+METHOD int data {
+	device_t dev;
+	phandle_t *cells;
+	int ncells;
+	void *data;
+};

@@ -40,6 +40,13 @@ enum xdma_direction {
 	DMA_DEV_TO_DEV,
 };
 
+struct xdma_device {
+	device_t dma_dev;
+	void *data;
+};
+
+typedef struct xdma_device *xdma_device_t;
+
 struct xdma_channel_config {
 	enum xdma_direction	direction;
 	uintptr_t		src_start;
@@ -50,6 +57,6 @@ struct xdma_channel_config {
 
 //int xdma_channel_configure(device_t dev, struct xdma_channel_config *);
 int xdma_test(device_t dev);
-device_t xdma_get(device_t dev, const char *prop);
+xdma_device_t xdma_get(device_t dev, const char *prop);
 
 #endif /* !_DEV_EXTRES_XDMA_H_ */

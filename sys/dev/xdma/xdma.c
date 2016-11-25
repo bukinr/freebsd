@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 
 #include <xdma_if.h>
 
-MALLOC_DEFINE(M_DMAX, "xdma", "xDMA framework");
+MALLOC_DEFINE(M_XDMA, "xdma", "xDMA framework");
 
 #if 0
 static int
@@ -113,16 +113,29 @@ xdma_test(device_t dev)
 	return (0);
 }
 
-device_t
+static int
+xdma_fill_data(xdma_device_t xdma_dev, phandle_t *cells, int ncells)
+{
+	uint32_t ret;
+
+	ret = XDMA_DATA(xdma_dev->dma_dev, cells, ncells, &xdma_dev->data);
+
+	return (ret);
+}
+
+xdma_device_t
 xdma_get(device_t dev, const char *prop)
 {
 	phandle_t parent, *cells;
 	device_t dma_dev;
+	xdma_device_t xdma_dev;
 	phandle_t node;
 	int ncells;
 	int error;
 	int ndmas;
 	int idx;
+
+	xdma_dev = malloc(sizeof(xdma_device_t), M_XDMA, M_WAITOK | M_ZERO);
 
 	node = ofw_bus_get_node(dev);
 	error = ofw_bus_parse_xref_list_get_length(node, "dmas", "#dma-cells", &ndmas);
@@ -150,9 +163,6 @@ xdma_get(device_t dev, const char *prop)
 		printf("Cant get dma\n");
 		return (NULL);
 	}
-	printf("ncells is %d\n", ncells);
-	if (ncells >= 1)
-		printf("cells[0] %d, cells[1] %d, cells[2] %d\n", cells[0], cells[1], cells[2]);
 
 	printf("get dev \n");
 	dma_dev = OF_device_from_xref(parent);
@@ -161,8 +171,13 @@ xdma_get(device_t dev, const char *prop)
 		return (NULL);
 	}
 
-	return (dma_dev);
+	xdma_dev->dma_dev = dma_dev;
+
+	xdma_fill_data(xdma_dev, cells, ncells);
+
+	return (xdma_dev);
 }
+
 
 #if 0
 int
