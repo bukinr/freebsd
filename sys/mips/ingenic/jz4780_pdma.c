@@ -70,6 +70,18 @@ struct pdma_softc {
 	void			*ih;
 };
 
+struct pdma_data {
+	int tx;
+	int rx;
+	int chan;
+};
+
+struct pdma_channel {
+	struct pdma_data data;
+};
+
+struct pdma_channel pdma_channels[32];
+
 static struct resource_spec pdma_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE },
@@ -173,13 +185,22 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 }
 
 static int
-pdma_data(device_t dev, phandle_t *cells, int ncells, void *data)
+pdma_data(device_t dev, phandle_t *cells, int ncells, void *ptr)
 {
+	struct pdma_channel *chan;
+	struct pdma_data *data;
+
+	chan = &pdma_channels[0];
+	data = &chan->data;
 
 	printf("%s: ncells is %d\n", __func__, ncells);
 	if (ncells >= 1)
 		printf("cells[0] %d, cells[1] %d, cells[2] %d\n",
 		    cells[0], cells[1], cells[2]);
+
+	data->rx = cells[0];
+	data->rx = cells[1];
+	data->chan = cells[2];
 
 	return (0);
 }
