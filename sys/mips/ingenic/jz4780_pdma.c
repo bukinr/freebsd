@@ -93,6 +93,8 @@ static struct resource_spec pdma_spec[] = {
 	{ -1, 0 }
 };
 
+struct pdma_hwdesc descs[32] __aligned(32*1024);
+
 static int pdma_probe(device_t dev);
 static int pdma_attach(device_t dev);
 static int pdma_detach(device_t dev);
@@ -104,7 +106,10 @@ pdma_intr(void *arg)
 
 	sc = arg;
 
-	printf("%s\n", __func__);
+	printf("%s: DIRQP %x\n", __func__, READ4(sc, PDMA_DIRQP));
+
+	WRITE4(sc, PDMA_DCS(2), 0);
+	WRITE4(sc, PDMA_DIRQP, 0);
 }
 
 static int
@@ -161,8 +166,18 @@ pdma_attach(device_t dev)
 	dd->dev = dev;
 
 	reg = READ4(sc, PDMA_DMAC);
+	reg &= ~(DMAC_HLT | DMAC_AR);
 	reg |= (DMAC_DMAE);
+	reg |= (DMAC_FMSC);
 	WRITE4(sc, PDMA_DMAC, reg);
+
+	WRITE4(sc, PDMA_DMACP, 0);
+
+	WRITE4(sc, PDMA_DRT(2), 0); //0x8);
+	WRITE4(sc, PDMA_DSA(2), 0); //conf->src_start);
+	WRITE4(sc, PDMA_DTA(2), 0); //vtophys(conf->dst_start);
+	WRITE4(sc, PDMA_DSD(2), 0);
+	WRITE4(sc, PDMA_DCM(2), 0);
 
 	return (0);
 }
@@ -197,31 +212,87 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 	chan = &pdma_channels[0];
 	data = &chan->data;
 
-	desc = malloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc), M_DEVBUF, M_WAITOK | M_ZERO);
+	WRITE4(sc, PDMA_DCS(2), 0);
+	WRITE4(sc, PDMA_DTC(2), 0);
+
+	//desc = malloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc), M_DEVBUF, M_WAITOK | M_ZERO);
+	desc = &descs[0];
+
+#if 0
+	desc = contigmalloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc),
+		M_DEVBUF,
+		(M_WAITOK | M_ZERO),
+		0UL /* low address */,
+		-1UL /* high address */,
+		1024 /* alignment */,
+		0UL /* boundary */);
+#endif
 
 	for (i = 0; i < conf->hwdesc_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
-			desc[i].dsa = vtophys(conf->src_start);
+			printf("mem to dev\n");
+			desc[i].dsa = conf->src_start;
 			desc[i].dta = conf->dst_start;
 			desc[i].drt = data->tx;
-			desc[i].dcm = DCM_TIE;
+			desc[i].dcm = DCM_TIE | DCM_SAI;
 
 			/* TODO: dehardcode */
 			desc[i].dtc = conf->period_len / 16;
 			desc[i].dcm |= DCM_TSZ_16 | DCM_DP_2 | DCM_SP_2;
+		} else if (conf->direction == XDMA_MEM_TO_MEM) {
+			desc[i].dsa = conf->src_start + (i * conf->period_len);
+			desc[i].dta = vtophys(conf->dst_start) + (i * conf->period_len);
+			desc[i].drt = DRT_AUTO;
+			desc[i].dcm = DCM_TIE | DCM_SAI | DCM_DAI;
+
+			printf("mem to mem: %x -> %x\n", desc[i].dsa, desc[i].dta);
+
+			/* TODO: dehardcode */
+			desc[i].dtc = conf->period_len / 32;
+			desc[i].dcm |= DCM_TSZ_32;
 		}
+		
 		if (i != (conf->hwdesc_num - 1)) {
 			desc[i].dcm |= DCM_LINK;
+			desc[i].dtc |= (((i + 1) * sizeof(struct pdma_hwdesc)) >> 4) << 24;
 		}
+
+		mb();
 	}
 
+	/* 8 byte descriptor */
+	reg = DCS_DES8;
+	WRITE4(sc, PDMA_DCS(2), reg);
+
 	printf("descriptor address %x phys %x\n", (uint32_t)desc, (uint32_t)vtophys(desc));
-	WRITE4(sc, PDMA_DDA(0), vtophys(desc));
+	WRITE4(sc, PDMA_DDA(2), vtophys(&desc[0]));
 
-	WRITE4(sc, PDMA_DDS, (1 << 0)); /* chan 0 */
+	//reg = READ4(sc, PDMA_DMAC);
+	//reg |= DMAC_INTCE;
+	//reg |= (2 << DMAC_INTCC_S);
+	//WRITE4(sc, PDMA_DMAC, reg);
 
+	/* Set Doorbell */
+	WRITE4(sc, PDMA_DDS, (1 << 2)); /* chan 2 */
+
+#if 0
+	for (i = 0; i < 10; i++) {
+		printf("PDMA_DSA(2) 0x%x\n", READ4(sc, PDMA_DSA(2)));
+		printf("PDMA_DTA(2) 0x%x\n", READ4(sc, PDMA_DTA(2)));
+		printf("PDMA_DTC(2) 0x%x\n", READ4(sc, PDMA_DTC(2)));
+		printf("PDMA_DRT(2) 0x%x\n", READ4(sc, PDMA_DRT(2)));
+		printf("PDMA_DCS(2) 0x%x\n", READ4(sc, PDMA_DCS(2)));
+		printf("PDMA_DCM(2) 0x%x\n", READ4(sc, PDMA_DCM(2)));
+		printf("PDMA_DDA(2) 0x%x\n", READ4(sc, PDMA_DDA(2)));
+		printf("PDMA_DSD(2) 0x%x\n", READ4(sc, PDMA_DSD(2)));
+	}
+#endif
+
+	/* 8 byte descriptor */
 	reg = DCS_DES8 | DCS_CTE;
-	WRITE4(sc, PDMA_DCS(0), reg);
+	WRITE4(sc, PDMA_DCS(2), reg);
+
+	mb();
 
 	return (0);
 }

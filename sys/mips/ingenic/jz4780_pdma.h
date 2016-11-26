@@ -71,6 +71,12 @@
 
 /* Global Control Registers */
 #define	PDMA_DMAC	0x1000	/* DMA Control */
+#define	 DMAC_FMSC	(1 << 31)
+#define	 DMAC_INTCC_S	17
+#define	 DMAC_INTCC_M 	(0x1f << DMAC_INTCC_S)
+#define	 DMAC_INTCE	(1 << 16) /* Permit INTC_IRQ to be bound to one of programmable channel. */
+#define	 DMAC_HLT	(1 << 3) /* Global halt status */
+#define	 DMAC_AR	(1 << 2) /* Global address error status */
 #define	 DMAC_DMAE	(1 << 0) /* Enable DMA. */
 #define	PDMA_DIRQP	0x1004	/* DMA Interrupt Pending */
 #define	PDMA_DDB	0x1008	/* DMA Doorbell */

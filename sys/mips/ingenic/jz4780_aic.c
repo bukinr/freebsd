@@ -62,6 +62,8 @@ __FBSDID("$FreeBSD$");
 
 #define	AIC_NCHANNELS		1
 
+char z[131072] __aligned(32*1024);
+
 struct aic_softc {
 	device_t		dev;
 	struct resource		*res[1];
@@ -409,6 +411,17 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->direction = XDMA_MEM_TO_DEV;
 	conf->src_start = sc->buf_base_phys;
 	conf->dst_start = (sc->aic_paddr + AICDR);
+
+#if 0
+	sc->buf_base[0] = 0x12345678;
+	conf->direction = XDMA_MEM_TO_MEM;
+	//uint32_t *m;
+	//m = malloc(sc->dma_size, M_DEVBUF, M_WAITOK | M_ZERO);  
+	//test
+	conf->src_start = sc->buf_base_phys;
+	conf->dst_start = (uint32_t)z;
+#endif
+
 	conf->period_len = sndbuf_getblksz(ch->buffer);
 	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
 
@@ -465,6 +478,10 @@ aic_start(struct sc_pcminfo *scp)
 
 	device_printf(scp->dev, "%s\n", __func__);
 
+	reg = READ4(sc, AICFR);
+	reg |= (AICFR_ENB);	/* Enable the controller. */
+	WRITE4(sc, AICFR, reg);
+
 	setup_dma(scp);
 
 	/* Enable DMA */
@@ -473,10 +490,6 @@ aic_start(struct sc_pcminfo *scp)
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
 	WRITE4(sc, AICCR, reg);
-
-	reg = READ4(sc, AICFR);
-	reg |= (AICFR_ENB);	/* Enable the controller. */
-	WRITE4(sc, AICFR, reg);
 
 #if 0
 	if (sdma_configure(sc->sdma_channel, sc->conf) != 0) {
@@ -503,6 +516,8 @@ aic_stop(struct sc_pcminfo *scp)
 	sc = scp->sc;
 
 	device_printf(scp->dev, "%s\n", __func__);
+
+	printf("z is %x\n", *(uint32_t *)z);
 
 #if 0
 	reg = READ4(sc, SSI_SIER);
@@ -722,6 +737,8 @@ aic_attach(device_t dev)
 				   driven out to the CODEC. */
 	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
 	reg |= (AICFR_ICDC);	/* Internal CODEC. */
+
+	reg &= ~(AICFR_ICDC); /* ext codec */
 	WRITE4(sc, AICFR, reg);
 
 	reg = READ4(sc, AICCR);
