@@ -66,7 +66,7 @@ char z[131072] __aligned(32*1024);
 
 struct aic_softc {
 	device_t		dev;
-	struct resource		*res[1];
+	struct resource		*res[2];
 	bus_space_tag_t		bst;
 	bus_space_handle_t	bsh;
 	struct mtx		*lock;
@@ -81,6 +81,7 @@ struct aic_softc {
 	clk_t			clk_i2s;
 	struct aic_rate		*sr;
 	struct xdma_channel_config conf;
+	void			*ih;
 };
 
 /* Channel registers */
@@ -108,6 +109,7 @@ struct sc_pcminfo {
 
 static struct resource_spec aic_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ SYS_RES_IRQ,		0,	RF_ACTIVE },
 	{ -1, 0 }
 };
 
@@ -477,14 +479,18 @@ aic_start(struct sc_pcminfo *scp)
 
 	reg = READ4(sc, I2SCR);
 	reg |= (I2SCR_ESCLK | I2SCR_AMSL);
-	WRITE4(sc, I2SCR, reg);
+	//WRITE4(sc, I2SCR, reg);
 
 	/* Enable DMA */
 	reg = READ4(sc, AICCR);
-	reg |= (AICCR_CHANNEL_2);
+	//reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
 	//reg |= (AICCR_ENLBF); //enable loopback
+	//reg |= (1 << 6); //EROR
+	//reg |= (1 << 5); //ETUR
+	//reg |= (1 << 4); //ERFS
+	//reg |= (1 << 3); //ETFS
 	WRITE4(sc, AICCR, reg);
 
 	setup_dma(scp);
@@ -631,6 +637,20 @@ aic_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 	*addr = segs[0].ds_addr;
 }
 
+static void
+aic_intr(void *arg)  
+{
+	struct aic_softc *sc;
+	int i;
+
+	sc = arg;
+
+	printf("aic intr1 %x, i2sSR %x\n", READ4(sc, AICSR), READ4(sc, I2SSR));
+	for (i = 0; i < 32; i++)
+		WRITE4(sc, AICDR, i);
+	printf("aic intr2 %x, i2sSR %x\n", READ4(sc, AICSR), READ4(sc, I2SSR));
+}
+
 static int
 aic_probe(device_t dev)
 {
@@ -681,6 +701,14 @@ aic_attach(device_t dev)
 	sc->bst = rman_get_bustag(sc->res[0]);
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 	sc->aic_paddr = rman_get_start(sc->res[0]);
+
+	/* Setup interrupt handler */
+	err = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC | INTR_MPSAFE,
+	    NULL, aic_intr, sc, &sc->ih);
+	if (err) {
+		device_printf(dev, "Unable to alloc interrupt resource.\n");
+		return (ENXIO);
+	}
 
 	/* Setup PCM */
 	scp = malloc(sizeof(struct sc_pcminfo), M_DEVBUF, M_NOWAIT | M_ZERO);
@@ -734,9 +762,33 @@ aic_attach(device_t dev)
 
 	err = clk_get_by_ofw_name(sc->dev, 0, "i2s", &sc->clk_i2s);
 	if (err == 0) {
+		printf("i2s clk found\n");
+	}
+
+#if 0
+	clk_t pclk;
+	clk_t eclk;
+	clk_t sclk;
+
+	clk_get_by_name(dev, "epll", &eclk);
+	clk_get_by_name(dev, "sclk_a", &sclk);
+	clk_get_by_name(dev, "i2s_pll", &pclk);
+
+	err = clk_set_parent_by_clk(pclk, sclk);
+	if (err == 0) {
+		printf("parent to pclk (sclk) set\n");
+	}
+
+	clk_t extclk;
+	clk_get_by_name(dev, "ext", &extclk);
+	err = clk_set_parent_by_clk(sc->clk_i2s, extclk);
+#endif
+
+	if (err == 0) {
 		printf("i2s clk found. enable\n");
 		err = clk_enable(sc->clk_i2s);
 	}
+
 	if (err != 0)
 		printf("failed to enable i2s clk\n");
 
@@ -749,31 +801,33 @@ aic_attach(device_t dev)
 
 	printf("clocks aic %d i2s %d\n", (uint32_t)aic_freq, (uint32_t)i2s_freq);
 
-	WRITE4(sc, AICFR, AICFR_RST);
+	//WRITE4(sc, AICFR, AICFR_RST);
 
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
 	reg = 0;
-	//reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
-	//reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
-	reg &= ~(AICFR_BCKD | AICFR_SYNCD);
+	reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
+	reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
+	//reg &= ~(AICFR_BCKD | AICFR_SYNCD);
 
 	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
 	reg |= (AICFR_ICDC);	/* Internal CODEC. */
 	reg |= (8 << 16);	/* TFTH  Transmit FIFO threshold */
 	reg |= (7 << 24);	/* RFTH  Receive FIFO threshold */
 
-	//reg &= ~(AICFR_ICDC); /* ext codec */
+	reg &= ~(AICFR_ICDC); /* ext codec */
 	WRITE4(sc, AICFR, reg);
 
 	reg = READ4(sc, AICCR);
 	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TFLUSH | AICCR_RFLUSH);
-	WRITE4(sc, AICCR, reg);
+	//WRITE4(sc, AICCR, reg);
 
 	reg = READ4(sc, AICFR);
 	reg |= (AICFR_ENB);	/* Enable the controller. */
 	WRITE4(sc, AICFR, reg);
+
+	printf("AICFR %x\n", READ4(sc, AICFR));
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 

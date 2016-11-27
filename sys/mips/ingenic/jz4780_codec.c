@@ -53,6 +53,8 @@ __FBSDID("$FreeBSD$");
 #include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_codec.h>
 
+#define ARRAY_SIZE(x)		(sizeof(x)/sizeof(x[0]))
+
 struct codec_softc {
 	device_t		dev;
 	struct resource		*res[1];
@@ -71,8 +73,13 @@ struct reg_default {
 	uint32_t val;
 };
 static struct reg_default jz4780_codec_reg_defaults[] = {
-	{ AICR_DAC,		0xd3 },
-	{ AICR_ADC,		0xd3 },
+	//{ AICR_DAC,		0xd3 },
+	//{ AICR_ADC,		0xd3 },
+	{ AICR_DAC,		0x03 },
+	{ AICR_ADC,		0x03 },
+
+	{ FCR_DAC,		10 },
+
 	{ CR_LO,		0x90 },
 	{ CR_HP,		0x90 },
 	{ CR_MIC1,		0xb0 },
@@ -144,9 +151,13 @@ codec_attach(device_t dev)
 	sc->bst = rman_get_bustag(sc->res[0]);
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 
-	for (i = 0; i < 17; i++) {
+	printf("sizeof %d\n", ARRAY_SIZE(jz4780_codec_reg_defaults));
+
+	if (1 == 1) {
+	for (i = 0; i < 18; i++) {
 		printf("write reg %x val %x\n", jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
 		codec_write(sc, jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
+	}
 	}
 
 	return (0);

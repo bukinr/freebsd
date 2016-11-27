@@ -263,6 +263,11 @@
 	pinctrl-0 = <&pins_uart4_data>;
 };
 
+&i2s {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_i2s_data>;
+};
+
 &i2c0 {
 	clock-frequency = <100000>;
 	pinctrl-names = "default";

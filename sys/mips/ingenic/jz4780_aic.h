@@ -43,6 +43,7 @@
 #define	 AICCR_CHANNEL_S	24
 #define	 AICCR_CHANNEL_M	(0x7 << AICCR_CHANNEL_S)
 #define	 AICCR_CHANNEL_2	(0x1 << AICCR_CHANNEL_S) /* 2 channels, stereo */
+#define	 AICCR_RDMS		(1 << 15) /* Receive DMA enable. */
 #define	 AICCR_TDMS		(1 << 14) /* Transmit DMA enable. */
 #define	 AICCR_ENLBF		(1 << 2) /* Enable AIC Loop Back Function. */
 #define	 AICCR_ERPL		(1 << 1) /* Enable Playing Back function. */
