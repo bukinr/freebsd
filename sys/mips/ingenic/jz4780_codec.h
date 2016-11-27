@@ -30,6 +30,14 @@
  * $FreeBSD$
  */
 
+#define	CODEC_RGADW	0x00	/* Address, data in and write command */
+#define	 RGADW_RGWR	(1 << 16) /* Issue a write command to CODEC */
+#define	 RGADW_RGADDR_S	16	/* CODEC register's address. */
+#define	 RGADW_RGADDR_M	(0x7f << RGADW_RGADDR_S)
+#define	 RGADW_RGDIN_S	0	/* CODEC register data to write */
+#define	 RGADW_RGDIN_M	(0xff << RGADW_RGDIN_S)
+#define	CODEC_RGDATA	0x04	/* The data read out */
+
 #define	SR		0x00	/* Status Register */
 #define	SR2		0x01	/* Status Register 2 */
 #define	MR		0x07	/* Mode status register */

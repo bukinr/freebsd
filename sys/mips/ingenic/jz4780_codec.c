@@ -66,9 +66,50 @@ static struct resource_spec codec_spec[] = {
 	{ -1, 0 }
 };
 
+struct reg_default {
+	uint32_t reg;
+	uint32_t val;
+};
+static struct reg_default jz4780_codec_reg_defaults[] = {
+	{ AICR_DAC,		0xd3 },
+	{ AICR_ADC,		0xd3 },
+	{ CR_LO,		0x90 },
+	{ CR_HP,		0x90 },
+	{ CR_MIC1,		0xb0 },
+	{ CR_MIC2,		0x30 },
+	{ CR_LI1,		0x10 },
+	{ CR_LI2,		0x10 },
+	{ CR_DAC,		0x90 },
+	{ CR_ADC,		0x90 },
+	{ CR_VIC,		0x03 },
+	{ IMR,			0xff },
+	{ IMR2,			0xff },
+	{ GCR_HPL,		0x06 },
+	{ GCR_HPR,		0x06 },
+	{ GCR_LIBYL,		0x06 },
+	{ GCR_LIBYR,		0x06 },
+};
+
 static int codec_probe(device_t dev);
 static int codec_attach(device_t dev);
 static int codec_detach(device_t dev);
+
+static int
+codec_write(struct codec_softc *sc, uint32_t reg, uint32_t val)
+{
+	uint32_t tmp;
+
+	tmp = (reg << RGADW_RGADDR_S);
+	tmp |= (val << RGADW_RGDIN_S);
+	tmp |= RGADW_RGWR;
+
+	WRITE4(sc, CODEC_RGADW, tmp);
+
+	while(READ4(sc, CODEC_RGADW) & RGADW_RGWR)
+		;
+
+	return (0);
+}
 
 static int
 codec_probe(device_t dev)
@@ -89,6 +130,7 @@ static int
 codec_attach(device_t dev)
 {
 	struct codec_softc *sc;
+	int i;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -101,6 +143,11 @@ codec_attach(device_t dev)
 	/* Memory interface */
 	sc->bst = rman_get_bustag(sc->res[0]);
 	sc->bsh = rman_get_bushandle(sc->res[0]);
+
+	for (i = 0; i < 17; i++) {
+		printf("write reg %x val %x\n", jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
+		codec_write(sc, jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
+	}
 
 	return (0);
 }
@@ -134,4 +181,4 @@ static driver_t codec_driver = {
 
 static devclass_t codec_devclass;
 
-EARLY_DRIVER_MODULE(codec, simplebus, codec_driver, codec_devclass, 0, 0, BUS_PASS_INTERRUPT+BUS_PASS_ORDER_LAST);
+DRIVER_MODULE(codec, simplebus, codec_driver, codec_devclass, 0, 0);
