@@ -77,7 +77,8 @@ struct aic_softc {
 	uint32_t		*buf_base;
 	uintptr_t		aic_paddr;
 	int			dma_size;
-	clk_t			clk;
+	clk_t			clk_aic;
+	clk_t			clk_i2s;
 	struct aic_rate		*sr;
 	struct xdma_channel_config conf;
 };
@@ -415,10 +416,6 @@ setup_dma(struct sc_pcminfo *scp)
 #if 0
 	sc->buf_base[0] = 0x12345678;
 	conf->direction = XDMA_MEM_TO_MEM;
-	//uint32_t *m;
-	//m = malloc(sc->dma_size, M_DEVBUF, M_WAITOK | M_ZERO);  
-	//test
-	conf->src_start = sc->buf_base_phys;
 	conf->dst_start = (uint32_t)z;
 #endif
 
@@ -478,18 +475,19 @@ aic_start(struct sc_pcminfo *scp)
 
 	device_printf(scp->dev, "%s\n", __func__);
 
-	reg = READ4(sc, AICFR);
-	reg |= (AICFR_ENB);	/* Enable the controller. */
-	WRITE4(sc, AICFR, reg);
-
-	setup_dma(scp);
+	reg = READ4(sc, I2SCR);
+	reg |= (I2SCR_ESCLK | I2SCR_AMSL);
+	WRITE4(sc, I2SCR, reg);
 
 	/* Enable DMA */
 	reg = READ4(sc, AICCR);
-	//reg |= (AICCR_CHANNEL_2);
+	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
+	//reg |= (AICCR_ENLBF); //enable loopback
 	WRITE4(sc, AICCR, reg);
+
+	setup_dma(scp);
 
 #if 0
 	if (sdma_configure(sc->sdma_channel, sc->conf) != 0) {
@@ -518,6 +516,9 @@ aic_stop(struct sc_pcminfo *scp)
 	device_printf(scp->dev, "%s\n", __func__);
 
 	printf("z is %x\n", *(uint32_t *)z);
+	printf("AICSR %x\n", READ4(sc, AICSR));
+	printf("I2SSR %x\n", READ4(sc, I2SSR));
+	printf("I2SCR %x\n", READ4(sc, I2SCR));
 
 #if 0
 	reg = READ4(sc, SSI_SIER);
@@ -723,30 +724,56 @@ aic_attach(device_t dev)
 
 	bzero(sc->buf_base, sc->dma_size);
 
-	err = clk_get_by_ofw_name(sc->dev, 0, "i2s", &sc->clk);
+	err = clk_get_by_ofw_name(sc->dev, 0, "aic", &sc->clk_aic);
 	if (err == 0) {
-		printf("i2s clk found. enable\n");
-		err = clk_enable(sc->clk);
+		printf("aic clk found. enable\n");
+		err = clk_enable(sc->clk_aic);
 	}
 	if (err != 0)
-		printf("failed to enable clk\n");
+		printf("failed to enable aic clk\n");
+
+	err = clk_get_by_ofw_name(sc->dev, 0, "i2s", &sc->clk_i2s);
+	if (err == 0) {
+		printf("i2s clk found. enable\n");
+		err = clk_enable(sc->clk_i2s);
+	}
+	if (err != 0)
+		printf("failed to enable i2s clk\n");
+
+	clk_set_freq(sc->clk_i2s, 12000000, 0);
+
+	uint64_t aic_freq;
+	uint64_t i2s_freq;
+	clk_get_freq(sc->clk_aic, &aic_freq);
+	clk_get_freq(sc->clk_i2s, &i2s_freq);
+
+	printf("clocks aic %d i2s %d\n", (uint32_t)aic_freq, (uint32_t)i2s_freq);
+
+	WRITE4(sc, AICFR, AICFR_RST);
 
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
-	reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and
-				   driven out to the CODEC. */
+	reg = 0;
+	//reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
+	//reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
+	reg &= ~(AICFR_BCKD | AICFR_SYNCD);
+
 	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
 	reg |= (AICFR_ICDC);	/* Internal CODEC. */
+	reg |= (8 << 16);	/* TFTH  Transmit FIFO threshold */
+	reg |= (7 << 24);	/* RFTH  Receive FIFO threshold */
 
-	reg &= ~(AICFR_ICDC); /* ext codec */
+	//reg &= ~(AICFR_ICDC); /* ext codec */
 	WRITE4(sc, AICFR, reg);
 
 	reg = READ4(sc, AICCR);
 	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TFLUSH | AICCR_RFLUSH);
-	//reg |= (AICCR_TDMS);
-	//reg |= (AICCR_ERPL);
 	WRITE4(sc, AICCR, reg);
+
+	reg = READ4(sc, AICFR);
+	reg |= (AICFR_ENB);	/* Enable the controller. */
+	WRITE4(sc, AICFR, reg);
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 

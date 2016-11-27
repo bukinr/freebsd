@@ -228,17 +228,25 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 		0UL /* boundary */);
 #endif
 
+	data->tx = 0x6;
+	conf->hwdesc_num = 1;
+
 	for (i = 0; i < conf->hwdesc_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
-			printf("mem to dev\n");
 			desc[i].dsa = conf->src_start;
 			desc[i].dta = conf->dst_start;
 			desc[i].drt = data->tx;
 			desc[i].dcm = DCM_TIE | DCM_SAI;
 
 			/* TODO: dehardcode */
-			desc[i].dtc = conf->period_len / 16;
+			//desc[i].dtc = conf->period_len / 16;
+			desc[i].dtc = 1;
 			desc[i].dcm |= DCM_TSZ_16 | DCM_DP_2 | DCM_SP_2;
+			desc[i].dcm |= DCM_LINK;
+
+			printf("mem to dev: %x -> %x, data->tx %d, dtc %d\n",
+			    desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
+
 		} else if (conf->direction == XDMA_MEM_TO_MEM) {
 			desc[i].dsa = conf->src_start + (i * conf->period_len);
 			desc[i].dta = vtophys(conf->dst_start) + (i * conf->period_len);
@@ -274,9 +282,8 @@ pdma_channel_configure(device_t dev, struct xdma_channel_config *conf)
 
 	/* Set Doorbell */
 	WRITE4(sc, PDMA_DDS, (1 << 2)); /* chan 2 */
-
-#if 0
-	for (i = 0; i < 10; i++) {
+#if 1
+	for (i = 0; i < 1; i++) {
 		printf("PDMA_DSA(2) 0x%x\n", READ4(sc, PDMA_DSA(2)));
 		printf("PDMA_DTA(2) 0x%x\n", READ4(sc, PDMA_DTA(2)));
 		printf("PDMA_DTC(2) 0x%x\n", READ4(sc, PDMA_DTC(2)));

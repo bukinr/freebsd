@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <mips/ingenic/jz4780_common.h>
+#include <mips/ingenic/jz4780_codec.h>
 
 struct codec_softc {
 	device_t		dev;
