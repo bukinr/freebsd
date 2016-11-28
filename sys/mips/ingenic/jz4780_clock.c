@@ -540,6 +540,9 @@ jz4780_clock_attach(device_t dev)
 	if (bootverbose)
 		clkdom_dump(sc->clkdom);
 
+	CSR_WRITE_4(sc, JZ_CLKGR0, 0);
+	CSR_WRITE_4(sc, JZ_CLKGR1, 0);
+
 	return (0);
 fail:
 	bus_release_resources(dev, jz4780_clock_spec, sc->res);

@@ -79,22 +79,29 @@ static struct reg_default jz4780_codec_reg_defaults[] = {
 	{ AICR_ADC,		0x03 },
 
 	{ FCR_DAC,		10 },
+	{ CR_CK,		0 },
 
-	{ CR_LO,		0x90 },
-	{ CR_HP,		0x90 },
+	//{ CR_LO,		0x90 },
+	{ CR_LO,		0x0 },
+	//{ CR_HP,		0x90 },
 	{ CR_MIC1,		0xb0 },
 	{ CR_MIC2,		0x30 },
 	{ CR_LI1,		0x10 },
 	{ CR_LI2,		0x10 },
-	{ CR_DAC,		0x90 },
-	{ CR_ADC,		0x90 },
-	{ CR_VIC,		0x03 },
+	//{ CR_DAC,		0x90 },
+	{ CR_DAC,		0x0 },
+	//{ CR_ADC,		0x90 },
+	{ CR_ADC,		0x0 },
+	//{ CR_VIC,		0x03 },
 	{ IMR,			0xff },
 	{ IMR2,			0xff },
 	{ GCR_HPL,		0x06 },
 	{ GCR_HPR,		0x06 },
 	{ GCR_LIBYL,		0x06 },
 	{ GCR_LIBYR,		0x06 },
+
+	{ CR_VIC,		0x0 },
+	{ CR_HP,		0x0 },
 };
 
 static int codec_probe(device_t dev);
@@ -119,6 +126,19 @@ codec_write(struct codec_softc *sc, uint32_t reg, uint32_t val)
 }
 
 static int
+codec_read(struct codec_softc *sc, uint32_t reg)
+{
+	uint32_t tmp;
+
+	tmp = (reg << RGADW_RGADDR_S);
+	WRITE4(sc, CODEC_RGADW, tmp);
+
+	tmp = READ4(sc, CODEC_RGDATA);
+
+	return (tmp);
+}
+
+static int
 codec_probe(device_t dev)
 {
 
@@ -137,7 +157,7 @@ static int
 codec_attach(device_t dev)
 {
 	struct codec_softc *sc;
-	int i;
+	//int i;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -153,12 +173,70 @@ codec_attach(device_t dev)
 
 	printf("sizeof %d\n", ARRAY_SIZE(jz4780_codec_reg_defaults));
 
-	if (1 == 1) {
-	for (i = 0; i < 18; i++) {
+	//WRITE4(sc, CODEC_RGADW, RGADW_ICRST);
+	//DELAY(10000);
+	//WRITE4(sc, CODEC_RGADW, 0);
+
+	codec_write(sc, CR_VIC, 0);
+	DELAY(10000);
+	codec_write(sc, CR_DAC, 0);
+	DELAY(10000);
+	codec_write(sc, AICR_DAC, 0x3); /* I2S */
+	DELAY(10000);
+	codec_write(sc, FCR_DAC, 10); /* 96000 */
+
+#if 0
+	for (i = 0; i < 19; i++) {
 		printf("write reg %x val %x\n", jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
 		codec_write(sc, jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
 	}
-	}
+#endif
+
+	DELAY(10000);
+
+	printf("codec SR %x\n", codec_read(sc, SR));
+	printf("codec SR2 %x\n", codec_read(sc, SR2));
+	printf("codec MR %x\n", codec_read(sc, MR));
+	printf("codec AICR_DAC %x\n", codec_read(sc, AICR_DAC));
+	printf("codec AICR_ADC %x\n", codec_read(sc, AICR_ADC));
+	printf("codec CR_LO %x\n", codec_read(sc, CR_LO));
+	printf("codec CR_HP %x\n", codec_read(sc, CR_HP));
+	printf("codec CR_DMIC %x\n", codec_read(sc, CR_DMIC));
+	printf("codec CR_MIC1 %x\n", codec_read(sc, CR_MIC1));
+	printf("codec CR_MIC2 %x\n", codec_read(sc, CR_MIC2));
+	printf("codec CR_LI1 %x\n", codec_read(sc, CR_LI1));
+	printf("codec CR_LI2 %x\n", codec_read(sc, CR_LI2));
+	printf("codec CR_DAC %x\n", codec_read(sc, CR_DAC));
+	printf("codec CR_ADC %x\n", codec_read(sc, CR_ADC));
+	printf("codec CR_MIX %x\n", codec_read(sc, CR_MIX));
+	printf("codec DR_MIX %x\n", codec_read(sc, DR_MIX));
+	printf("codec CR_VIC %x\n", codec_read(sc, CR_VIC));
+	printf("codec CR_CK %x\n", codec_read(sc, CR_CK));
+	printf("codec FCR_DAC %x\n", codec_read(sc, FCR_DAC));
+	printf("codec FCR_ADC %x\n", codec_read(sc, FCR_ADC));
+	printf("codec CR_TIMER_MSB %x\n", codec_read(sc, CR_TIMER_MSB));
+	printf("codec CR_TIMER_LSB %x\n", codec_read(sc, CR_TIMER_LSB));
+	printf("codec ICR %x\n", codec_read(sc, ICR));
+	printf("codec IMR %x\n", codec_read(sc, IMR));
+	printf("codec IFR %x\n", codec_read(sc, IFR));
+	printf("codec IMR2 %x\n", codec_read(sc, IMR2));
+	printf("codec IFR2 %x\n", codec_read(sc, IFR2));
+	printf("codec GCR_HPL %x\n", codec_read(sc, GCR_HPL));
+	printf("codec GCR_HPR %x\n", codec_read(sc, GCR_HPR));
+	printf("codec GCR_LIBYL %x\n", codec_read(sc, GCR_LIBYL));
+	printf("codec GCR_LIBYR %x\n", codec_read(sc, GCR_LIBYR));
+	printf("codec GCR_DACL %x\n", codec_read(sc, GCR_DACL));
+	printf("codec GCR_DACR %x\n", codec_read(sc, GCR_DACR));
+	printf("codec GCR_MIC1 %x\n", codec_read(sc, GCR_MIC1));
+	printf("codec GCR_MIC2 %x\n", codec_read(sc, GCR_MIC2));
+	printf("codec GCR_ADCL %x\n", codec_read(sc, GCR_ADCL));
+	printf("codec GCR_ADCR %x\n", codec_read(sc, GCR_ADCR));
+	printf("codec GCR_MIXDACL %x\n", codec_read(sc, GCR_MIXDACL));
+	printf("codec GCR_MIXDACR %x\n", codec_read(sc, GCR_MIXDACR));
+	printf("codec GCR_MIXADCL %x\n", codec_read(sc, GCR_MIXADCL));
+	printf("codec GCR_MIXADCR %x\n", codec_read(sc, GCR_MIXADCR));
+	printf("codec CR_ADC_AGC %x\n", codec_read(sc, CR_ADC_AGC));
+	printf("codec DR_ADC_AGC %x\n", codec_read(sc, DR_ADC_AGC));
 
 	return (0);
 }

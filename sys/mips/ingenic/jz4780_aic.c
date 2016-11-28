@@ -479,11 +479,13 @@ aic_start(struct sc_pcminfo *scp)
 
 	reg = READ4(sc, I2SCR);
 	reg |= (I2SCR_ESCLK | I2SCR_AMSL);
-	//WRITE4(sc, I2SCR, reg);
+	WRITE4(sc, I2SCR, reg);
+
+	WRITE4(sc, I2SDIV, 15);
 
 	/* Enable DMA */
 	reg = READ4(sc, AICCR);
-	//reg |= (AICCR_CHANNEL_2);
+	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
 	//reg |= (AICCR_ENLBF); //enable loopback
@@ -801,27 +803,22 @@ aic_attach(device_t dev)
 
 	printf("clocks aic %d i2s %d\n", (uint32_t)aic_freq, (uint32_t)i2s_freq);
 
-	//WRITE4(sc, AICFR, AICFR_RST);
+	WRITE4(sc, AICFR, AICFR_RST);
 
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
 	reg = 0;
-	reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
-	reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
-	//reg &= ~(AICFR_BCKD | AICFR_SYNCD);
-
+	//reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
+	//reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
 	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
 	reg |= (AICFR_ICDC);	/* Internal CODEC. */
 	reg |= (8 << 16);	/* TFTH  Transmit FIFO threshold */
 	reg |= (7 << 24);	/* RFTH  Receive FIFO threshold */
-
-	reg &= ~(AICFR_ICDC); /* ext codec */
 	WRITE4(sc, AICFR, reg);
 
 	reg = READ4(sc, AICCR);
 	reg |= (AICCR_CHANNEL_2);
-	reg |= (AICCR_TFLUSH | AICCR_RFLUSH);
-	//WRITE4(sc, AICCR, reg);
+	WRITE4(sc, AICCR, reg);
 
 	reg = READ4(sc, AICFR);
 	reg |= (AICFR_ENB);	/* Enable the controller. */
