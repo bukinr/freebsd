@@ -82,10 +82,13 @@ struct pdma_data {
 };
 
 struct pdma_channel {
+	struct xdma_channel *xchan;
 	struct pdma_data data;
+	int used;
 };
 
-struct pdma_channel pdma_channels[32];
+#define	PDMA_NCHANNELS	32
+struct pdma_channel pdma_channels[PDMA_NCHANNELS];
 
 static struct resource_spec pdma_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
@@ -102,13 +105,28 @@ static int pdma_detach(device_t dev);
 static void
 pdma_intr(void *arg)
 {
+	struct pdma_channel *chan;
 	struct pdma_softc *sc;
+	int pending;
+	int i;
 
 	sc = arg;
 
-	printf("%s: DIRQP %x\n", __func__, READ4(sc, PDMA_DIRQP));
+	pending = READ4(sc, PDMA_DIRQP);
 
-	WRITE4(sc, PDMA_DCS(2), 0);
+	printf("%s: DIRQP %x\n", __func__, pending);
+
+	for (i = 0; i < PDMA_NCHANNELS; i++) {
+		if (pending & (1 << i)) {
+			chan = &pdma_channels[i];
+			xdma_callback(chan->xchan);
+
+			/* Disable channel */
+			WRITE4(sc, PDMA_DCS(i), 0);
+		}
+	}
+
+	/* Ack all the channels */
 	WRITE4(sc, PDMA_DIRQP, 0);
 }
 
@@ -192,6 +210,29 @@ pdma_detach(device_t dev)
 	bus_release_resources(dev, pdma_spec, sc->res);
 
 	return (0);
+}
+
+static int
+pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
+{
+	struct pdma_channel *chan;
+	struct pdma_softc *sc;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	for (i = 0; i < PDMA_NCHANNELS; i++) {
+		chan = &pdma_channels[i];
+		if (chan->used == 0) {
+			chan->xchan = xchan;
+			xchan->chan = (void *)chan;
+			chan->used = 1;
+
+			return (0);
+		}
+	}
+
+	return (-1);
 }
 
 static int
@@ -333,6 +374,7 @@ static device_method_t pdma_methods[] = {
 	DEVMETHOD(device_detach,		pdma_detach),
 
 	/* xDMA Interface */
+	DEVMETHOD(xdma_channel_alloc,		pdma_channel_alloc),
 	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
 	DEVMETHOD(xdma_data,			pdma_data),
 

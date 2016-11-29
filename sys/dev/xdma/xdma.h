@@ -52,6 +52,14 @@ struct xdma_device {
 
 typedef struct xdma_device *xdma_device_t;
 
+struct xdma_channel {
+	xdma_device_t		xdev;
+	uint32_t		(*cb)(void *);
+	void			*cb_user;
+	void			*chan;
+	int			used;
+};
+
 struct xdma_channel_config {
 	enum xdma_direction	direction;
 	uintptr_t		src_start;
@@ -61,11 +69,15 @@ struct xdma_channel_config {
 	int			period_len;
 	int			hwdesc_num;
 	int			word_len;
+	uint32_t		(*cb)(void *);
+	void			*cb_user;
 };
 
 xdma_device_t xdma_get(device_t dev, const char *prop);
-int xdma_prepare(xdma_device_t xdma_dev, struct xdma_channel_config *conf);
+int xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *xconf);
 int xdma_test(device_t dev);
 int xdma_control(xdma_device_t xdma_dev, int command);
+int xdma_callback(struct xdma_channel *xchan);
+struct xdma_channel * xdma_channel_alloc(xdma_device_t xdma_dev);
 
 #endif /* !_DEV_EXTRES_XDMA_H_ */

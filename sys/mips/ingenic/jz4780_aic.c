@@ -394,26 +394,43 @@ find_sdma_controller(struct aic_softc *sc)
 };
 #endif
 
+static uint32_t
+aic_xdma_intr(void *arg)
+{
+	struct sc_pcminfo *scp;
+	//struct aic_softc *sc;
+
+	scp = arg;
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
 static int
 setup_dma(struct sc_pcminfo *scp)
 {
 	struct xdma_channel_config *conf;
+	struct xdma_channel *xchan;
 	xdma_device_t xdma_dev;
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
 	int fmt;
+	int err;
 
 	ch = &scp->chan[0];
 	sc = scp->sc;
-	conf =  &sc->conf;
 
 	fmt = sndbuf_getfmt(ch->buffer);
 
+	conf = &sc->conf;
 	conf->dst_incr = 0;
 	conf->src_incr = 0;
 	conf->direction = XDMA_MEM_TO_DEV;
 	conf->src_start = sc->buf_base_phys;
 	conf->dst_start = (sc->aic_paddr + AICDR);
+	conf->cb = aic_xdma_intr;
+	conf->cb_user = scp;
 
 #if 0
 	sc->buf_base[0] = 0x12345678;
@@ -431,8 +448,25 @@ setup_dma(struct sc_pcminfo *scp)
 
 	printf("dst_start is %x\n", conf->dst_start);
 
+	/* Get xDMA controller */
 	xdma_dev = xdma_get(sc->dev, "tx");
-	xdma_prepare(xdma_dev, conf);
+	if (xdma_dev == NULL) {
+		printf("Can't find xDMA controller.\n");
+		return (-1);
+	}
+
+	/* Alloc xDMA virtual channel. */
+	xchan = xdma_channel_alloc(xdma_dev);
+	if (xchan == NULL) {
+		printf("Can't alloc virtual channel.\n");
+		return (-1);
+	}
+
+	err = xdma_prepare(xchan, conf);
+	if (err != 0) {
+		printf("Cant configure virtual channel\n");
+		return (-1);
+	}
 
 #if 0
 	conf->ih = aic_dma_intr;

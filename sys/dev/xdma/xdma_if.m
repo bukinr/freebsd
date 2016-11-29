@@ -73,3 +73,8 @@ METHOD int data {
 	int ncells;
 	void *data;
 };
+
+METHOD int channel_alloc {
+	device_t dev;
+	struct xdma_channel *xchan;
+};

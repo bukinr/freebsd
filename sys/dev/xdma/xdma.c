@@ -58,11 +58,53 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_XDMA, "xdma", "xDMA framework");
 
+#define	XDMA_NCHANNELS	32
+struct xdma_channel xdma_channels[XDMA_NCHANNELS];
+
+struct xdma_channel *
+xdma_channel_alloc(xdma_device_t xdma_dev)
+{
+	struct xdma_channel *xchan;
+	int ret;
+	int i;
+
+	for (i = 0; i < XDMA_NCHANNELS; i++) {
+		xchan = &xdma_channels[i];
+		if (xchan->used == 0) {
+			ret = XDMA_CHANNEL_ALLOC(xdma_dev->dma_dev, xchan);
+			if (ret == 0) {
+				xchan->xdev = xdma_dev;
+				xchan->used = 1;
+				return (xchan);
+			}
+		}
+	}
+
+	return (NULL);
+}
+
 int
-xdma_prepare(xdma_device_t xdma_dev, struct xdma_channel_config *conf)
+xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *conf)
+{
+	xdma_device_t xdev;
+	int ret;
+
+	xdev = xchan->xdev;
+
+	ret = XDMA_CHANNEL_CONFIGURE(xdev->dma_dev, conf);
+	if (ret == 0) {
+
+		return (0);
+	}
+
+	return (-1);
+}
+
+int
+xdma_callback(struct xdma_channel *xchan)
 {
 
-	XDMA_CHANNEL_CONFIGURE(xdma_dev->dma_dev, conf);
+	printf("%s\n", __func__);
 
 	return (0);
 }
@@ -177,6 +219,7 @@ xdma_get(device_t dev, const char *prop)
 
 	return (xdma_dev);
 }
+
 int
 xdma_control(xdma_device_t xdma_dev, int command)
 {
