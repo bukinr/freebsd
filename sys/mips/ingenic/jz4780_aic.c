@@ -80,8 +80,10 @@ struct aic_softc {
 	clk_t			clk_aic;
 	clk_t			clk_i2s;
 	struct aic_rate		*sr;
-	struct xdma_channel_config conf;
 	void			*ih;
+	struct xdma_channel_config conf;
+	struct xdma_channel	*xchan;
+	xdma_device_t		xdma_dev;
 };
 
 /* Channel registers */
@@ -411,8 +413,6 @@ static int
 setup_dma(struct sc_pcminfo *scp)
 {
 	struct xdma_channel_config *conf;
-	struct xdma_channel *xchan;
-	xdma_device_t xdma_dev;
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
 	int fmt;
@@ -448,21 +448,7 @@ setup_dma(struct sc_pcminfo *scp)
 
 	printf("dst_start is %x\n", conf->dst_start);
 
-	/* Get xDMA controller */
-	xdma_dev = xdma_get(sc->dev, "tx");
-	if (xdma_dev == NULL) {
-		printf("Can't find xDMA controller.\n");
-		return (-1);
-	}
-
-	/* Alloc xDMA virtual channel. */
-	xchan = xdma_channel_alloc(xdma_dev);
-	if (xchan == NULL) {
-		printf("Can't alloc virtual channel.\n");
-		return (-1);
-	}
-
-	err = xdma_prepare(xchan, conf);
+	err = xdma_prepare(sc->xchan, conf);
 	if (err != 0) {
 		printf("Cant configure virtual channel\n");
 		return (-1);
@@ -719,6 +705,24 @@ aic_attach(device_t dev)
 	//sc->sr = &rate_map[0];
 	sc->pos = 0;
 	//sc->conf = malloc(sizeof(struct sdma_conf), M_DEVBUF, M_WAITOK | M_ZERO);
+
+	/* Setup xDMA */
+
+	/* Get xDMA controller */
+	sc->xdma_dev = xdma_get(sc->dev, "tx");
+	if (sc->xdma_dev == NULL) {
+		printf("Can't find xDMA controller.\n");
+		return (-1);
+	}
+
+	/* Alloc xDMA virtual channel. */
+	sc->xchan = xdma_channel_alloc(sc->xdma_dev);
+	if (sc->xchan == NULL) {
+		printf("Can't alloc virtual channel.\n");
+		return (-1);
+	}
+
+	/* Setup sound subsystem */
 
 	printf("%s cl\n", __func__);
 	sc->lock = snd_mtxcreate(device_get_nameunit(dev), "aic softc");

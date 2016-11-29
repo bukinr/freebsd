@@ -91,8 +91,10 @@ xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *conf)
 
 	xdev = xchan->xdev;
 
-	ret = XDMA_CHANNEL_CONFIGURE(xdev->dma_dev, conf);
+	ret = XDMA_CHANNEL_CONFIGURE(xdev->dma_dev, xchan, conf);
 	if (ret == 0) {
+		xchan->cb = conf->cb;
+		xchan->cb_user = conf->cb_user;
 
 		return (0);
 	}
@@ -104,7 +106,10 @@ int
 xdma_callback(struct xdma_channel *xchan)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: xchan %x\n", __func__, (uint32_t)xchan);
+	if (xchan->cb != NULL) {
+		xchan->cb(xchan->cb_user);
+	}
 
 	return (0);
 }
@@ -147,10 +152,10 @@ xdma_test(device_t dev)
 		return (-1);
 	}
 
-	struct xdma_channel_config conf;
+	//struct xdma_channel_config conf;
 	printf("call xdma_chan_conf\n");
 
-	XDMA_CHANNEL_CONFIGURE(dma_dev, &conf);
+	//XDMA_CHANNEL_CONFIGURE(dma_dev, xchan, &conf);
 
 	return (0);
 }
