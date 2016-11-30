@@ -129,7 +129,7 @@ struct aic_rate {
 };
 
 static struct aic_rate rate_map[] = {
-	{ 192000, 49, 152, 1000 }, /* PLL4 49.152 Mhz */
+	{ 44100, 49, 152, 1000 }, /* PLL4 49.152 Mhz */
 	/* TODO: add more frequences */
 	{ 0, 0 },
 };
@@ -390,6 +390,8 @@ setup_dma(struct sc_pcminfo *scp)
 
 	if (fmt & AFMT_16BIT) {
 		conf->word_len = 16;
+	} else if (fmt & AFMT_24BIT) {
+		conf->word_len = 24;
 	} else
 		panic("here\n");
 
@@ -455,6 +457,8 @@ aic_start(struct sc_pcminfo *scp)
 	reg = 0;
 	reg |= (1 << 19); // OSS 16 bit
 	reg |= (1 << 16); // ISS 16 bit
+	//reg |= (4 << 19); // OSS 24 bit
+	//reg |= (4 << 16); // ISS 24 bit
 	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);

@@ -87,6 +87,7 @@ struct pdma_channel {
 	int			cur_desc;
 	int			used;
 	int			index;
+	struct xdma_channel_config *conf;
 };
 
 #define	PDMA_NCHANNELS	32
@@ -98,7 +99,7 @@ static struct resource_spec pdma_spec[] = {
 	{ -1, 0 }
 };
 
-struct pdma_hwdesc descs[32] __aligned(32*1024);
+struct pdma_hwdesc descs[128] __aligned(32*1024);
 
 static int pdma_probe(device_t dev);
 static int pdma_attach(device_t dev);
@@ -108,6 +109,7 @@ static int chan_start(struct pdma_softc *sc, struct pdma_channel *chan);
 static void
 pdma_intr(void *arg)
 {
+	struct xdma_channel_config *conf;
 	struct pdma_channel *chan;
 	struct pdma_softc *sc;
 	int pending;
@@ -122,7 +124,8 @@ pdma_intr(void *arg)
 	for (i = 0; i < PDMA_NCHANNELS; i++) {
 		if (pending & (1 << i)) {
 			chan = &pdma_channels[i];
-			chan->cur_desc = (chan->cur_desc + 1) % 32;
+			conf = chan->conf;
+			chan->cur_desc = (chan->cur_desc + 1) % conf->hwdesc_num;
 			xdma_callback(chan->xchan);
 
 			chan_start(sc, chan);
@@ -292,6 +295,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 	    conf->hwdesc_num, conf->period_len);
 
 	chan = (struct pdma_channel *)xchan->chan;
+	chan->conf = conf;
 	data = &chan->data;
 
 	WRITE4(sc, PDMA_DCS(chan->index), 0);

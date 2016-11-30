@@ -95,10 +95,10 @@ static struct reg_default jz4780_codec_reg_defaults[] = {
 	//{ CR_VIC,		0x03 },
 	{ IMR,			0xff },
 	{ IMR2,			0xff },
-	{ GCR_HPL,		0x06 },
-	{ GCR_HPR,		0x06 },
-	{ GCR_LIBYL,		0x06 },
-	{ GCR_LIBYR,		0x06 },
+	{ GCR_HPL,		31 },
+	{ GCR_HPR,		31 },
+	{ GCR_LIBYL,		31 },
+	{ GCR_LIBYR,		31 },
 
 	{ CR_VIC,		0x0 },
 	{ CR_HP,		0x0 },
@@ -188,14 +188,16 @@ codec_attach(device_t dev)
 	DELAY(10000);
 	codec_write(sc, CR_DAC, 0);
 	DELAY(10000);
+	//codec_write(sc, AICR_DAC, (0x3 | (1 << 5))); /* I2S, slave */
+	//codec_write(sc, AICR_DAC, (0x3 | (3 << 6))); /* I2S, 24 bit */
 	codec_write(sc, AICR_DAC, 0x3); /* I2S */
 	DELAY(10000);
 	//codec_write(sc, FCR_DAC, 10); /* 96000 */
 	codec_write(sc, FCR_DAC, 7); /* 44100 */
 
 	DELAY(10000);
-	codec_write(sc, GCR_DACL, 6);
-	codec_write(sc, GCR_DACR, 6);
+	codec_write(sc, GCR_DACL, 25);
+	codec_write(sc, GCR_DACR, 25);
 	DELAY(10000);
 
 	printf("codec SR %x\n", codec_read(sc, SR));
