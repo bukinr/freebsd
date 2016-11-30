@@ -330,78 +330,13 @@ aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 	return (sndbuf_getblksz(ch->buffer));
 }
 
-#if 0
-uint32_t
-aic_dma_intr(void *arg, int chn)
-{
-	struct sc_pcminfo *scp;
-	struct sdma_conf *conf;
-	struct sc_chinfo *ch;
-	struct aic_softc *sc;
-	int bufsize;
-
-	scp = arg;
-	ch = &scp->chan[0];
-	sc = scp->sc;
-	conf = &sc->conf;
-
-	bufsize = sndbuf_getsize(ch->buffer);
-
-	sc->pos += conf->period;
-	if (sc->pos >= bufsize)
-		sc->pos -= bufsize;
-
-	if (ch->run)
-		chn_intr(ch->channel);
-
-	return (0);
-}
-
-static int
-find_sdma_controller(struct aic_softc *sc)
-{
-	struct sdma_softc *sdma_sc;
-	phandle_t node, sdma_node;
-	device_t sdma_dev;
-	int dts_value[8];
-	int len;
-
-	if ((node = ofw_bus_get_node(sc->dev)) == -1)
-		return (ENXIO);
-
-	if ((len = OF_getproplen(node, "dmas")) <= 0)
-		return (ENXIO);
-
-	OF_getencprop(node, "dmas", &dts_value, len);
-
-	sc->sdma_ev_rx = dts_value[1];
-	sc->sdma_ev_tx = dts_value[5];
-
-	sdma_node = OF_node_from_xref(dts_value[0]);
-
-	sdma_sc = NULL;
-
-	sdma_dev = devclass_get_device(devclass_find("sdma"), 0);
-	if (sdma_dev)
-		sdma_sc = device_get_softc(sdma_dev);
-
-	if (sdma_sc == NULL) {
-		device_printf(sc->dev, "No sDMA found. Can't operate\n");
-		return (ENXIO);
-	}
-
-	sc->sdma_sc = sdma_sc;
-
-	return (0);
-};
-#endif
-
 static uint32_t
 aic_xdma_intr(void *arg)
 {
 	struct sc_pcminfo *scp;
 	struct sc_chinfo *ch;
 	struct aic_softc *sc;
+	//int bufsize;
 
 	scp = arg;
 	sc = scp->sc;
