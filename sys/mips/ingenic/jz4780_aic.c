@@ -336,19 +336,19 @@ aic_xdma_intr(void *arg)
 	struct sc_pcminfo *scp;
 	struct sc_chinfo *ch;
 	struct aic_softc *sc;
-	//int bufsize;
+	struct xdma_channel_config *conf;
+	int bufsize;
 
 	scp = arg;
 	sc = scp->sc;
 	ch = &scp->chan[0];
-	//conf = &sc->conf;
+	conf = &sc->conf;
 
-	//bufsize = sndbuf_getsize(ch->buffer);
+	bufsize = sndbuf_getsize(ch->buffer);
 
-	sc->pos += 4096;
-	//sc->pos += conf->period;
-	//if (sc->pos >= bufsize)
-	//	sc->pos -= bufsize;
+	sc->pos += conf->period_len;
+	if (sc->pos >= bufsize)
+		sc->pos -= bufsize;
 
 	if (ch->run)
 		chn_intr(ch->channel);
@@ -448,10 +448,13 @@ aic_start(struct sc_pcminfo *scp)
 	reg |= (I2SCR_ESCLK | I2SCR_AMSL);
 	WRITE4(sc, I2SCR, reg);
 
-	WRITE4(sc, I2SDIV, 15);
+	WRITE4(sc, I2SDIV, 12);
 
 	/* Enable DMA */
 	reg = READ4(sc, AICCR);
+	reg = 0;
+	reg |= (1 << 19); // OSS 16 bit
+	reg |= (1 << 16); // ISS 16 bit
 	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
@@ -519,8 +522,6 @@ aicchan_trigger(kobj_t obj, void *data, int go)
 	scp = ch->parent;
 	sc = scp->sc;
 
-	device_printf(scp->dev, "%s\n", __func__);
-
 	snd_mtxlock(sc->lock);
 
 	switch (go) {
@@ -562,7 +563,7 @@ aicchan_getptr(kobj_t obj, void *data)
 	scp = ch->parent;
 	sc = scp->sc;
 
-	device_printf(scp->dev, "%s: %d\n", __func__, sc->pos);
+	//device_printf(scp->dev, "%s: %d\n", __func__, sc->pos);
 
 	return (sc->pos);
 }
@@ -572,7 +573,8 @@ static uint32_t aic_pfmt[] = {
 	0
 };
 
-static struct pcmchan_caps aic_pcaps = {44100, 192000, aic_pfmt, 0};
+//static struct pcmchan_caps aic_pcaps = {44100, 192000, aic_pfmt, 0};
+static struct pcmchan_caps aic_pcaps = {44100, 44100, aic_pfmt, 0};
 
 static struct pcmchan_caps *
 aicchan_getcaps(kobj_t obj, void *data)
@@ -801,9 +803,9 @@ aic_attach(device_t dev)
 	reg |= (7 << 24);	/* RFTH  Receive FIFO threshold */
 	WRITE4(sc, AICFR, reg);
 
-	reg = READ4(sc, AICCR);
-	reg |= (AICCR_CHANNEL_2);
-	WRITE4(sc, AICCR, reg);
+	//reg = READ4(sc, AICCR);
+	//reg |= (AICCR_CHANNEL_2);
+	//WRITE4(sc, AICCR, reg);
 
 	reg = READ4(sc, AICFR);
 	reg |= (AICFR_ENB);	/* Enable the controller. */

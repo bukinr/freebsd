@@ -225,7 +225,7 @@
 				pins_i2s_data: i2s-data {
 					ingenic,pins = <&gpe   5 2 &pincfg_nobias
 							&gpd  12 1 &pincfg_nobias
-							&gpd  13 0 &pincfg_nobias
+							&gpd  13 4 &pincfg_nobias
 							&gpe   6 0 &pincfg_nobias
 							&gpe   7 0 &pincfg_nobias
 							&gpe   8 1 &pincfg_nobias

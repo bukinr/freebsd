@@ -106,7 +106,8 @@ int
 xdma_callback(struct xdma_channel *xchan)
 {
 
-	printf("%s: xchan %x\n", __func__, (uint32_t)xchan);
+	//printf("%s: xchan %x\n", __func__, (uint32_t)xchan);
+
 	if (xchan->cb != NULL) {
 		xchan->cb(xchan->cb_user);
 	}

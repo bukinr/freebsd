@@ -117,7 +117,7 @@ pdma_intr(void *arg)
 
 	pending = READ4(sc, PDMA_DIRQP);
 
-	printf("%s: DIRQP %x\n", __func__, pending);
+	//printf("%s: DIRQP %x\n", __func__, pending);
 
 	for (i = 0; i < PDMA_NCHANNELS; i++) {
 		if (pending & (1 << i)) {
@@ -240,21 +240,22 @@ static int
 chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 {
 	struct pdma_hwdesc *desc;
-	int i;
 
 	desc = &descs[0];
 
 	/* 8 byte descriptor */
 	WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
 
-	printf("descriptor address %x phys %x\n",
-	    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
+	//printf("descriptor address %x phys %x\n",
+	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
+
 	WRITE4(sc, PDMA_DDA(chan->index), vtophys(&desc[chan->cur_desc]));
 
 	/* Set Doorbell */
 	WRITE4(sc, PDMA_DDS, (1 << chan->index));
 
-#if 1
+#if 0
+	int i;
 	for (i = 0; i < 1; i++) {
 		printf("PDMA_DSA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSA(chan->index)));
 		printf("PDMA_DTA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DTA(chan->index)));
@@ -318,7 +319,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 	for (i = 0; i < conf->hwdesc_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
-			desc[i].dsa = conf->src_start;
+			desc[i].dsa = conf->src_start + (i * conf->period_len);
 			desc[i].dta = conf->dst_start;
 			desc[i].drt = data->tx;
 			desc[i].dcm = DCM_TIE | DCM_SAI;

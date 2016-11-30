@@ -78,7 +78,7 @@ static struct reg_default jz4780_codec_reg_defaults[] = {
 	{ AICR_DAC,		0x03 },
 	{ AICR_ADC,		0x03 },
 
-	{ FCR_DAC,		10 },
+	{ FCR_DAC,		7 },
 	{ CR_CK,		0 },
 
 	//{ CR_LO,		0x90 },
@@ -157,7 +157,6 @@ static int
 codec_attach(device_t dev)
 {
 	struct codec_softc *sc;
-	//int i;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -177,21 +176,26 @@ codec_attach(device_t dev)
 	//DELAY(10000);
 	//WRITE4(sc, CODEC_RGADW, 0);
 
-	codec_write(sc, CR_VIC, 0);
-	DELAY(10000);
-	codec_write(sc, CR_DAC, 0);
-	DELAY(10000);
-	codec_write(sc, AICR_DAC, 0x3); /* I2S */
-	DELAY(10000);
-	codec_write(sc, FCR_DAC, 10); /* 96000 */
-
-#if 0
+#if 1
+	int i;
 	for (i = 0; i < 19; i++) {
 		printf("write reg %x val %x\n", jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
 		codec_write(sc, jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
 	}
 #endif
 
+	codec_write(sc, CR_VIC, 0);
+	DELAY(10000);
+	codec_write(sc, CR_DAC, 0);
+	DELAY(10000);
+	codec_write(sc, AICR_DAC, 0x3); /* I2S */
+	DELAY(10000);
+	//codec_write(sc, FCR_DAC, 10); /* 96000 */
+	codec_write(sc, FCR_DAC, 7); /* 44100 */
+
+	DELAY(10000);
+	codec_write(sc, GCR_DACL, 6);
+	codec_write(sc, GCR_DACR, 6);
 	DELAY(10000);
 
 	printf("codec SR %x\n", codec_read(sc, SR));
