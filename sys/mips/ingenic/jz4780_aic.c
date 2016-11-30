@@ -400,11 +400,23 @@ static uint32_t
 aic_xdma_intr(void *arg)
 {
 	struct sc_pcminfo *scp;
-	//struct aic_softc *sc;
+	struct sc_chinfo *ch;
+	struct aic_softc *sc;
 
 	scp = arg;
+	sc = scp->sc;
+	ch = &scp->chan[0];
+	//conf = &sc->conf;
 
-	printf("%s\n", __func__);
+	//bufsize = sndbuf_getsize(ch->buffer);
+
+	sc->pos += 4096;
+	//sc->pos += conf->period;
+	//if (sc->pos >= bufsize)
+	//	sc->pos -= bufsize;
+
+	if (ch->run)
+		chn_intr(ch->channel);
 
 	return (0);
 }
@@ -615,7 +627,7 @@ aicchan_getptr(kobj_t obj, void *data)
 	scp = ch->parent;
 	sc = scp->sc;
 
-	device_printf(scp->dev, "%s\n", __func__);
+	device_printf(scp->dev, "%s: %d\n", __func__, sc->pos);
 
 	return (sc->pos);
 }

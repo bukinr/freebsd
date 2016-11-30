@@ -271,7 +271,6 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 #endif
 
 	data->tx = 0x6;
-	//conf->hwdesc_num = 1;
 
 	for (i = 0; i < conf->hwdesc_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
@@ -282,10 +281,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 			/* TODO: dehardcode */
 			desc[i].dtc = conf->period_len / 16;
-			//desc[i].dtc = 1;
 			desc[i].dcm |= DCM_TSZ_16 | DCM_DP_2 | DCM_SP_2;
-			//desc[i].dtc = conf->period_len / 32;
-			//desc[i].dcm |= DCM_TSZ_32;
 
 			printf("mem to dev: %x -> %x, data->tx %d, dtc %d\n",
 			    desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
@@ -315,16 +311,13 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 	reg = DCS_DES8;
 	WRITE4(sc, PDMA_DCS(chan->index), reg);
 
-	printf("descriptor address %x phys %x\n", (uint32_t)desc, (uint32_t)vtophys(desc));
+	printf("descriptor address %x phys %x\n",
+	    (uint32_t)desc, (uint32_t)vtophys(desc));
 	WRITE4(sc, PDMA_DDA(chan->index), vtophys(&desc[0]));
-
-	//reg = READ4(sc, PDMA_DMAC);
-	//reg |= DMAC_INTCE;
-	//reg |= (2 << DMAC_INTCC_S);
-	//WRITE4(sc, PDMA_DMAC, reg);
 
 	/* Set Doorbell */
 	WRITE4(sc, PDMA_DDS, (1 << chan->index));
+
 #if 1
 	for (i = 0; i < 1; i++) {
 		printf("PDMA_DSA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSA(chan->index)));
