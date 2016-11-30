@@ -329,7 +329,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 			desc[i].dcm = DCM_TIE | DCM_SAI;
 
 			/* TODO: dehardcode */
-			desc[i].dtc = conf->period_len / 16;
+			desc[i].dtc = (conf->period_len / 16);
 			desc[i].dcm |= DCM_TSZ_16 | DCM_DP_2 | DCM_SP_2;
 
 			printf("mem to dev: %x -> %x, data->tx %d, dtc %d\n",
