@@ -58,42 +58,41 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_XDMA, "xdma", "xDMA framework");
 
-#define	XDMA_NCHANNELS	32
-struct xdma_channel xdma_channels[XDMA_NCHANNELS];
+static struct mtx xdma_lock;
 
-struct xdma_channel *
-xdma_channel_alloc(xdma_device_t xdma_dev)
+/*
+ * Allocate virtual channel.
+ */
+xdma_channel_t *
+xdma_channel_alloc(xdma_controller_t xdma)
 {
-	struct xdma_channel *xchan;
+	xdma_channel_t *xchan;
 	int ret;
-	int i;
 
-	for (i = 0; i < XDMA_NCHANNELS; i++) {
-		xchan = &xdma_channels[i];
-		if (xchan->used == 0) {
-			ret = XDMA_CHANNEL_ALLOC(xdma_dev->dma_dev, xchan);
-			if (ret == 0) {
-				xchan->xdev = xdma_dev;
-				xchan->used = 1;
-				return (xchan);
-			}
-		}
+	xchan = malloc(sizeof(xdma_channel_t), M_XDMA, M_WAITOK | M_ZERO);
+
+	/* Request a real channel from hardware */
+	ret = XDMA_CHANNEL_ALLOC(xdma->dev, xchan);
+	if (ret == 0) {
+		xchan->xdma = xdma;
+		return (xchan);
 	}
 
+	free(xchan, M_XDMA);
 	return (NULL);
 }
 
 int
-xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *conf)
+xdma_prepare(xdma_channel_t *xchan, struct xdma_channel_config *conf)
 {
-	xdma_device_t xdev;
+	xdma_controller_t xdma;
 	int ret;
 
-	xdev = xchan->xdev;
+	xdma = xchan->xdma;
 
 	//xchan->descs = 
 
-	ret = XDMA_CHANNEL_CONFIGURE(xdev->dma_dev, xchan, conf);
+	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan, conf);
 	if (ret == 0) {
 		xchan->cb = conf->cb;
 		xchan->cb_user = conf->cb_user;
@@ -105,7 +104,7 @@ xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *conf)
 }
 
 int
-xdma_callback(struct xdma_channel *xchan)
+xdma_callback(xdma_channel_t *xchan)
 {
 
 	//printf("%s: xchan %x\n", __func__, (uint32_t)xchan);
@@ -118,21 +117,20 @@ xdma_callback(struct xdma_channel *xchan)
 }
 
 static int
-xdma_fill_data(xdma_device_t xdma_dev, phandle_t *cells, int ncells)
+xdma_fill_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 {
 	uint32_t ret;
 
-	ret = XDMA_DATA(xdma_dev->dma_dev, cells, ncells, &xdma_dev->data);
+	ret = XDMA_DATA(xdma->dev, cells, ncells, &xdma->data);
 
 	return (ret);
 }
 
-xdma_device_t
+xdma_controller_t
 xdma_get(device_t dev, const char *prop)
 {
 	phandle_t parent, *cells;
-	xdma_device_t xdma_dev;
-	device_t dma_dev;
+	xdma_controller_t xdma;
 	phandle_t node;
 	int ncells;
 	int error;
@@ -169,22 +167,22 @@ xdma_get(device_t dev, const char *prop)
 	}
 
 	printf("get dev \n");
-	dma_dev = OF_device_from_xref(parent);
-	if (dma_dev == NULL) {
+	dev = OF_device_from_xref(parent);
+	if (dev == NULL) {
 		printf("failed to get dma dev\n");
 		return (NULL);
 	}
 
-	xdma_dev = malloc(sizeof(xdma_device_t), M_XDMA, M_WAITOK | M_ZERO);
-	xdma_dev->dma_dev = dma_dev;
+	xdma = malloc(sizeof(xdma_controller_t), M_XDMA, M_WAITOK | M_ZERO);
+	xdma->dev = dev;
 
-	xdma_fill_data(xdma_dev, cells, ncells);
+	xdma_fill_data(xdma, cells, ncells);
 
-	return (xdma_dev);
+	return (xdma);
 }
 
 int
-xdma_control(xdma_device_t xdma_dev, int command)
+xdma_control(xdma_controller_t xdma, int command)
 {
 
 	switch(command) {
@@ -196,3 +194,14 @@ xdma_control(xdma_device_t xdma_dev, int command)
 
 	return (0);
 }
+
+static void
+xdma_init(void)
+{
+
+	printf("%s\n", __func__);
+
+	mtx_init(&xdma_lock, "xDMA", NULL, MTX_DEF);
+}
+
+SYSINIT(xdma, SI_SUB_DRIVERS, SI_ORDER_FIRST, xdma_init, NULL);

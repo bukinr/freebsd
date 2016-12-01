@@ -83,7 +83,7 @@ struct aic_softc {
 	void			*ih;
 	struct xdma_channel_config conf;
 	struct xdma_channel	*xchan;
-	xdma_device_t		xdma_dev;
+	xdma_controller_t	xdma_tx;
 };
 
 /* Channel registers */
@@ -632,14 +632,14 @@ aic_attach(device_t dev)
 	/* Setup xDMA */
 
 	/* Get xDMA controller */
-	sc->xdma_dev = xdma_get(sc->dev, "tx");
-	if (sc->xdma_dev == NULL) {
+	sc->xdma_tx = xdma_get(sc->dev, "tx");
+	if (sc->xdma_tx == NULL) {
 		printf("Can't find xDMA controller.\n");
 		return (-1);
 	}
 
 	/* Alloc xDMA virtual channel. */
-	sc->xchan = xdma_channel_alloc(sc->xdma_dev);
+	sc->xchan = xdma_channel_alloc(sc->xdma_tx);
 	if (sc->xchan == NULL) {
 		printf("Can't alloc virtual DMA channel.\n");
 		return (-1);

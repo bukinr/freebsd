@@ -45,21 +45,23 @@ enum xdma_command {
 	XDMA_CMD_STOP,
 };
 
-struct xdma_device {
-	device_t dma_dev;
+struct xdma_controller {
+	device_t dev;		/* A real DMA device_t. */
 	void *data;
 };
 
-typedef struct xdma_device *xdma_device_t;
+typedef struct xdma_controller *xdma_controller_t;
 
 struct xdma_channel {
-	xdma_device_t		xdev;
+	xdma_controller_t	xdma;
 	uint32_t		(*cb)(void *);
 	void			*cb_user;
 	void			*chan;
 	int			used;
 	void			*descs;
 };
+
+typedef struct xdma_channel xdma_channel_t;
 
 struct xdma_channel_config {
 	enum xdma_direction	direction;
@@ -74,11 +76,11 @@ struct xdma_channel_config {
 	void			*cb_user;
 };
 
-xdma_device_t xdma_get(device_t dev, const char *prop);
+xdma_controller_t xdma_get(device_t dev, const char *prop);
 int xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *xconf);
 int xdma_test(device_t dev);
-int xdma_control(xdma_device_t xdma_dev, int command);
+int xdma_control(xdma_controller_t xdma, int command);
 int xdma_callback(struct xdma_channel *xchan);
-struct xdma_channel * xdma_channel_alloc(xdma_device_t xdma_dev);
+struct xdma_channel * xdma_channel_alloc(xdma_controller_t xdma);
 
 #endif /* !_DEV_EXTRES_XDMA_H_ */
