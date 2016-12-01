@@ -331,12 +331,12 @@ aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 }
 
 static uint32_t
-aic_xdma_intr(void *arg)
+aic_intr(void *arg)
 {
+	struct xdma_channel_config *conf;
 	struct sc_pcminfo *scp;
 	struct sc_chinfo *ch;
 	struct aic_softc *sc;
-	struct xdma_channel_config *conf;
 	int bufsize;
 
 	scp = arg;
@@ -371,14 +371,16 @@ setup_dma(struct sc_pcminfo *scp)
 	fmt = sndbuf_getfmt(ch->buffer);
 
 	conf = &sc->conf;
-	conf->dst_incr = 0;
-	conf->src_incr = 0;
 	conf->direction = XDMA_MEM_TO_DEV;
-	conf->src_start = sc->buf_base_phys;
-	conf->dst_start = (sc->aic_paddr + AICDR);
-	conf->cb = aic_xdma_intr;
+	conf->src_addr = sc->buf_base_phys;
+	conf->dst_addr = (sc->aic_paddr + AICDR);
+	conf->period_len = sndbuf_getblksz(ch->buffer);
+	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
+	conf->width = 2;
+	conf->cb = aic_intr;
 	conf->cb_user = scp;
-	//conf->command = CMD_2BYTES;
+
+	KASSERT(fmt & AFMT_16BIT, ("16-bit audio supported only."));
 
 #if 0
 	sc->buf_base[0] = 0x12345678;
@@ -386,15 +388,7 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->dst_start = (uint32_t)z;
 #endif
 
-	conf->period_len = sndbuf_getblksz(ch->buffer);
-	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
-
-	if (fmt & AFMT_16BIT) {
-		conf->word_len = 16;
-	} else
-		panic("here\n");
-
-	printf("dst_start is %x\n", conf->dst_start);
+	printf("dst_addr is %x\n", conf->dst_addr);
 
 	err = xdma_prepare(sc->xchan, conf);
 	if (err != 0) {
@@ -582,6 +576,7 @@ aic_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 	*addr = segs[0].ds_addr;
 }
 
+#if 0
 static void
 aic_intr(void *arg)  
 {
@@ -595,6 +590,7 @@ aic_intr(void *arg)
 		WRITE4(sc, AICDR, i);
 	printf("aic intr2 %x, i2sSR %x\n", READ4(sc, AICSR), READ4(sc, I2SSR));
 }
+#endif
 
 static int
 aic_probe(device_t dev)
@@ -665,6 +661,7 @@ aic_attach(device_t dev)
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 	sc->aic_paddr = rman_get_start(sc->res[0]);
 
+#if 0
 	/* Setup interrupt handler */
 	err = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC | INTR_MPSAFE,
 	    NULL, aic_intr, sc, &sc->ih);
@@ -672,6 +669,7 @@ aic_attach(device_t dev)
 		device_printf(dev, "Unable to alloc interrupt resource.\n");
 		return (ENXIO);
 	}
+#endif
 
 	/* Setup PCM */
 	scp = malloc(sizeof(struct sc_pcminfo), M_DEVBUF, M_NOWAIT | M_ZERO);

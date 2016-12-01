@@ -82,12 +82,12 @@ struct pdma_data {
 };
 
 struct pdma_channel {
-	struct xdma_channel	*xchan;
+	struct xdma_channel_config *conf;
+	xdma_channel_t		*xchan;
 	struct pdma_data	data;
 	int			cur_desc;
 	int			used;
 	int			index;
-	struct xdma_channel_config *conf;
 };
 
 #define	PDMA_NCHANNELS	32
@@ -327,29 +327,32 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 	for (i = 0; i < conf->hwdesc_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
-			desc[i].dsa = conf->src_start + (i * conf->period_len);
-			desc[i].dta = conf->dst_start;
+			desc[i].dsa = conf->src_addr + (i * conf->period_len);
+			desc[i].dta = conf->dst_addr;
 			desc[i].drt = data->tx;
 			desc[i].dcm = DCM_TIE | DCM_SAI;
-
-			/* TODO: dehardcode */
-			desc[i].dtc = (conf->period_len / 2);
-			desc[i].dcm |= DCM_TSZ_2 | DCM_DP_2 | DCM_SP_2;
-
 			printf("mem to dev: %x -> %x, data->tx %d, dtc %d\n",
 			    desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
 
 		} else if (conf->direction == XDMA_MEM_TO_MEM) {
-			desc[i].dsa = conf->src_start + (i * conf->period_len);
-			desc[i].dta = vtophys(conf->dst_start) + (i * conf->period_len);
+			desc[i].dsa = conf->src_addr + (i * conf->period_len);
+			desc[i].dta = vtophys(conf->dst_addr) + (i * conf->period_len);
 			desc[i].drt = DRT_AUTO;
 			desc[i].dcm = DCM_TIE | DCM_SAI | DCM_DAI;
-
 			printf("mem to mem: %x -> %x\n", desc[i].dsa, desc[i].dta);
 
-			/* TODO: dehardcode */
-			desc[i].dtc = conf->period_len / 32;
-			desc[i].dcm |= DCM_TSZ_32;
+		} else if (conf->direction == XDMA_DEV_TO_MEM) {
+			/* TODO */
+		}
+
+		desc[i].dtc = (conf->period_len / conf->width);
+
+		if (conf->width == 1) {
+			desc[i].dcm |= DCM_TSZ_1 | DCM_DP_1 | DCM_SP_1;
+		} else if (conf->width == 2) {
+			desc[i].dcm |= DCM_TSZ_2 | DCM_DP_2 | DCM_SP_2;
+		} else if (conf->width == 4) {
+			desc[i].dcm |= DCM_TSZ_4 | DCM_DP_4 | DCM_SP_4;
 		}
 		
 #if 0

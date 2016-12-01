@@ -47,7 +47,7 @@ enum xdma_command {
 
 struct xdma_controller {
 	device_t dev;		/* A real DMA device_t. */
-	void *data;
+	void *data;		/* MD part */
 };
 
 typedef struct xdma_controller *xdma_controller_t;
@@ -65,22 +65,20 @@ typedef struct xdma_channel xdma_channel_t;
 
 struct xdma_channel_config {
 	enum xdma_direction	direction;
-	uintptr_t		src_start;
-	uintptr_t		dst_start;
-	bool			src_incr;
-	bool			dst_incr;
-	int			period_len;
+	uintptr_t		src_addr;
+	uintptr_t		dst_addr;
+	int			period_len;	/* In bytes. */
 	int			hwdesc_num;
-	int			word_len;
+	int			width;		/* In bytes. */
 	uint32_t		(*cb)(void *);
 	void			*cb_user;
 };
 
 xdma_controller_t xdma_get(device_t dev, const char *prop);
+xdma_channel_t * xdma_channel_alloc(xdma_controller_t xdma);
 int xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *xconf);
 int xdma_test(device_t dev);
 int xdma_control(xdma_controller_t xdma, int command);
 int xdma_callback(struct xdma_channel *xchan);
-struct xdma_channel * xdma_channel_alloc(xdma_controller_t xdma);
 
 #endif /* !_DEV_EXTRES_XDMA_H_ */
