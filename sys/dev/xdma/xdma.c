@@ -117,52 +117,6 @@ xdma_callback(struct xdma_channel *xchan)
 	return (0);
 }
 
-int
-xdma_test(device_t dev)
-{
-	phandle_t node;
-	int error;
-	int ndmas;
-	int idx;
-
-	node = ofw_bus_get_node(dev);
-	error = ofw_bus_parse_xref_list_get_length(node, "dmas", "#dma-cells", &ndmas);
-	printf("ndmas %d\n", ndmas);
-
-	error = ofw_bus_find_string_index(node, "dma-names", "tx", &idx);
-	printf("tx dma idx %d\n", idx);
-
-	error = ofw_bus_find_string_index(node, "dma-names", "rx", &idx);
-	printf("rx dma idx %d\n", idx);
-
-	phandle_t parent, *cells;
-	device_t dma_dev;
-	int ncells;
-
-	printf("get dmas \n");
-
-	error = ofw_bus_parse_xref_list_alloc(node, "dmas", "#dma-cells", idx,
-	    &parent, &ncells, &cells);
-	if (error != 0) {
-		printf("Cant get dma\n");
-		return (-1);
-	}
-
-	printf("get dev \n");
-	dma_dev = OF_device_from_xref(parent);
-	if (dma_dev == NULL) {
-		printf("failed to get dma dev\n");
-		return (-1);
-	}
-
-	//struct xdma_channel_config conf;
-	printf("call xdma_chan_conf\n");
-
-	//XDMA_CHANNEL_CONFIGURE(dma_dev, xchan, &conf);
-
-	return (0);
-}
-
 static int
 xdma_fill_data(xdma_device_t xdma_dev, phandle_t *cells, int ncells)
 {
@@ -177,33 +131,33 @@ xdma_device_t
 xdma_get(device_t dev, const char *prop)
 {
 	phandle_t parent, *cells;
-	device_t dma_dev;
 	xdma_device_t xdma_dev;
+	device_t dma_dev;
 	phandle_t node;
 	int ncells;
 	int error;
 	int ndmas;
 	int idx;
 
-	xdma_dev = malloc(sizeof(xdma_device_t), M_XDMA, M_WAITOK | M_ZERO);
-
 	node = ofw_bus_get_node(dev);
 	error = ofw_bus_parse_xref_list_get_length(node, "dmas", "#dma-cells", &ndmas);
 	if (error) {
-		printf("failed\n");
+		printf("Failed\n");
 		return (NULL);
 	}
+
 	printf("ndmas %d\n", ndmas);
 	if (ndmas == 0) {
-		printf("failed\n");
+		printf("Failed\n");
 		return (NULL);
 	}
 
 	error = ofw_bus_find_string_index(node, "dma-names", prop, &idx);
 	if (error != 0) {
-		printf("failed\n");
+		printf("Failed\n");
 		return (NULL);
 	}
+
 	printf("dma idx %d\n", idx);
 	printf("get dmas \n");
 
@@ -221,6 +175,7 @@ xdma_get(device_t dev, const char *prop)
 		return (NULL);
 	}
 
+	xdma_dev = malloc(sizeof(xdma_device_t), M_XDMA, M_WAITOK | M_ZERO);
 	xdma_dev->dma_dev = dma_dev;
 
 	xdma_fill_data(xdma_dev, cells, ncells);

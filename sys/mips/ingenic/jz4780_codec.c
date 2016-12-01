@@ -192,8 +192,8 @@ codec_attach(device_t dev)
 	//codec_write(sc, AICR_DAC, (0x3 | (3 << 6))); /* I2S, 24 bit */
 	codec_write(sc, AICR_DAC, 0x3); /* I2S */
 	DELAY(10000);
-	//codec_write(sc, FCR_DAC, 10); /* 96000 */
-	codec_write(sc, FCR_DAC, 7); /* 44100 */
+	codec_write(sc, FCR_DAC, 10); /* 96000 */
+	//codec_write(sc, FCR_DAC, 7); /* 44100 */
 	codec_write(sc, CR_HP, 0);
 
 	DELAY(10000);

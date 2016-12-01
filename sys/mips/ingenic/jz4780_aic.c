@@ -129,7 +129,7 @@ struct aic_rate {
 };
 
 static struct aic_rate rate_map[] = {
-	{ 44100, 49, 152, 1000 }, /* PLL4 49.152 Mhz */
+	{ 96000, 49, 152, 1000 }, /* PLL4 49.152 Mhz */
 	/* TODO: add more frequences */
 	{ 0, 0 },
 };
@@ -391,8 +391,6 @@ setup_dma(struct sc_pcminfo *scp)
 
 	if (fmt & AFMT_16BIT) {
 		conf->word_len = 16;
-	} else if (fmt & AFMT_24BIT) {
-		conf->word_len = 24;
 	} else
 		panic("here\n");
 
@@ -421,11 +419,12 @@ aic_start(struct sc_pcminfo *scp)
 	reg |= (I2SCR_ESCLK | I2SCR_AMSL);
 	WRITE4(sc, I2SCR, reg);
 
-	WRITE4(sc, I2SDIV, 12);
+	//WRITE4(sc, I2SDIV, 1);
 
 	/* Enable DMA */
 	reg = READ4(sc, AICCR);
 	reg = 0;
+	//reg |= (1 << 28); //pack16
 	reg |= (1 << 19); // OSS 16 bit
 	reg |= (1 << 16); // ISS 16 bit
 	//reg |= (4 << 19); // OSS 24 bit
@@ -549,7 +548,7 @@ static uint32_t aic_pfmt[] = {
 };
 
 //static struct pcmchan_caps aic_pcaps = {44100, 192000, aic_pfmt, 0};
-static struct pcmchan_caps aic_pcaps = {44100, 44100, aic_pfmt, 0};
+static struct pcmchan_caps aic_pcaps = {96000, 96000, aic_pfmt, 0};
 
 static struct pcmchan_caps *
 aicchan_getcaps(kobj_t obj, void *data)

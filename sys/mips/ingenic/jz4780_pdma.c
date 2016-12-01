@@ -122,14 +122,17 @@ pdma_intr(void *arg)
 	for (i = 0; i < PDMA_NCHANNELS; i++) {
 		if (pending & (1 << i)) {
 			chan = &pdma_channels[i];
-			conf = chan->conf;
-			chan->cur_desc = (chan->cur_desc + 1) % conf->hwdesc_num;
-			xdma_callback(chan->xchan);
 
-			chan_start(sc, chan);
+			//printf("dsa %x\n", READ4(sc, PDMA_DSA(chan->index)));
 
 			/* Disable channel */
-			//WRITE4(sc, PDMA_DCS(i), 0);
+			WRITE4(sc, PDMA_DCS(chan->index), 0);
+
+			conf = chan->conf;
+			xdma_callback(chan->xchan);
+
+			chan->cur_desc = (chan->cur_desc + 1) % conf->hwdesc_num;
+			chan_start(sc, chan);
 		}
 	}
 
@@ -273,8 +276,8 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 #endif
 
 	/* Channel transfer enable */
+	mb();
 	WRITE4(sc, PDMA_DCS(chan->index), (DCS_DES8 | DCS_CTE));
-
 	mb();
 
 	return (0);
@@ -318,7 +321,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 	desc = (struct pdma_hwdesc *)xchan->descs;
 
-	printf("xchan->descs is %x\n", vtophys(xchan->descs));
+	printf("xchan->descs is %x, hwdesc_num %d\n", vtophys(xchan->descs), conf->hwdesc_num);
 
 	data->tx = 0x6;
 
@@ -379,7 +382,7 @@ pdma_data(device_t dev, phandle_t *cells, int ncells, void *ptr)
 		    cells[0], cells[1], cells[2]);
 
 	data->rx = cells[0];
-	data->rx = cells[1];
+	data->tx = cells[1];
 	data->chan = cells[2];
 
 	return (0);
