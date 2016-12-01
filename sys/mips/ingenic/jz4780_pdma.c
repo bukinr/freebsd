@@ -257,8 +257,6 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
 
 	WRITE4(sc, PDMA_DDA(chan->index), vtophys(&desc[chan->cur_desc]));
-
-	/* Set Doorbell */
 	WRITE4(sc, PDMA_DDS, (1 << chan->index));
 
 #if 0
@@ -321,7 +319,8 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 	desc = (struct pdma_hwdesc *)xchan->descs;
 
-	printf("xchan->descs is %x, hwdesc_num %d\n", vtophys(xchan->descs), conf->hwdesc_num);
+	printf("xchan->descs is %x, hwdesc_num %d, data->tx %d\n",
+	    vtophys(xchan->descs), conf->hwdesc_num, data->tx);
 
 	data->tx = 0x6;
 
@@ -336,7 +335,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 		} else if (conf->direction == XDMA_MEM_TO_MEM) {
 			desc[i].dsa = conf->src_addr + (i * conf->period_len);
-			desc[i].dta = vtophys(conf->dst_addr) + (i * conf->period_len);
+			desc[i].dta = conf->dst_addr + (i * conf->period_len);
 			desc[i].drt = DRT_AUTO;
 			desc[i].dcm = DCM_TIE | DCM_SAI | DCM_DAI;
 			printf("mem to mem: %x -> %x\n", desc[i].dsa, desc[i].dta);
