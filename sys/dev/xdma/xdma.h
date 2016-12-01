@@ -58,6 +58,7 @@ struct xdma_channel {
 	void			*cb_user;
 	void			*chan;
 	int			used;
+	void			*descs;
 };
 
 struct xdma_channel_config {

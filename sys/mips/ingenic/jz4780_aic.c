@@ -378,6 +378,7 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->dst_start = (sc->aic_paddr + AICDR);
 	conf->cb = aic_xdma_intr;
 	conf->cb_user = scp;
+	//conf->command = CMD_2BYTES;
 
 #if 0
 	sc->buf_base[0] = 0x12345678;
@@ -402,36 +403,6 @@ setup_dma(struct sc_pcminfo *scp)
 		printf("Cant configure virtual channel\n");
 		return (-1);
 	}
-
-#if 0
-	conf->ih = aic_dma_intr;
-	conf->ih_user = scp;
-	conf->saddr = sc->buf_base_phys;
-	conf->daddr = rman_get_start(sc->res[0]) + SSI_STX0;
-	conf->event = sc->sdma_ev_tx; /* SDMA TX event */
-	conf->period = sndbuf_getblksz(ch->buffer);
-	conf->num_bd = sndbuf_getblkcnt(ch->buffer);
-
-	/*
-	 * Word Length
-	 * Can be 32, 24, 16 or 8 for sDMA.
-	 *
-	 * SSI supports 24 at max.
-	 */
-
-	fmt = sndbuf_getfmt(ch->buffer);
-
-	if (fmt & AFMT_16BIT) {
-		conf->word_length = 16;
-		conf->command = CMD_2BYTES;
-	} else if (fmt & AFMT_24BIT) {
-		conf->word_length = 24;
-		conf->command = CMD_3BYTES;
-	} else {
-		device_printf(sc->dev, "Unknown format\n");
-		return (-1);
-	}
-#endif
 
 	return (0);
 }
@@ -671,7 +642,7 @@ aic_attach(device_t dev)
 	/* Alloc xDMA virtual channel. */
 	sc->xchan = xdma_channel_alloc(sc->xdma_dev);
 	if (sc->xchan == NULL) {
-		printf("Can't alloc virtual channel.\n");
+		printf("Can't alloc virtual DMA channel.\n");
 		return (-1);
 	}
 

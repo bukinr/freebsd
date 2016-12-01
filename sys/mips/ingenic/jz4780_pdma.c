@@ -99,8 +99,6 @@ static struct resource_spec pdma_spec[] = {
 	{ -1, 0 }
 };
 
-struct pdma_hwdesc descs[128] __aligned(32*1024);
-
 static int pdma_probe(device_t dev);
 static int pdma_attach(device_t dev);
 static int pdma_detach(device_t dev);
@@ -195,7 +193,7 @@ pdma_attach(device_t dev)
 	reg = READ4(sc, PDMA_DMAC);
 	reg &= ~(DMAC_HLT | DMAC_AR);
 	reg |= (DMAC_DMAE);
-	reg |= (DMAC_FMSC);
+	//reg |= (DMAC_FMSC);
 	WRITE4(sc, PDMA_DMAC, reg);
 
 	WRITE4(sc, PDMA_DMACP, 0);
@@ -242,9 +240,12 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 static int
 chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 {
+	struct xdma_channel *xchan;
 	struct pdma_hwdesc *desc;
 
-	desc = &descs[0];
+	xchan = chan->xchan;
+
+	desc = (struct pdma_hwdesc *)xchan->descs;
 
 	/* 8 byte descriptor */
 	WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
@@ -306,18 +307,18 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 	WRITE4(sc, PDMA_DSD(chan->index), 0);
 	WRITE4(sc, PDMA_DCM(chan->index), 0);
 
-	//desc = malloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc), M_DEVBUF, M_WAITOK | M_ZERO);
-	desc = &descs[0];
+	if (xchan->descs == NULL) {
+		xchan->descs = contigmalloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc),
+			M_DEVBUF, (M_WAITOK | M_ZERO),
+			0UL /* low address */,
+			-1UL /* high address */,
+			1024 /* alignment */,
+			0UL /* boundary */);
+	}
 
-#if 0
-	desc = contigmalloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc),
-		M_DEVBUF,
-		(M_WAITOK | M_ZERO),
-		0UL /* low address */,
-		-1UL /* high address */,
-		1024 /* alignment */,
-		0UL /* boundary */);
-#endif
+	desc = (struct pdma_hwdesc *)xchan->descs;
+
+	printf("xchan->descs is %x\n", vtophys(xchan->descs));
 
 	data->tx = 0x6;
 

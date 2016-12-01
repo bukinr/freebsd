@@ -91,6 +91,8 @@ xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *conf)
 
 	xdev = xchan->xdev;
 
+	//xchan->descs = 
+
 	ret = XDMA_CHANNEL_CONFIGURE(xdev->dma_dev, xchan, conf);
 	if (ret == 0) {
 		xchan->cb = conf->cb;

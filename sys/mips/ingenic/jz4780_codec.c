@@ -176,7 +176,7 @@ codec_attach(device_t dev)
 	//DELAY(10000);
 	//WRITE4(sc, CODEC_RGADW, 0);
 
-#if 0
+#if 1
 	int i;
 	for (i = 0; i < 19; i++) {
 		printf("write reg %x val %x\n", jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
