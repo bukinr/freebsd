@@ -288,6 +288,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 	struct pdma_hwdesc *desc;
 	struct pdma_data *data;
 	struct pdma_softc *sc;
+	xdma_controller_t xdma;
 	//int reg;
 	int i;
 
@@ -298,7 +299,9 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 	chan = (struct pdma_channel *)xchan->chan;
 	chan->conf = conf;
-	data = &chan->data;
+
+	xdma = xchan->xdma;
+	data = (struct pdma_data *)xdma->data;
 
 	WRITE4(sc, PDMA_DCS(chan->index), 0);
 	WRITE4(sc, PDMA_DTC(chan->index), 0);
@@ -322,8 +325,6 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 	printf("xchan->descs is %x, hwdesc_num %d, data->tx %d\n",
 	    vtophys(xchan->descs), conf->hwdesc_num, data->tx);
 
-	data->tx = 0x6;
-
 	for (i = 0; i < conf->hwdesc_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
 			desc[i].dsa = conf->src_addr + (i * conf->period_len);
@@ -345,7 +346,6 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 		}
 
 		desc[i].dtc = (conf->period_len / conf->width);
-
 		if (conf->width == 1) {
 			desc[i].dcm |= DCM_TSZ_1 | DCM_DP_1 | DCM_SP_1;
 		} else if (conf->width == 2) {
@@ -370,21 +370,19 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 }
 
 static int
-pdma_data(device_t dev, phandle_t *cells, int ncells, void *ptr)
+pdma_data(device_t dev, phandle_t *cells, int ncells, void **ptr)
 {
-	struct pdma_channel *chan;
 	struct pdma_data *data;
 
-	chan = &pdma_channels[2];
-	data = &chan->data;
+	if (ncells != 3) {
+		return (-1);
+	}
 
-	printf("%s: ncells is %d\n", __func__, ncells);
-	if (ncells >= 1)
-		printf("cells[0] %d, cells[1] %d, cells[2] %d\n",
-		    cells[0], cells[1], cells[2]);
+	*ptr = malloc(sizeof(struct pdma_data), M_DEVBUF, (M_WAITOK | M_ZERO));
 
-	data->rx = cells[0];
-	data->tx = cells[1];
+	data = *ptr;
+	data->tx = cells[0];
+	data->rx = cells[1];
 	data->chan = cells[2];
 
 	return (0);

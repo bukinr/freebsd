@@ -72,7 +72,7 @@ METHOD int data {
 	device_t dev;
 	phandle_t *cells;
 	int ncells;
-	void *data;
+	void **data;
 };
 
 METHOD int channel_alloc {
