@@ -396,6 +396,8 @@ setup_dma(struct sc_pcminfo *scp)
 		return (-1);
 	}
 
+	xdma_begin(sc->xchan);
+
 	return (0);
 }
 

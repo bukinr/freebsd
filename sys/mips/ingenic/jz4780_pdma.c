@@ -282,6 +282,21 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 }
 
 static int
+pdma_channel_reset(struct pdma_softc *sc, uint32_t idx)
+{
+
+	WRITE4(sc, PDMA_DCS(idx), 0);
+	WRITE4(sc, PDMA_DTC(idx), 0);
+	WRITE4(sc, PDMA_DRT(idx), 0);
+	WRITE4(sc, PDMA_DSA(idx), 0);
+	WRITE4(sc, PDMA_DTA(idx), 0);
+	WRITE4(sc, PDMA_DSD(idx), 0);
+	WRITE4(sc, PDMA_DCM(idx), 0);
+
+	return (0);
+}
+
+static int
 pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_channel_config *conf)
 {
 	struct pdma_channel *chan;
@@ -290,6 +305,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 	struct pdma_softc *sc;
 	xdma_controller_t xdma;
 	//int reg;
+	int ret;
 	int i;
 
 	sc = device_get_softc(dev);
@@ -303,21 +319,12 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 	xdma = xchan->xdma;
 	data = (struct pdma_data *)xdma->data;
 
-	WRITE4(sc, PDMA_DCS(chan->index), 0);
-	WRITE4(sc, PDMA_DTC(chan->index), 0);
-	WRITE4(sc, PDMA_DRT(chan->index), 0);
-	WRITE4(sc, PDMA_DSA(chan->index), 0);
-	WRITE4(sc, PDMA_DTA(chan->index), 0);
-	WRITE4(sc, PDMA_DSD(chan->index), 0);
-	WRITE4(sc, PDMA_DCM(chan->index), 0);
+	pdma_channel_reset(sc, chan->index);
 
-	if (xchan->descs == NULL) {
-		xchan->descs = contigmalloc(conf->hwdesc_num * sizeof(struct pdma_hwdesc),
-			M_DEVBUF, (M_WAITOK | M_ZERO),
-			0UL /* low address */,
-			-1UL /* high address */,
-			1024 /* alignment */,
-			0UL /* boundary */);
+	ret = xdma_desc_alloc(xchan, conf->hwdesc_num, sizeof(struct pdma_hwdesc));
+	if (ret != 0) {
+		printf("Can't allocate descriptors");
+		return (-1);
 	}
 
 	desc = (struct pdma_hwdesc *)xchan->descs;
@@ -331,9 +338,6 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 			desc[i].dta = conf->dst_addr;
 			desc[i].drt = data->tx;
 			desc[i].dcm = DCM_SAI;
-			printf("mem to dev: %x -> %x, data->tx %d, dtc %d\n",
-			    desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
-
 		} else if (conf->direction == XDMA_DEV_TO_MEM) {
 			desc[i].dsa = conf->src_addr;
 			desc[i].dta = conf->dst_addr + (i * conf->period_len);
@@ -344,10 +348,10 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 			desc[i].dta = conf->dst_addr + (i * conf->period_len);
 			desc[i].drt = DRT_AUTO;
 			desc[i].dcm = DCM_SAI | DCM_DAI;
-			printf("mem to mem: %x -> %x\n", desc[i].dsa, desc[i].dta);
 		}
 
 		desc[i].dtc = (conf->period_len / conf->width);
+
 		if (conf->width == 1) {
 			desc[i].dcm |= DCM_TSZ_1 | DCM_DP_1 | DCM_SP_1;
 		} else if (conf->width == 2) {
@@ -365,8 +369,24 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 		}
 #endif
 
+		printf("desc: %x -> %x, data->tx %d, dtc %d\n",
+		    desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
+
 		mb();
 	}
+
+	return (0);
+}
+
+static int
+pdma_channel_begin(device_t dev, xdma_channel_t *xchan)
+{
+	struct pdma_channel *chan;
+	struct pdma_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	chan = (struct pdma_channel *)xchan->chan;
 
 	chan_start(sc, chan);
 
@@ -401,6 +421,7 @@ static device_method_t pdma_methods[] = {
 	/* xDMA Interface */
 	DEVMETHOD(xdma_channel_alloc,		pdma_channel_alloc),
 	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
+	DEVMETHOD(xdma_channel_begin,		pdma_channel_begin),
 	DEVMETHOD(xdma_data,			pdma_data),
 
 	DEVMETHOD_END

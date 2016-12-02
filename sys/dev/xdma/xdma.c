@@ -83,6 +83,33 @@ xdma_channel_alloc(xdma_controller_t xdma)
 }
 
 int
+xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
+{
+	xdma_controller_t xdma;
+	void *ret;
+
+	xdma = xchan->xdma;
+
+	ret = contigmalloc(ndescs * desc_sz,
+		M_DEVBUF,
+		(M_WAITOK | M_ZERO),
+		0UL /* low address */,
+		-1UL /* high address */,
+		1024 /* alignment */,
+		0UL /* boundary */);
+
+	if (ret == NULL) {
+		printf("Can't allocate memory for descriptors");
+		return (-1);
+	}
+
+	xchan->descs = ret;
+	xchan->ndescs = ndescs;
+
+	return (0);
+}
+
+int
 xdma_prepare(xdma_channel_t *xchan, struct xdma_channel_config *conf)
 {
 	xdma_controller_t xdma;
@@ -90,7 +117,7 @@ xdma_prepare(xdma_channel_t *xchan, struct xdma_channel_config *conf)
 
 	xdma = xchan->xdma;
 
-	//xchan->descs = 
+	//xchan->descs = xdma_desc_alloc(
 
 	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan, conf);
 	if (ret == 0) {
@@ -101,6 +128,18 @@ xdma_prepare(xdma_channel_t *xchan, struct xdma_channel_config *conf)
 	}
 
 	return (-1);
+}
+
+int
+xdma_begin(xdma_channel_t *xchan)
+{
+	xdma_controller_t xdma;
+
+	xdma = xchan->xdma;
+
+	XDMA_CHANNEL_BEGIN(xdma->dev, xchan);
+
+	return (0);
 }
 
 int

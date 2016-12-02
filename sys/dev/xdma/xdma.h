@@ -57,8 +57,9 @@ struct xdma_channel {
 	uint32_t		(*cb)(void *);
 	void			*cb_user;
 	void			*chan;
-	int			used;
+	uint32_t		used;
 	void			*descs;
+	uint32_t		ndescs;
 };
 
 typedef struct xdma_channel xdma_channel_t;
@@ -80,5 +81,7 @@ int xdma_prepare(struct xdma_channel *xchan, struct xdma_channel_config *xconf);
 int xdma_test(device_t dev);
 int xdma_control(xdma_controller_t xdma, int command);
 int xdma_callback(struct xdma_channel *xchan);
+int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz);
+int xdma_begin(xdma_channel_t *xchan);
 
 #endif /* !_DEV_EXTRES_XDMA_H_ */
