@@ -330,19 +330,21 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 			desc[i].dsa = conf->src_addr + (i * conf->period_len);
 			desc[i].dta = conf->dst_addr;
 			desc[i].drt = data->tx;
-			desc[i].dcm = DCM_TIE | DCM_SAI;
+			desc[i].dcm = DCM_SAI;
 			printf("mem to dev: %x -> %x, data->tx %d, dtc %d\n",
 			    desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
 
+		} else if (conf->direction == XDMA_DEV_TO_MEM) {
+			desc[i].dsa = conf->src_addr;
+			desc[i].dta = conf->dst_addr + (i * conf->period_len);
+			desc[i].drt = data->rx;
+			desc[i].dcm = DCM_DAI;
 		} else if (conf->direction == XDMA_MEM_TO_MEM) {
 			desc[i].dsa = conf->src_addr + (i * conf->period_len);
 			desc[i].dta = conf->dst_addr + (i * conf->period_len);
 			desc[i].drt = DRT_AUTO;
-			desc[i].dcm = DCM_TIE | DCM_SAI | DCM_DAI;
+			desc[i].dcm = DCM_SAI | DCM_DAI;
 			printf("mem to mem: %x -> %x\n", desc[i].dsa, desc[i].dta);
-
-		} else if (conf->direction == XDMA_DEV_TO_MEM) {
-			/* TODO */
 		}
 
 		desc[i].dtc = (conf->period_len / conf->width);
@@ -353,6 +355,8 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 		} else if (conf->width == 4) {
 			desc[i].dcm |= DCM_TSZ_4 | DCM_DP_4 | DCM_SP_4;
 		}
+
+		desc[i].dcm |= DCM_TIE;
 		
 #if 0
 		if (i != (conf->hwdesc_num - 1)) {
