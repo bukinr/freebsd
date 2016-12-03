@@ -117,28 +117,28 @@ pdma_intr(void *arg)
 
 	pending = READ4(sc, PDMA_DIRQP);
 
-	printf(".");
+	//printf(".");
 	//printf("%s: DIRQP %x\n", __func__, pending);
+
+	/* Ack all the channels */
+	WRITE4(sc, PDMA_DIRQP, 0);
 
 	for (i = 0; i < PDMA_NCHANNELS; i++) {
 		if (pending & (1 << i)) {
 			chan = &pdma_channels[i];
+			conf = chan->conf;
 
 			//printf("dsa %x\n", READ4(sc, PDMA_DSA(chan->index)));
 
 			/* Disable channel */
 			WRITE4(sc, PDMA_DCS(chan->index), 0);
-
-			conf = chan->conf;
-			xdma_callback(chan->xchan);
-
+			/* Enable again */
 			chan->cur_desc = (chan->cur_desc + 1) % conf->hwdesc_num;
 			chan_start(sc, chan);
+
+			xdma_callback(chan->xchan);
 		}
 	}
-
-	/* Ack all the channels */
-	WRITE4(sc, PDMA_DIRQP, 0);
 }
 
 static int

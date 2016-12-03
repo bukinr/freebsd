@@ -153,7 +153,7 @@ aicmixer_init(struct snd_mixer *m)
 		return -1;
 
 	mask = SOUND_MASK_PCM;
-	mask |= SOUND_MASK_VOLUME;
+	//mask |= SOUND_MASK_VOLUME;
 
 	snd_mtxlock(sc->lock);
 	pcm_setflags(scp->dev, pcm_getflags(scp->dev) | SD_F_SOFTPCMVOL);
@@ -412,15 +412,16 @@ aic_start(struct sc_pcminfo *scp)
 	device_printf(scp->dev, "%s\n", __func__);
 
 	reg = READ4(sc, I2SCR);
-	reg |= (I2SCR_ESCLK | I2SCR_AMSL);
+	reg |= (I2SCR_ESCLK);
 	WRITE4(sc, I2SCR, reg);
 
 	//WRITE4(sc, I2SDIV, 1);
 
 	/* Enable DMA */
-	reg = READ4(sc, AICCR);
-	reg = 0;
+	//reg = READ4(sc, AICCR);
 	//reg |= (1 << 28); //pack16
+
+	reg = 0;
 	reg |= (1 << 19); // OSS 16 bit
 	reg |= (1 << 16); // ISS 16 bit
 	//reg |= (4 << 19); // OSS 24 bit
@@ -769,10 +770,15 @@ aic_attach(device_t dev)
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
 	reg = 0;
-	//reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
-	//reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
+	int internal_codec;
+	internal_codec = 0;
+	if (internal_codec) {
+		reg |= (AICFR_ICDC);	/* Internal CODEC. */
+	} else {
+		reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
+		reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
+	}
 	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
-	reg |= (AICFR_ICDC);	/* Internal CODEC. */
 	reg |= (8 << 16);	/* TFTH  Transmit FIFO threshold */
 	reg |= (7 << 24);	/* RFTH  Receive FIFO threshold */
 	WRITE4(sc, AICFR, reg);
