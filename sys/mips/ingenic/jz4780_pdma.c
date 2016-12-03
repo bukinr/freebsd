@@ -117,6 +117,7 @@ pdma_intr(void *arg)
 
 	pending = READ4(sc, PDMA_DIRQP);
 
+	printf(".");
 	//printf("%s: DIRQP %x\n", __func__, pending);
 
 	for (i = 0; i < PDMA_NCHANNELS; i++) {
@@ -217,6 +218,63 @@ pdma_detach(device_t dev)
 }
 
 static int
+chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
+{
+	struct xdma_channel *xchan;
+	struct pdma_hwdesc *desc;
+
+	xchan = chan->xchan;
+
+	/* 8 byte descriptor */
+	//WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
+
+	//printf("descriptor address %x phys %x\n",
+	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
+
+	desc = (struct pdma_hwdesc *)xchan->descs_phys;
+	WRITE4(sc, PDMA_DDA(chan->index), (uint32_t)&desc[chan->cur_desc]);
+	mb();
+	WRITE4(sc, PDMA_DDS, (1 << chan->index));
+
+#if 0
+	int i;
+	for (i = 0; i < 1; i++) {
+		printf("PDMA_DSA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSA(chan->index)));
+		printf("PDMA_DTA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DTA(chan->index)));
+		printf("PDMA_DTC(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DTC(chan->index)));
+		printf("PDMA_DRT(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DRT(chan->index)));
+		printf("PDMA_DCS(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DCS(chan->index)));
+		printf("PDMA_DCM(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DCM(chan->index)));
+		printf("PDMA_DDA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DDA(chan->index)));
+		printf("PDMA_DSD(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSD(chan->index)));
+	}
+#endif
+
+	/* Channel transfer enable */
+	mb();
+	WRITE4(sc, PDMA_DCS(chan->index), (DCS_DES8 | DCS_CTE));
+	mb();
+	mb();
+
+	return (0);
+}
+
+static int
+pdma_channel_reset(struct pdma_softc *sc, uint32_t idx)
+{
+
+	WRITE4(sc, PDMA_DCS(idx), 0);
+	WRITE4(sc, PDMA_DTC(idx), 0);
+	WRITE4(sc, PDMA_DRT(idx), 0);
+	WRITE4(sc, PDMA_DSA(idx), 0);
+	WRITE4(sc, PDMA_DTA(idx), 0);
+	WRITE4(sc, PDMA_DSD(idx), 0);
+	WRITE4(sc, PDMA_DCM(idx), 0);
+
+	return (0);
+}
+
+static int
 pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 {
 	struct pdma_channel *chan;
@@ -238,62 +296,6 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 	}
 
 	return (-1);
-}
-
-static int
-chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
-{
-	struct xdma_channel *xchan;
-	struct pdma_hwdesc *desc;
-
-	xchan = chan->xchan;
-
-	desc = (struct pdma_hwdesc *)xchan->descs;
-
-	/* 8 byte descriptor */
-	WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
-
-	//printf("descriptor address %x phys %x\n",
-	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
-
-	WRITE4(sc, PDMA_DDA(chan->index), vtophys(&desc[chan->cur_desc]));
-	WRITE4(sc, PDMA_DDS, (1 << chan->index));
-
-#if 0
-	int i;
-	for (i = 0; i < 1; i++) {
-		printf("PDMA_DSA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSA(chan->index)));
-		printf("PDMA_DTA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DTA(chan->index)));
-		printf("PDMA_DTC(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DTC(chan->index)));
-		printf("PDMA_DRT(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DRT(chan->index)));
-		printf("PDMA_DCS(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DCS(chan->index)));
-		printf("PDMA_DCM(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DCM(chan->index)));
-		printf("PDMA_DDA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DDA(chan->index)));
-		printf("PDMA_DSD(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSD(chan->index)));
-	}
-#endif
-
-	/* Channel transfer enable */
-	mb();
-	WRITE4(sc, PDMA_DCS(chan->index), (DCS_DES8 | DCS_CTE));
-	mb();
-
-	return (0);
-}
-
-static int
-pdma_channel_reset(struct pdma_softc *sc, uint32_t idx)
-{
-
-	WRITE4(sc, PDMA_DCS(idx), 0);
-	WRITE4(sc, PDMA_DTC(idx), 0);
-	WRITE4(sc, PDMA_DRT(idx), 0);
-	WRITE4(sc, PDMA_DSA(idx), 0);
-	WRITE4(sc, PDMA_DTA(idx), 0);
-	WRITE4(sc, PDMA_DSD(idx), 0);
-	WRITE4(sc, PDMA_DCM(idx), 0);
-
-	return (0);
 }
 
 static int
@@ -394,7 +396,7 @@ pdma_channel_begin(device_t dev, xdma_channel_t *xchan)
 }
 
 static int
-pdma_data(device_t dev, phandle_t *cells, int ncells, void **ptr)
+pdma_md_data(device_t dev, phandle_t *cells, int ncells, void **ptr)
 {
 	struct pdma_data *data;
 
@@ -422,7 +424,7 @@ static device_method_t pdma_methods[] = {
 	DEVMETHOD(xdma_channel_alloc,		pdma_channel_alloc),
 	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
 	DEVMETHOD(xdma_channel_begin,		pdma_channel_begin),
-	DEVMETHOD(xdma_data,			pdma_data),
+	DEVMETHOD(xdma_md_data,			pdma_md_data),
 
 	DEVMETHOD_END
 };

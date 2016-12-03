@@ -68,7 +68,7 @@ METHOD int channel_configure {
 	struct xdma_channel_config *conf;
 } DEFAULT xdma_channel_configure;
 
-METHOD int data {
+METHOD int md_data {
 	device_t dev;
 	phandle_t *cells;
 	int ncells;

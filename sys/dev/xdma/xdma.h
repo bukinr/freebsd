@@ -40,6 +40,12 @@ enum xdma_direction {
 	XDMA_DEV_TO_DEV,
 };
 
+enum xdma_operation_type {
+	XDMA_CYCLIC,
+	XDMA_SG,
+	XDMA_MEMCPY,
+};
+
 enum xdma_command {
 	XDMA_CMD_START,
 	XDMA_CMD_STOP,
@@ -53,13 +59,16 @@ struct xdma_controller {
 typedef struct xdma_controller *xdma_controller_t;
 
 struct xdma_channel {
-	xdma_controller_t	xdma;
-	uint32_t		(*cb)(void *);
-	void			*cb_user;
-	void			*chan;
-	uint32_t		used;
-	void			*descs;
-	uint32_t		ndescs;
+	xdma_controller_t		xdma;
+	void				*chan;
+	void				*descs;
+	uintptr_t			descs_phys;
+	uint32_t			ndescs;
+	//struct xdma_intr_handler	*ih;
+	TAILQ_HEAD(, xdma_intr_handler)	ie_handlers; /* Interrupt handlers. */
+
+	int				(*cb)(void *);
+	void				*cb_user;
 };
 
 typedef struct xdma_channel xdma_channel_t;
@@ -71,7 +80,7 @@ struct xdma_channel_config {
 	int			period_len;	/* In bytes. */
 	int			hwdesc_num;
 	int			width;		/* In bytes. */
-	uint32_t		(*cb)(void *);
+	int			(*cb)(void *);
 	void			*cb_user;
 };
 
@@ -83,5 +92,12 @@ int xdma_control(xdma_controller_t xdma, int command);
 int xdma_callback(struct xdma_channel *xchan);
 int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz);
 int xdma_begin(xdma_channel_t *xchan);
+int xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg);
+
+struct xdma_intr_handler {
+	int	(*cb)(void *);
+	void	*cb_user;
+	TAILQ_ENTRY(xdma_intr_handler)	ih_next;
+};
 
 #endif /* !_DEV_EXTRES_XDMA_H_ */

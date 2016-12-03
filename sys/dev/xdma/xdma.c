@@ -46,6 +46,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/sx.h>
 
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/pmap.h>
+
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
@@ -58,7 +63,9 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_XDMA, "xdma", "xDMA framework");
 
-static struct mtx xdma_lock;
+static struct mtx xdma_mtx;
+#define	XDMA_LOCK()	mtx_lock(&xdma_mtx)
+#define	XDMA_UNLOCK()	mtx_unlock(&xdma_mtx)
 
 /*
  * Allocate virtual channel.
@@ -70,16 +77,40 @@ xdma_channel_alloc(xdma_controller_t xdma)
 	int ret;
 
 	xchan = malloc(sizeof(xdma_channel_t), M_XDMA, M_WAITOK | M_ZERO);
+	TAILQ_INIT(&xchan->ie_handlers);
 
-	/* Request a real channel from hardware */
+	XDMA_LOCK();
+
+	/* Request a real channel from hardware driver. */
 	ret = XDMA_CHANNEL_ALLOC(xdma->dev, xchan);
 	if (ret == 0) {
 		xchan->xdma = xdma;
+
+		XDMA_UNLOCK();
 		return (xchan);
 	}
 
+	XDMA_UNLOCK();
+
 	free(xchan, M_XDMA);
 	return (NULL);
+}
+
+int
+xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg)
+{
+	struct xdma_intr_handler *ih;
+	xdma_controller_t xdma;
+
+	xdma = xchan->xdma;
+
+	ih = malloc(sizeof(struct xdma_intr_handler), M_XDMA, M_WAITOK | M_ZERO);
+	ih->cb = cb;
+	ih->cb_user = arg;
+
+	TAILQ_INSERT_TAIL(&xchan->ie_handlers, ih, ih_next);
+
+	return (0);
 }
 
 int
@@ -89,6 +120,9 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
 	void *ret;
 
 	xdma = xchan->xdma;
+	if (xdma == NULL) {
+		return (-1);
+	}
 
 	ret = contigmalloc(ndescs * desc_sz,
 		M_DEVBUF,
@@ -104,6 +138,7 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
 	}
 
 	xchan->descs = ret;
+	xchan->descs_phys = vtophys(ret);
 	xchan->ndescs = ndescs;
 
 	return (0);
@@ -117,16 +152,18 @@ xdma_prepare(xdma_channel_t *xchan, struct xdma_channel_config *conf)
 
 	xdma = xchan->xdma;
 
-	//xchan->descs = xdma_desc_alloc(
+	XDMA_LOCK();
 
 	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan, conf);
 	if (ret == 0) {
 		xchan->cb = conf->cb;
 		xchan->cb_user = conf->cb_user;
 
+		XDMA_UNLOCK();
 		return (0);
 	}
 
+	XDMA_UNLOCK();
 	return (-1);
 }
 
@@ -134,33 +171,38 @@ int
 xdma_begin(xdma_channel_t *xchan)
 {
 	xdma_controller_t xdma;
+	int ret;
 
 	xdma = xchan->xdma;
 
-	XDMA_CHANNEL_BEGIN(xdma->dev, xchan);
+	ret = XDMA_CHANNEL_BEGIN(xdma->dev, xchan);
 
-	return (0);
+	return (ret);
 }
 
 int
 xdma_callback(xdma_channel_t *xchan)
 {
+	struct xdma_intr_handler *entry;
 
 	//printf("%s: xchan %x\n", __func__, (uint32_t)xchan);
+	//if (xchan->cb != NULL) {
+	//	xchan->cb(xchan->cb_user);
+	//}
 
-	if (xchan->cb != NULL) {
-		xchan->cb(xchan->cb_user);
+	TAILQ_FOREACH(entry, &xchan->ie_handlers, ih_next) {
+		entry->cb(entry->cb_user);
 	}
 
 	return (0);
 }
 
 static int
-xdma_fill_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
+xdma_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 {
 	uint32_t ret;
 
-	ret = XDMA_DATA(xdma->dev, cells, ncells, &xdma->data);
+	ret = XDMA_MD_DATA(xdma->dev, cells, ncells, &xdma->data);
 
 	return (ret);
 }
@@ -215,7 +257,7 @@ xdma_get(device_t dev, const char *prop)
 	xdma = malloc(sizeof(xdma_controller_t), M_XDMA, M_WAITOK | M_ZERO);
 	xdma->dev = dev;
 
-	xdma_fill_data(xdma, cells, ncells);
+	xdma_md_data(xdma, cells, ncells);
 
 	return (xdma);
 }
@@ -234,13 +276,17 @@ xdma_control(xdma_controller_t xdma, int command)
 	return (0);
 }
 
+#if 0
 static void
 xdma_init(void)
 {
 
 	printf("%s\n", __func__);
 
-	mtx_init(&xdma_lock, "xDMA", NULL, MTX_DEF);
+	mtx_init(&xdma_mtx, "xDMA", NULL, MTX_DEF);
 }
 
 SYSINIT(xdma, SI_SUB_DRIVERS, SI_ORDER_FIRST, xdma_init, NULL);
+#endif
+
+MTX_SYSINIT(xdma_lock, &xdma_mtx, "xDMA", MTX_DEF);

@@ -175,6 +175,16 @@
 				bias-pull-down;
 			};
 
+			pinfunc_i2s: i2s {
+				pins_i2s_data: i2s-data {
+					ingenic,pins = <&gpb  0 1 &pincfg_nobias
+							&gpb  1 1 &pincfg_nobias
+							&gpb  2 1 &pincfg_nobias
+							&gpb  3 1 &pincfg_nobias
+							&gpb  4 1 &pincfg_nobias >;
+				};
+			};
+
 			pinfunc_uart2: uart2 {
 				pins_uart2_data: uart2-data {
 					ingenic,pins = <&gpd  6 1 &pincfg_nobias  /* rxd */

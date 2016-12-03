@@ -111,7 +111,7 @@ struct sc_pcminfo {
 
 static struct resource_spec aic_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
-	{ SYS_RES_IRQ,		0,	RF_ACTIVE },
+	//{ SYS_RES_IRQ,		0,	RF_ACTIVE },
 	{ -1, 0 }
 };
 
@@ -330,7 +330,7 @@ aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 	return (sndbuf_getblksz(ch->buffer));
 }
 
-static uint32_t
+static int
 aic_intr(void *arg)
 {
 	struct xdma_channel_config *conf;
@@ -788,6 +788,9 @@ aic_attach(device_t dev)
 	printf("AICFR %x\n", READ4(sc, AICFR));
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
+
+	/* Setup interrupt handler. */
+	xdma_setup_intr(sc->xchan, aic_intr, scp);
 
 	err = pcm_register(dev, scp, 1, 0);
 	if (err) {

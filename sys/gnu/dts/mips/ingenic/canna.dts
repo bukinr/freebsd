@@ -36,6 +36,11 @@
 	pinctrl-0 = <&pins_msc0_pa>;
 };
 
+&i2s {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pins_i2s_data>;
+};
+
 &uart2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pins_uart2_dataplusflow>;
