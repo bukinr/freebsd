@@ -198,7 +198,7 @@ xdma_begin(xdma_channel_t *xchan)
 
 	xdma = xchan->xdma;
 
-	ret = XDMA_CHANNEL_CONTROL(xdma->dev, xchan, XDMA_CMD_START);
+	ret = XDMA_CHANNEL_CONTROL(xdma->dev, xchan, XDMA_CMD_BEGIN);
 
 	return (ret);
 }
@@ -211,7 +211,20 @@ xdma_terminate(xdma_channel_t *xchan)
 
 	xdma = xchan->xdma;
 
-	ret = XDMA_CHANNEL_CONTROL(xdma->dev, xchan, XDMA_CMD_STOP);
+	ret = XDMA_CHANNEL_CONTROL(xdma->dev, xchan, XDMA_CMD_TERMINATE);
+
+	return (ret);
+}
+
+int
+xdma_pause(xdma_channel_t *xchan)
+{
+	xdma_controller_t xdma;
+	int ret;
+
+	xdma = xchan->xdma;
+
+	ret = XDMA_CHANNEL_CONTROL(xdma->dev, xchan, XDMA_CMD_PAUSE);
 
 	return (ret);
 }

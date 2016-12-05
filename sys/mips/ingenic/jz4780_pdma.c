@@ -421,6 +421,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 			return (-1);
 		};
 
+		desc[i].dtc = (conf->block_len / max_width);
 		desc[i].dcm |= DCM_TIE;
 		
 #if 0
@@ -450,12 +451,15 @@ pdma_channel_control(device_t dev, xdma_channel_t *xchan, int cmd)
 	chan = (struct pdma_channel *)xchan->chan;
 
 	switch (cmd) {
-	case XDMA_CMD_START:
+	case XDMA_CMD_BEGIN:
 		chan_start(sc, chan);
 		break;
-	case XDMA_CMD_STOP:
+	case XDMA_CMD_TERMINATE:
 		chan_stop(sc, chan);
 		break;
+	case XDMA_CMD_PAUSE:
+		/* TODO: implement me */
+		return (-1);
 	}
 
 	return (0);

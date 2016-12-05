@@ -47,9 +47,10 @@ enum xdma_operation_type {
 };
 
 enum xdma_command {
-	XDMA_CMD_START,
-	XDMA_CMD_STOP,
+	XDMA_CMD_BEGIN,
 	XDMA_CMD_PAUSE,
+	XDMA_CMD_TERMINATE,
+	XDMA_CMD_TERMINATE_ALL,
 };
 
 struct xdma_controller {
@@ -86,15 +87,17 @@ typedef struct xdma_channel xdma_channel_t;
 xdma_controller_t xdma_fdt_get(device_t dev, const char *prop);
 xdma_channel_t * xdma_channel_alloc(xdma_controller_t xdma);
 int xdma_prepare(xdma_channel_t *, enum xdma_direction, uintptr_t, uintptr_t, int, int, int, int);
-int xdma_test(device_t dev);
-int xdma_control(xdma_controller_t xdma, int command);
-int xdma_callback(struct xdma_channel *xchan);
 int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz);
+
+/* Channel Control */
 int xdma_begin(xdma_channel_t *xchan);
+int xdma_pause(xdma_channel_t *xchan);
 int xdma_terminate(xdma_channel_t *xchan);
 
+/* Interrupt callback */
 int xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg, void **);
 int xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih);
+int xdma_callback(struct xdma_channel *xchan);
 
 struct xdma_intr_handler {
 	int	(*cb)(void *);
