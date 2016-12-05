@@ -377,8 +377,6 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->period_len = sndbuf_getblksz(ch->buffer);
 	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
 	conf->width = 2;
-	//conf->cb = aic_intr;
-	//conf->cb_user = scp;
 
 	KASSERT(fmt & AFMT_16BIT, ("16-bit audio supported only."));
 
@@ -408,6 +406,7 @@ aic_start(struct sc_pcminfo *scp)
 	int reg;
 
 	sc = scp->sc;
+	sc->pos = 0;
 
 	device_printf(scp->dev, "%s\n", __func__);
 
@@ -417,9 +416,7 @@ aic_start(struct sc_pcminfo *scp)
 
 	//WRITE4(sc, I2SDIV, 1);
 
-	/* Enable DMA */
-	//reg = READ4(sc, AICCR);
-	//reg |= (1 << 28); //pack16
+	setup_dma(scp);
 
 	reg = 0;
 	reg |= (1 << 19); // OSS 16 bit
@@ -436,21 +433,6 @@ aic_start(struct sc_pcminfo *scp)
 	//reg |= (1 << 3); //ETFS
 	WRITE4(sc, AICCR, reg);
 
-	setup_dma(scp);
-
-#if 0
-	if (sdma_configure(sc->sdma_channel, sc->conf) != 0) {
-		device_printf(sc->dev, "Can't configure sDMA\n");
-		return (-1);
-	}
-
-	/* Enable DMA interrupt */
-	reg = (SIER_TDMAE);
-	WRITE4(sc, SSI_SIER, reg);
-
-	sdma_start(sc->sdma_channel);
-#endif
-
 	return (0);
 }
 
@@ -458,26 +440,24 @@ static int
 aic_stop(struct sc_pcminfo *scp)
 {
 	struct aic_softc *sc;
-	//int reg;
+	int reg;
 
 	sc = scp->sc;
 
 	device_printf(scp->dev, "%s\n", __func__);
 
+	reg = READ4(sc, AICCR);
+	reg &= ~(AICCR_TDMS | AICCR_ERPL);
+	WRITE4(sc, AICCR, reg);
+
+	xdma_terminate(sc->xchan);
+
+	sc->pos = 0;
+
 	printf("z is %x\n", *(uint32_t *)z);
 	printf("AICSR %x\n", READ4(sc, AICSR));
 	printf("I2SSR %x\n", READ4(sc, I2SSR));
 	printf("I2SCR %x\n", READ4(sc, I2SCR));
-
-#if 0
-	reg = READ4(sc, SSI_SIER);
-	reg &= ~(SIER_TDMAE);
-	WRITE4(sc, SSI_SIER, reg);
-
-	sdma_stop(sc->sdma_channel);
-#endif
-
-	xdma_terminate(sc->xchan);
 
 	bzero(sc->buf_base, sc->dma_size);
 
@@ -784,10 +764,6 @@ aic_attach(device_t dev)
 	reg |= (8 << 16);	/* TFTH  Transmit FIFO threshold */
 	reg |= (7 << 24);	/* RFTH  Receive FIFO threshold */
 	WRITE4(sc, AICFR, reg);
-
-	//reg = READ4(sc, AICCR);
-	//reg |= (AICCR_CHANNEL_2);
-	//WRITE4(sc, AICCR, reg);
 
 	reg = READ4(sc, AICFR);
 	reg |= (AICFR_ENB);	/* Enable the controller. */

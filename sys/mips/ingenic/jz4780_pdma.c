@@ -117,7 +117,7 @@ pdma_intr(void *arg)
 
 	pending = READ4(sc, PDMA_DIRQP);
 
-	//printf(".");
+	printf(".");
 	//printf("%s: DIRQP %x\n", __func__, pending);
 
 	/* Ack all the channels */
@@ -237,11 +237,17 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 {
 	struct xdma_channel *xchan;
 	struct pdma_hwdesc *desc;
+	int reg;
 
 	xchan = chan->xchan;
 
+	reg = READ4(sc, PDMA_DMAC);
+	reg &= ~(DMAC_HLT | DMAC_AR);
+	reg |= (DMAC_DMAE);
+	WRITE4(sc, PDMA_DMAC, reg);
+
 	/* 8 byte descriptor */
-	//WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
+	WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
 
 	//printf("descriptor address %x phys %x\n",
 	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
@@ -269,7 +275,6 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 	mb();
 	WRITE4(sc, PDMA_DCS(chan->index), (DCS_DES8 | DCS_CTE));
 	mb();
-	mb();
 
 	return (0);
 }
@@ -277,9 +282,16 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 static int
 chan_stop(struct pdma_softc *sc, struct pdma_channel *chan)
 {
+	int reg;
 
-	//WRITE4(sc, PDMA_DCS(chan->index), 0);
-	pdma_channel_reset(sc, chan->index);
+	printf("%s: Stopping chan %d\n", __func__, chan->index);
+	mb();
+	WRITE4(sc, PDMA_DCS(chan->index), 0);
+	mb();
+
+	reg = READ4(sc, PDMA_DMAC);
+	reg &= ~(DMAC_HLT | DMAC_AR);
+	WRITE4(sc, PDMA_DMAC, reg);
 
 	return (0);
 }

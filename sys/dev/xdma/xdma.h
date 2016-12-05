@@ -81,8 +81,6 @@ struct xdma_channel_config {
 	int			period_len;	/* In bytes. */
 	int			hwdesc_num;
 	int			width;		/* In bytes. */
-	//int			(*cb)(void *);
-	//void			*cb_user;
 };
 
 xdma_controller_t xdma_get(device_t dev, const char *prop);
