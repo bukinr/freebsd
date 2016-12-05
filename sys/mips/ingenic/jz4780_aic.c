@@ -102,7 +102,7 @@ struct sc_chinfo {
 /* PCM device private data */
 struct sc_pcminfo {
 	device_t		dev;
-	uint32_t		(*ih)(struct sc_pcminfo *scp);
+	//uint32_t		(*ih)(struct sc_pcminfo *scp);
 	uint32_t		chnum;
 	struct sc_chinfo	chan[AIC_NCHANNELS];
 	struct aic_softc	*sc;
@@ -380,7 +380,7 @@ setup_dma(struct sc_pcminfo *scp)
 #endif
 
 	err = xdma_prepare(sc->xchan, XDMA_MEM_TO_DEV, sc->buf_base_phys, sc->aic_fifo_paddr,
-	    sndbuf_getblksz(ch->buffer), sndbuf_getblkcnt(ch->buffer), 2);
+	    sndbuf_getblksz(ch->buffer), sndbuf_getblkcnt(ch->buffer), 2, 2);
 	if (err != 0) {
 		printf("Cant configure virtual channel\n");
 		return (-1);
@@ -605,7 +605,7 @@ aic_attach(device_t dev)
 	/* Setup xDMA */
 
 	/* Get xDMA controller */
-	sc->xdma_tx = xdma_get(sc->dev, "tx");
+	sc->xdma_tx = xdma_fdt_get(sc->dev, "tx");
 	if (sc->xdma_tx == NULL) {
 		printf("Can't find xDMA controller.\n");
 		return (-1);
@@ -766,7 +766,7 @@ aic_attach(device_t dev)
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 
 	/* Setup interrupt handler. */
-	err = xdma_setup_intr(sc->xchan, aic_intr, scp);
+	err = xdma_setup_intr(sc->xchan, aic_intr, scp, &sc->ih);
 	if (err) {
 		device_printf(dev, "Can't setup xDMA interrupt handler.\n");
 		return (ENXIO);

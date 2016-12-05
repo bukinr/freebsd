@@ -97,7 +97,8 @@ xdma_channel_alloc(xdma_controller_t xdma)
 }
 
 int
-xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg)
+xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg,
+    void **ihandler)
 {
 	struct xdma_intr_handler *ih;
 	xdma_controller_t xdma;
@@ -105,10 +106,29 @@ xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg)
 	xdma = xchan->xdma;
 
 	ih = malloc(sizeof(struct xdma_intr_handler), M_XDMA, M_WAITOK | M_ZERO);
+	if (ih == NULL) {
+		return (-1);
+	}
+
 	ih->cb = cb;
 	ih->cb_user = arg;
 
 	TAILQ_INSERT_TAIL(&xchan->ie_handlers, ih, ih_next);
+
+	*ihandler = ih;
+
+	return (0);
+}
+
+int
+xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
+{
+
+	if (ih == NULL) {
+		return (-1);
+	}
+
+	TAILQ_REMOVE(&xchan->ie_handlers, ih, ih_next);
 
 	return (0);
 }
@@ -146,7 +166,7 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
 
 int
 xdma_prepare(xdma_channel_t *xchan, enum xdma_direction dir, uintptr_t src_addr,
-    uintptr_t dst_addr, int block_len, int block_num, int width)
+    uintptr_t dst_addr, int block_len, int block_num, int src_width, int dst_width)
 {
 	xdma_controller_t xdma;
 	xdma_config_t *conf;
@@ -155,12 +175,13 @@ xdma_prepare(xdma_channel_t *xchan, enum xdma_direction dir, uintptr_t src_addr,
 	xdma = xchan->xdma;
 
 	conf = &xchan->conf;
-	conf->dir = dir;
+	conf->direction = dir;
 	conf->src_addr = src_addr;
 	conf->dst_addr = dst_addr;
 	conf->block_len = block_len;
 	conf->block_num = block_num;
-	conf->width = width;
+	conf->src_width = src_width;
+	conf->dst_width = dst_width;
 
 	XDMA_LOCK();
 	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan);
@@ -222,8 +243,9 @@ xdma_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 	return (ret);
 }
 
+#ifdef FDT
 xdma_controller_t
-xdma_get(device_t dev, const char *prop)
+xdma_fdt_get(device_t dev, const char *prop)
 {
 	phandle_t parent, *cells;
 	xdma_controller_t xdma;
@@ -276,6 +298,7 @@ xdma_get(device_t dev, const char *prop)
 
 	return (xdma);
 }
+#endif
 
 #if 0
 static void

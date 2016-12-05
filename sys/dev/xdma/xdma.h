@@ -60,12 +60,13 @@ struct xdma_controller {
 typedef struct xdma_controller *xdma_controller_t;
 
 struct xdma_channel_config {
-	enum xdma_direction	dir;
+	enum xdma_direction	direction;
 	uintptr_t		src_addr;
 	uintptr_t		dst_addr;
 	int			block_len;	/* In bytes. */
 	int			block_num;
-	int			width;		/* In bytes. */
+	int			src_width;	/* In bytes. */
+	int			dst_width;	/* In bytes. */
 };
 
 typedef struct xdma_channel_config xdma_config_t;
@@ -82,16 +83,18 @@ struct xdma_channel {
 
 typedef struct xdma_channel xdma_channel_t;
 
-xdma_controller_t xdma_get(device_t dev, const char *prop);
+xdma_controller_t xdma_fdt_get(device_t dev, const char *prop);
 xdma_channel_t * xdma_channel_alloc(xdma_controller_t xdma);
-int xdma_prepare(xdma_channel_t *, enum xdma_direction, uintptr_t, uintptr_t, int, int, int);
+int xdma_prepare(xdma_channel_t *, enum xdma_direction, uintptr_t, uintptr_t, int, int, int, int);
 int xdma_test(device_t dev);
 int xdma_control(xdma_controller_t xdma, int command);
 int xdma_callback(struct xdma_channel *xchan);
 int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz);
 int xdma_begin(xdma_channel_t *xchan);
 int xdma_terminate(xdma_channel_t *xchan);
-int xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg);
+
+int xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg, void **);
+int xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih);
 
 struct xdma_intr_handler {
 	int	(*cb)(void *);

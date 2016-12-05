@@ -331,6 +331,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 	struct pdma_softc *sc;
 	xdma_controller_t xdma;
 	xdma_config_t *conf;
+	int max_width;
 	//int reg;
 	int ret;
 	int i;
@@ -360,32 +361,65 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 	    vtophys(xchan->descs), conf->block_num, data->tx);
 
 	for (i = 0; i < conf->block_num; i++) {
-		if (conf->dir == XDMA_MEM_TO_DEV) {
+		if (conf->direction == XDMA_MEM_TO_DEV) {
 			desc[i].dsa = conf->src_addr + (i * conf->block_len);
 			desc[i].dta = conf->dst_addr;
 			desc[i].drt = data->tx;
 			desc[i].dcm = DCM_SAI;
-		} else if (conf->dir == XDMA_DEV_TO_MEM) {
+		} else if (conf->direction == XDMA_DEV_TO_MEM) {
 			desc[i].dsa = conf->src_addr;
 			desc[i].dta = conf->dst_addr + (i * conf->block_len);
 			desc[i].drt = data->rx;
 			desc[i].dcm = DCM_DAI;
-		} else if (conf->dir == XDMA_MEM_TO_MEM) {
+		} else if (conf->direction == XDMA_MEM_TO_MEM) {
 			desc[i].dsa = conf->src_addr + (i * conf->block_len);
 			desc[i].dta = conf->dst_addr + (i * conf->block_len);
 			desc[i].drt = DRT_AUTO;
 			desc[i].dcm = DCM_SAI | DCM_DAI;
 		}
 
-		desc[i].dtc = (conf->block_len / conf->width);
-
-		if (conf->width == 1) {
-			desc[i].dcm |= DCM_TSZ_1 | DCM_DP_1 | DCM_SP_1;
-		} else if (conf->width == 2) {
-			desc[i].dcm |= DCM_TSZ_2 | DCM_DP_2 | DCM_SP_2;
-		} else if (conf->width == 4) {
-			desc[i].dcm |= DCM_TSZ_4 | DCM_DP_4 | DCM_SP_4;
+		switch (conf->src_width) {
+		case 1:
+			desc[i].dcm |= DCM_SP_1;
+			break;
+		case 2:
+			desc[i].dcm |= DCM_SP_2;
+			break;
+		case 4:
+			desc[i].dcm |= DCM_SP_4;
+			break;
+		default:
+			return (-1);
 		}
+
+		switch (conf->dst_width) {
+		case 1:
+			desc[i].dcm |= DCM_DP_1;
+			break;
+		case 2:
+			desc[i].dcm |= DCM_DP_2;
+			break;
+		case 4:
+			desc[i].dcm |= DCM_DP_4;
+			break;
+		default:
+			return (-1);
+		}
+
+		max_width = max(conf->src_width, conf->dst_width);
+		switch (max_width) {
+		case 1:
+			desc[i].dcm |= DCM_TSZ_1;
+			break;
+		case 2:
+			desc[i].dcm |= DCM_TSZ_2;
+			break;
+		case 4:
+			desc[i].dcm |= DCM_TSZ_4;
+			break;
+		default:
+			return (-1);
+		};
 
 		desc[i].dcm |= DCM_TIE;
 		
