@@ -108,6 +108,7 @@ pdma_intr(void *arg)
 {
 	struct pdma_channel *chan;
 	struct pdma_softc *sc;
+	xdma_channel_t *xchan;
 	xdma_config_t *conf;
 	int pending;
 	int i;
@@ -125,12 +126,14 @@ pdma_intr(void *arg)
 	for (i = 0; i < PDMA_NCHANNELS; i++) {
 		if (pending & (1 << i)) {
 			chan = &pdma_channels[i];
-			conf = &chan->xchan->conf;
+			xchan = chan->xchan;
+			conf = &xchan->conf;
 
 			//printf("dsa %x\n", READ4(sc, PDMA_DSA(chan->index)));
 
 			/* Disable channel */
 			WRITE4(sc, PDMA_DCS(chan->index), 0);
+
 			/* Enable again */
 			chan->cur_desc = (chan->cur_desc + 1) % conf->block_num;
 			chan_start(sc, chan);
