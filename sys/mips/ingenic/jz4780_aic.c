@@ -377,8 +377,8 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->period_len = sndbuf_getblksz(ch->buffer);
 	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
 	conf->width = 2;
-	conf->cb = aic_intr;
-	conf->cb_user = scp;
+	//conf->cb = aic_intr;
+	//conf->cb_user = scp;
 
 	KASSERT(fmt & AFMT_16BIT, ("16-bit audio supported only."));
 
@@ -476,6 +476,8 @@ aic_stop(struct sc_pcminfo *scp)
 
 	sdma_stop(sc->sdma_channel);
 #endif
+
+	xdma_terminate(sc->xchan);
 
 	bzero(sc->buf_base, sc->dma_size);
 
@@ -771,7 +773,7 @@ aic_attach(device_t dev)
 	reg = READ4(sc, AICFR);
 	reg = 0;
 	int internal_codec;
-	internal_codec = 0;
+	internal_codec = 1;
 	if (internal_codec) {
 		reg |= (AICFR_ICDC);	/* Internal CODEC. */
 	} else {
@@ -796,7 +798,11 @@ aic_attach(device_t dev)
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 
 	/* Setup interrupt handler. */
-	xdma_setup_intr(sc->xchan, aic_intr, scp);
+	err = xdma_setup_intr(sc->xchan, aic_intr, scp);
+	if (err) {
+		device_printf(dev, "Can't setup xDMA interrupt handler.\n");
+		return (ENXIO);
+	}
 
 	err = pcm_register(dev, scp, 1, 0);
 	if (err) {

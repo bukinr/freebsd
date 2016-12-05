@@ -176,7 +176,7 @@ codec_attach(device_t dev)
 	//DELAY(10000);
 	//WRITE4(sc, CODEC_RGADW, 0);
 
-#if 1
+#if 0
 	int i;
 	for (i = 0; i < 19; i++) {
 		printf("write reg %x val %x\n", jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
@@ -197,8 +197,8 @@ codec_attach(device_t dev)
 	codec_write(sc, CR_HP, 0);
 
 	DELAY(10000);
-	codec_write(sc, GCR_DACL, 25);
-	codec_write(sc, GCR_DACR, 25);
+	//codec_write(sc, GCR_DACL, 25);
+	//codec_write(sc, GCR_DACR, 25);
 	DELAY(10000);
 
 	printf("codec SR %x\n", codec_read(sc, SR));

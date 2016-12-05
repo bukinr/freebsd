@@ -41,14 +41,15 @@ enum xdma_direction {
 };
 
 enum xdma_operation_type {
-	XDMA_CYCLIC,
-	XDMA_SG,
 	XDMA_MEMCPY,
+	XDMA_SG,
+	XDMA_CYCLIC,
 };
 
 enum xdma_command {
 	XDMA_CMD_START,
 	XDMA_CMD_STOP,
+	XDMA_CMD_PAUSE,
 };
 
 struct xdma_controller {
@@ -80,8 +81,8 @@ struct xdma_channel_config {
 	int			period_len;	/* In bytes. */
 	int			hwdesc_num;
 	int			width;		/* In bytes. */
-	int			(*cb)(void *);
-	void			*cb_user;
+	//int			(*cb)(void *);
+	//void			*cb_user;
 };
 
 xdma_controller_t xdma_get(device_t dev, const char *prop);
@@ -92,6 +93,7 @@ int xdma_control(xdma_controller_t xdma, int command);
 int xdma_callback(struct xdma_channel *xchan);
 int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz);
 int xdma_begin(xdma_channel_t *xchan);
+int xdma_terminate(xdma_channel_t *xchan);
 int xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg);
 
 struct xdma_intr_handler {

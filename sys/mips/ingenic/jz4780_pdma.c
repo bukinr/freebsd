@@ -218,6 +218,21 @@ pdma_detach(device_t dev)
 }
 
 static int
+pdma_channel_reset(struct pdma_softc *sc, uint32_t idx)
+{
+
+	WRITE4(sc, PDMA_DCS(idx), 0);
+	WRITE4(sc, PDMA_DTC(idx), 0);
+	WRITE4(sc, PDMA_DRT(idx), 0);
+	WRITE4(sc, PDMA_DSA(idx), 0);
+	WRITE4(sc, PDMA_DTA(idx), 0);
+	WRITE4(sc, PDMA_DSD(idx), 0);
+	WRITE4(sc, PDMA_DCM(idx), 0);
+
+	return (0);
+}
+
+static int
 chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 {
 	struct xdma_channel *xchan;
@@ -260,16 +275,11 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 }
 
 static int
-pdma_channel_reset(struct pdma_softc *sc, uint32_t idx)
+chan_stop(struct pdma_softc *sc, struct pdma_channel *chan)
 {
 
-	WRITE4(sc, PDMA_DCS(idx), 0);
-	WRITE4(sc, PDMA_DTC(idx), 0);
-	WRITE4(sc, PDMA_DRT(idx), 0);
-	WRITE4(sc, PDMA_DSA(idx), 0);
-	WRITE4(sc, PDMA_DTA(idx), 0);
-	WRITE4(sc, PDMA_DSD(idx), 0);
-	WRITE4(sc, PDMA_DCM(idx), 0);
+	//WRITE4(sc, PDMA_DCS(chan->index), 0);
+	pdma_channel_reset(sc, chan->index);
 
 	return (0);
 }
@@ -381,7 +391,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 }
 
 static int
-pdma_channel_begin(device_t dev, xdma_channel_t *xchan)
+pdma_channel_control(device_t dev, xdma_channel_t *xchan, int cmd)
 {
 	struct pdma_channel *chan;
 	struct pdma_softc *sc;
@@ -390,7 +400,14 @@ pdma_channel_begin(device_t dev, xdma_channel_t *xchan)
 
 	chan = (struct pdma_channel *)xchan->chan;
 
-	chan_start(sc, chan);
+	switch (cmd) {
+	case XDMA_CMD_START:
+		chan_start(sc, chan);
+		break;
+	case XDMA_CMD_STOP:
+		chan_stop(sc, chan);
+		break;
+	}
 
 	return (0);
 }
@@ -423,7 +440,7 @@ static device_method_t pdma_methods[] = {
 	/* xDMA Interface */
 	DEVMETHOD(xdma_channel_alloc,		pdma_channel_alloc),
 	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
-	DEVMETHOD(xdma_channel_begin,		pdma_channel_begin),
+	DEVMETHOD(xdma_channel_control,		pdma_channel_control),
 	DEVMETHOD(xdma_md_data,			pdma_md_data),
 
 	DEVMETHOD_END

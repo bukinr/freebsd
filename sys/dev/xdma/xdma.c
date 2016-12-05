@@ -156,8 +156,8 @@ xdma_prepare(xdma_channel_t *xchan, struct xdma_channel_config *conf)
 
 	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan, conf);
 	if (ret == 0) {
-		xchan->cb = conf->cb;
-		xchan->cb_user = conf->cb_user;
+		//xchan->cb = conf->cb;
+		//xchan->cb_user = conf->cb_user;
 
 		XDMA_UNLOCK();
 		return (0);
@@ -175,7 +175,20 @@ xdma_begin(xdma_channel_t *xchan)
 
 	xdma = xchan->xdma;
 
-	ret = XDMA_CHANNEL_BEGIN(xdma->dev, xchan);
+	ret = XDMA_CHANNEL_CONTROL(xdma->dev, xchan, XDMA_CMD_START);
+
+	return (ret);
+}
+
+int
+xdma_terminate(xdma_channel_t *xchan)
+{
+	xdma_controller_t xdma;
+	int ret;
+
+	xdma = xchan->xdma;
+
+	ret = XDMA_CHANNEL_CONTROL(xdma->dev, xchan, XDMA_CMD_STOP);
 
 	return (ret);
 }
