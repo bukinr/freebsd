@@ -82,7 +82,6 @@ struct pdma_data {
 };
 
 struct pdma_channel {
-	struct xdma_config_t	*conf;
 	xdma_channel_t		*xchan;
 	struct pdma_data	data;
 	int			cur_desc;
