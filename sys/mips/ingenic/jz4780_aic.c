@@ -379,8 +379,14 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->dst_start = (uint32_t)z;
 #endif
 
-	err = xdma_prepare(sc->xchan, XDMA_MEM_TO_DEV, sc->buf_base_phys, sc->aic_fifo_paddr,
-	    sndbuf_getblksz(ch->buffer), sndbuf_getblkcnt(ch->buffer), 2, 2);
+	err = xdma_prepare(sc->xchan,
+	    XDMA_MEM_TO_DEV,			/* direction */
+	    sc->buf_base_phys,			/* src addr */
+	    sc->aic_fifo_paddr,			/* dst addr */
+	    sndbuf_getblksz(ch->buffer),	/* block len */
+	    sndbuf_getblkcnt(ch->buffer),	/* block num */
+	    2,					/* src port width */
+	    2);					/* dst port width */
 	if (err != 0) {
 		printf("Cant configure virtual channel\n");
 		return (-1);
