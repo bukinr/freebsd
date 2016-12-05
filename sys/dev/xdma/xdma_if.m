@@ -47,15 +47,10 @@ CODE {
 	#include <sys/bus.h>
 
 	static int
-	xdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_channel_config *conf)
+	xdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 	{
-		device_t pdev;
 
-		pdev = device_get_parent(dev);
-		if (pdev == NULL)
-			return (ENXIO);
-
-		return (XDMA_CHANNEL_CONFIGURE(pdev, xchan, conf));
+		return (-1);
 	}
 }
 
@@ -63,9 +58,8 @@ CODE {
 # Configure a channel
 #
 METHOD int channel_configure {
-	device_t dev;
-	struct xdma_channel *xchan;
-	struct xdma_channel_config *conf;
+	device_t		dev;
+	struct xdma_channel	*xchan;
 } DEFAULT xdma_channel_configure;
 
 METHOD int md_data {

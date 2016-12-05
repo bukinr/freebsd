@@ -82,7 +82,7 @@ struct pdma_data {
 };
 
 struct pdma_channel {
-	struct xdma_channel_config *conf;
+	struct xdma_config_t	*conf;
 	xdma_channel_t		*xchan;
 	struct pdma_data	data;
 	int			cur_desc;
@@ -107,9 +107,9 @@ static int chan_start(struct pdma_softc *sc, struct pdma_channel *chan);
 static void
 pdma_intr(void *arg)
 {
-	struct xdma_channel_config *conf;
 	struct pdma_channel *chan;
 	struct pdma_softc *sc;
+	xdma_config_t *conf;
 	int pending;
 	int i;
 
@@ -126,14 +126,14 @@ pdma_intr(void *arg)
 	for (i = 0; i < PDMA_NCHANNELS; i++) {
 		if (pending & (1 << i)) {
 			chan = &pdma_channels[i];
-			conf = chan->conf;
+			conf = &chan->xchan->conf;
 
 			//printf("dsa %x\n", READ4(sc, PDMA_DSA(chan->index)));
 
 			/* Disable channel */
 			WRITE4(sc, PDMA_DCS(chan->index), 0);
 			/* Enable again */
-			chan->cur_desc = (chan->cur_desc + 1) % conf->hwdesc_num;
+			chan->cur_desc = (chan->cur_desc + 1) % conf->block_num;
 			chan_start(sc, chan);
 
 			xdma_callback(chan->xchan);
@@ -321,31 +321,32 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 }
 
 static int
-pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_channel_config *conf)
+pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 {
 	struct pdma_channel *chan;
 	struct pdma_hwdesc *desc;
 	struct pdma_data *data;
 	struct pdma_softc *sc;
 	xdma_controller_t xdma;
+	xdma_config_t *conf;
 	//int reg;
 	int ret;
 	int i;
 
 	sc = device_get_softc(dev);
 
-	printf("%s: desc num %d, period_len %d\n", __func__,
-	    conf->hwdesc_num, conf->period_len);
+	conf = &xchan->conf;
+	printf("%s: block len %d, block num %d\n", __func__,
+	    conf->block_len, conf->block_num);
 
 	chan = (struct pdma_channel *)xchan->chan;
-	chan->conf = conf;
 
 	xdma = xchan->xdma;
 	data = (struct pdma_data *)xdma->data;
 
 	pdma_channel_reset(sc, chan->index);
 
-	ret = xdma_desc_alloc(xchan, conf->hwdesc_num, sizeof(struct pdma_hwdesc));
+	ret = xdma_desc_alloc(xchan, conf->block_num, sizeof(struct pdma_hwdesc));
 	if (ret != 0) {
 		printf("Can't allocate descriptors");
 		return (-1);
@@ -353,28 +354,28 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 
 	desc = (struct pdma_hwdesc *)xchan->descs;
 
-	printf("xchan->descs is %x, hwdesc_num %d, data->tx %d\n",
-	    vtophys(xchan->descs), conf->hwdesc_num, data->tx);
+	printf("xchan->descs is %x, block_num %d, data->tx %d\n",
+	    vtophys(xchan->descs), conf->block_num, data->tx);
 
-	for (i = 0; i < conf->hwdesc_num; i++) {
-		if (conf->direction == XDMA_MEM_TO_DEV) {
-			desc[i].dsa = conf->src_addr + (i * conf->period_len);
+	for (i = 0; i < conf->block_num; i++) {
+		if (conf->dir == XDMA_MEM_TO_DEV) {
+			desc[i].dsa = conf->src_addr + (i * conf->block_len);
 			desc[i].dta = conf->dst_addr;
 			desc[i].drt = data->tx;
 			desc[i].dcm = DCM_SAI;
-		} else if (conf->direction == XDMA_DEV_TO_MEM) {
+		} else if (conf->dir == XDMA_DEV_TO_MEM) {
 			desc[i].dsa = conf->src_addr;
-			desc[i].dta = conf->dst_addr + (i * conf->period_len);
+			desc[i].dta = conf->dst_addr + (i * conf->block_len);
 			desc[i].drt = data->rx;
 			desc[i].dcm = DCM_DAI;
-		} else if (conf->direction == XDMA_MEM_TO_MEM) {
-			desc[i].dsa = conf->src_addr + (i * conf->period_len);
-			desc[i].dta = conf->dst_addr + (i * conf->period_len);
+		} else if (conf->dir == XDMA_MEM_TO_MEM) {
+			desc[i].dsa = conf->src_addr + (i * conf->block_len);
+			desc[i].dta = conf->dst_addr + (i * conf->block_len);
 			desc[i].drt = DRT_AUTO;
 			desc[i].dcm = DCM_SAI | DCM_DAI;
 		}
 
-		desc[i].dtc = (conf->period_len / conf->width);
+		desc[i].dtc = (conf->block_len / conf->width);
 
 		if (conf->width == 1) {
 			desc[i].dcm |= DCM_TSZ_1 | DCM_DP_1 | DCM_SP_1;
@@ -387,7 +388,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan, struct xdma_cha
 		desc[i].dcm |= DCM_TIE;
 		
 #if 0
-		if (i != (conf->hwdesc_num - 1)) {
+		if (i != (conf->block_num - 1)) {
 			desc[i].dcm |= DCM_LINK;
 			desc[i].dtc |= (((i + 1) * sizeof(struct pdma_hwdesc)) >> 4) << 24;
 		}

@@ -145,26 +145,28 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
 }
 
 int
-xdma_prepare(xdma_channel_t *xchan, struct xdma_channel_config *conf)
+xdma_prepare(xdma_channel_t *xchan, enum xdma_direction dir, uintptr_t src_addr,
+    uintptr_t dst_addr, int block_len, int block_num, int width)
 {
 	xdma_controller_t xdma;
+	xdma_config_t *conf;
 	int ret;
 
 	xdma = xchan->xdma;
 
+	conf = &xchan->conf;
+	conf->dir = dir;
+	conf->src_addr = src_addr;
+	conf->dst_addr = dst_addr;
+	conf->block_len = block_len;
+	conf->block_num = block_num;
+	conf->width = width;
+
 	XDMA_LOCK();
-
-	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan, conf);
-	if (ret == 0) {
-		//xchan->cb = conf->cb;
-		//xchan->cb_user = conf->cb_user;
-
-		XDMA_UNLOCK();
-		return (0);
-	}
-
+	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan);
 	XDMA_UNLOCK();
-	return (-1);
+
+	return (ret);
 }
 
 int
@@ -273,20 +275,6 @@ xdma_get(device_t dev, const char *prop)
 	xdma_md_data(xdma, cells, ncells);
 
 	return (xdma);
-}
-
-int
-xdma_control(xdma_controller_t xdma, int command)
-{
-
-	switch(command) {
-	case XDMA_CMD_START:
-		break;
-	default:
-		break;
-	}
-
-	return (0);
 }
 
 #if 0

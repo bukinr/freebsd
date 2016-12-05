@@ -75,13 +75,12 @@ struct aic_softc {
 	bus_dmamap_t		dma_map;
 	bus_addr_t		buf_base_phys;
 	uint32_t		*buf_base;
-	uintptr_t		aic_paddr;
+	uintptr_t		aic_fifo_paddr;
 	int			dma_size;
 	clk_t			clk_aic;
 	clk_t			clk_i2s;
 	struct aic_rate		*sr;
 	void			*ih;
-	struct xdma_channel_config conf;
 	struct xdma_channel	*xchan;
 	xdma_controller_t	xdma_tx;
 };
@@ -333,8 +332,9 @@ aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 static int
 aic_intr(void *arg)
 {
-	struct xdma_channel_config *conf;
 	struct sc_pcminfo *scp;
+	xdma_channel_t *xchan;
+	xdma_config_t *conf;
 	struct sc_chinfo *ch;
 	struct aic_softc *sc;
 	int bufsize;
@@ -342,11 +342,13 @@ aic_intr(void *arg)
 	scp = arg;
 	sc = scp->sc;
 	ch = &scp->chan[0];
-	conf = &sc->conf;
+
+	xchan = sc->xchan;
+	conf = &xchan->conf;
 
 	bufsize = sndbuf_getsize(ch->buffer);
 
-	sc->pos += conf->period_len;
+	sc->pos += conf->block_len;
 	if (sc->pos >= bufsize)
 		sc->pos -= bufsize;
 
@@ -359,7 +361,6 @@ aic_intr(void *arg)
 static int
 setup_dma(struct sc_pcminfo *scp)
 {
-	struct xdma_channel_config *conf;
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
 	int fmt;
@@ -370,14 +371,6 @@ setup_dma(struct sc_pcminfo *scp)
 
 	fmt = sndbuf_getfmt(ch->buffer);
 
-	conf = &sc->conf;
-	conf->direction = XDMA_MEM_TO_DEV;
-	conf->src_addr = sc->buf_base_phys;
-	conf->dst_addr = (sc->aic_paddr + AICDR);
-	conf->period_len = sndbuf_getblksz(ch->buffer);
-	conf->hwdesc_num = sndbuf_getblkcnt(ch->buffer);
-	conf->width = 2;
-
 	KASSERT(fmt & AFMT_16BIT, ("16-bit audio supported only."));
 
 #if 0
@@ -386,9 +379,8 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->dst_start = (uint32_t)z;
 #endif
 
-	printf("dst_addr is %x\n", conf->dst_addr);
-
-	err = xdma_prepare(sc->xchan, conf);
+	err = xdma_prepare(sc->xchan, XDMA_MEM_TO_DEV, sc->buf_base_phys, sc->aic_fifo_paddr,
+	    sndbuf_getblksz(ch->buffer), sndbuf_getblkcnt(ch->buffer), 2);
 	if (err != 0) {
 		printf("Cant configure virtual channel\n");
 		return (-1);
@@ -644,7 +636,7 @@ aic_attach(device_t dev)
 	/* Memory interface */
 	sc->bst = rman_get_bustag(sc->res[0]);
 	sc->bsh = rman_get_bushandle(sc->res[0]);
-	sc->aic_paddr = rman_get_start(sc->res[0]);
+	sc->aic_fifo_paddr = rman_get_start(sc->res[0]) + AICDR;
 
 #if 0
 	/* Setup interrupt handler */
