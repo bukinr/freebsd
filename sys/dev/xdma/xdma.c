@@ -83,17 +83,16 @@ xdma_channel_alloc(xdma_controller_t xdma)
 
 	/* Request a real channel from hardware driver. */
 	ret = XDMA_CHANNEL_ALLOC(xdma->dev, xchan);
-	if (ret == 0) {
-		xchan->xdma = xdma;
-
+	if (ret != 0) {
 		XDMA_UNLOCK();
-		return (xchan);
+		free(xchan, M_XDMA);
+		return (NULL);
 	}
 
+	xchan->xdma = xdma;
 	XDMA_UNLOCK();
 
-	free(xchan, M_XDMA);
-	return (NULL);
+	return (xchan);
 }
 
 int
