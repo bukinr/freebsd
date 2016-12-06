@@ -58,7 +58,8 @@ enum xdma_desc_alloc_method {
 };
 
 struct xdma_controller {
-	device_t dev;		/* A real DMA device_t. */
+	device_t dev;		/* DMA consumer device_t. */
+	device_t dma_dev;	/* A real DMA device_t. */
 	void *data;		/* MD part */
 };
 
