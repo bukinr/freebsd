@@ -310,11 +310,6 @@ xdma_callback(xdma_channel_t *xchan)
 {
 	struct xdma_intr_handler *entry;
 
-	//printf("%s: xchan %x\n", __func__, (uint32_t)xchan);
-	//if (xchan->cb != NULL) {
-	//	xchan->cb(xchan->cb_user);
-	//}
-
 	TAILQ_FOREACH(entry, &xchan->ie_handlers, ih_next) {
 		entry->cb(entry->cb_user);
 	}
@@ -333,6 +328,7 @@ xdma_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 }
 
 #ifdef FDT
+
 xdma_controller_t
 xdma_fdt_get(device_t dev, const char *prop)
 {
@@ -345,49 +341,60 @@ xdma_fdt_get(device_t dev, const char *prop)
 	int idx;
 
 	node = ofw_bus_get_node(dev);
+	if (node <= 0) {
+		device_printf(dev,
+		    "%s called on not ofw based device\n", __func__);
+	}
 
-	error = ofw_bus_parse_xref_list_get_length(node, "dmas", "#dma-cells", &ndmas);
+	error = ofw_bus_parse_xref_list_get_length(node,
+	    "dmas", "#dma-cells", &ndmas);
 	if (error) {
-		printf("Failed\n");
+		device_printf(dev,
+		    "%s can't get dmas list\n", __func__);
 		return (NULL);
 	}
 
-	printf("ndmas %d\n", ndmas);
 	if (ndmas == 0) {
-		printf("Failed\n");
+		device_printf(dev,
+		    "%s dmas list is empty\n", __func__);
 		return (NULL);
 	}
 
 	error = ofw_bus_find_string_index(node, "dma-names", prop, &idx);
 	if (error != 0) {
-		printf("Failed\n");
+		device_printf(dev,
+		    "%s can't find string index\n", __func__);
 		return (NULL);
 	}
 
-	printf("dma idx %d\n", idx);
-	printf("get dmas \n");
-
-	error = ofw_bus_parse_xref_list_alloc(node, "dmas", "#dma-cells", idx,
-	    &parent, &ncells, &cells);
+	error = ofw_bus_parse_xref_list_alloc(node, "dmas", "#dma-cells",
+	    idx, &parent, &ncells, &cells);
 	if (error != 0) {
-		printf("Cant get dma\n");
+		device_printf(dev,
+		    "%s can't get dma device xref\n", __func__);
 		return (NULL);
 	}
 
-	printf("get dev \n");
 	dev = OF_device_from_xref(parent);
 	if (dev == NULL) {
-		printf("failed to get dma dev\n");
+		device_printf(dev,
+		    "%s can't get dma device\n", __func__);
 		return (NULL);
 	}
 
 	xdma = malloc(sizeof(xdma_controller_t), M_XDMA, M_WAITOK | M_ZERO);
+	if (xdma == NULL) {
+		device_printf(dev,
+		    "%s can't allocate memory for xdma\n", __func__);
+		return (NULL);
+	}
 	xdma->dev = dev;
 
 	xdma_md_data(xdma, cells, ncells);
 
 	return (xdma);
 }
+
 #endif
 
 #if 0
