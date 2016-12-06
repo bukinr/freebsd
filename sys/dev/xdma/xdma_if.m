@@ -74,6 +74,11 @@ METHOD int channel_alloc {
 	struct xdma_channel *xchan;
 };
 
+METHOD int channel_free {
+	device_t dev;
+	struct xdma_channel *xchan;
+};
+
 METHOD int channel_control {
 	device_t dev;
 	struct xdma_channel *xchan;

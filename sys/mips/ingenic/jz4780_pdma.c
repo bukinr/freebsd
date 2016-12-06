@@ -299,10 +299,25 @@ chan_stop(struct pdma_softc *sc, struct pdma_channel *chan)
 }
 
 static int
+pdma_channel_free(device_t dev, struct xdma_channel *xchan)
+{
+	struct pdma_channel *chan;
+	struct pdma_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	chan = (struct pdma_channel *)xchan->chan;
+	chan->used = 0;
+
+	return (0);
+}
+
+static int
 pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 {
 	struct pdma_channel *chan;
 	struct pdma_softc *sc;
+	int ret;
 	int i;
 
 	sc = device_get_softc(dev);
@@ -314,6 +329,12 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 			xchan->chan = (void *)chan;
 			chan->used = 1;
 			chan->index = i;
+
+			ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc));
+			if (ret != 0) {
+				printf("Can't allocate descriptors");
+				return (-1);
+			}
 
 			return (0);
 		}
@@ -333,7 +354,6 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 	xdma_config_t *conf;
 	int max_width;
 	//int reg;
-	int ret;
 	int i;
 
 	sc = device_get_softc(dev);
@@ -348,12 +368,6 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 	data = (struct pdma_data *)xdma->data;
 
 	pdma_channel_reset(sc, chan->index);
-
-	ret = xdma_desc_alloc(xchan, conf->block_num, sizeof(struct pdma_hwdesc));
-	if (ret != 0) {
-		printf("Can't allocate descriptors");
-		return (-1);
-	}
 
 	desc = (struct pdma_hwdesc *)xchan->descs;
 
@@ -492,6 +506,7 @@ static device_method_t pdma_methods[] = {
 
 	/* xDMA Interface */
 	DEVMETHOD(xdma_channel_alloc,		pdma_channel_alloc),
+	DEVMETHOD(xdma_channel_free,		pdma_channel_free),
 	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
 	DEVMETHOD(xdma_channel_control,		pdma_channel_control),
 	DEVMETHOD(xdma_md_data,			pdma_md_data),

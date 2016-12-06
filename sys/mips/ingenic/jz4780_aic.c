@@ -379,7 +379,8 @@ setup_dma(struct sc_pcminfo *scp)
 	conf->dst_start = (uint32_t)z;
 #endif
 
-	err = xdma_prepare(sc->xchan,
+	/* Alloc xDMA virtual channel. */
+	sc->xchan = xdma_channel_alloc(sc->xdma_tx,
 	    XDMA_MEM_TO_DEV,			/* direction */
 	    sc->buf_base_phys,			/* src addr */
 	    sc->aic_fifo_paddr,			/* dst addr */
@@ -387,6 +388,20 @@ setup_dma(struct sc_pcminfo *scp)
 	    sndbuf_getblkcnt(ch->buffer),	/* block num */
 	    2,					/* src port width */
 	    2);					/* dst port width */
+
+	if (sc->xchan == NULL) {
+		printf("Can't alloc virtual DMA channel.\n");
+		return (-1);
+	}
+
+	/* Setup interrupt handler. */
+	err = xdma_setup_intr(sc->xchan, aic_intr, scp, &sc->ih);
+	if (err) {
+		device_printf(sc->dev, "Can't setup xDMA interrupt handler.\n");
+		return (ENXIO);
+	}
+
+	err = xdma_prepare(sc->xchan);
 	if (err != 0) {
 		printf("Cant configure virtual channel\n");
 		return (-1);
@@ -449,6 +464,7 @@ aic_stop(struct sc_pcminfo *scp)
 	WRITE4(sc, AICCR, reg);
 
 	xdma_terminate(sc->xchan);
+	xdma_channel_free(sc->xchan);
 
 	sc->pos = 0;
 
@@ -608,19 +624,10 @@ aic_attach(device_t dev)
 	sc->pos = 0;
 	//sc->conf = malloc(sizeof(struct sdma_conf), M_DEVBUF, M_WAITOK | M_ZERO);
 
-	/* Setup xDMA */
-
 	/* Get xDMA controller */
 	sc->xdma_tx = xdma_fdt_get(sc->dev, "tx");
 	if (sc->xdma_tx == NULL) {
 		printf("Can't find xDMA controller.\n");
-		return (-1);
-	}
-
-	/* Alloc xDMA virtual channel. */
-	sc->xchan = xdma_channel_alloc(sc->xdma_tx);
-	if (sc->xchan == NULL) {
-		printf("Can't alloc virtual DMA channel.\n");
 		return (-1);
 	}
 
@@ -770,13 +777,6 @@ aic_attach(device_t dev)
 	printf("AICFR %x\n", READ4(sc, AICFR));
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
-
-	/* Setup interrupt handler. */
-	err = xdma_setup_intr(sc->xchan, aic_intr, scp, &sc->ih);
-	if (err) {
-		device_printf(dev, "Can't setup xDMA interrupt handler.\n");
-		return (ENXIO);
-	}
 
 	err = pcm_register(dev, scp, 1, 0);
 	if (err) {

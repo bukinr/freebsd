@@ -75,19 +75,25 @@ typedef struct xdma_channel_config xdma_config_t;
 struct xdma_channel {
 	xdma_controller_t		xdma;
 	xdma_config_t			conf;
+	uint8_t				flags;
+#define	XCHAN_FLAG_CONFIGURED		(1 << 0)
 	void				*chan;
 	void				*descs;
+	uint32_t			descs_size;
 	uintptr_t			descs_phys;
-	uint32_t			ndescs;
 	TAILQ_HEAD(, xdma_intr_handler)	ie_handlers; /* Interrupt handlers. */
 };
 
 typedef struct xdma_channel xdma_channel_t;
 
 xdma_controller_t xdma_fdt_get(device_t dev, const char *prop);
-xdma_channel_t * xdma_channel_alloc(xdma_controller_t xdma);
-int xdma_prepare(xdma_channel_t *, enum xdma_direction, uintptr_t, uintptr_t, int, int, int, int);
-int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz);
+
+xdma_channel_t * xdma_channel_alloc(xdma_controller_t xdma, enum xdma_direction,
+    uintptr_t, uintptr_t, int, int, int, int);
+int xdma_channel_free(xdma_channel_t *xchan);
+int xdma_prepare(xdma_channel_t *);
+
+int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz);
 
 /* Channel Control */
 int xdma_begin(xdma_channel_t *xchan);

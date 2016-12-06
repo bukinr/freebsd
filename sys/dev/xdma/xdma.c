@@ -68,19 +68,38 @@ static struct mtx xdma_mtx;
 #define	XDMA_UNLOCK()	mtx_unlock(&xdma_mtx)
 
 /*
- * Allocate virtual channel.
+ * Allocate virtual xDMA channel.
  */
 xdma_channel_t *
-xdma_channel_alloc(xdma_controller_t xdma)
+xdma_channel_alloc(xdma_controller_t xdma, enum xdma_direction dir,
+    uintptr_t src_addr, uintptr_t dst_addr, int block_len, int block_num,
+    int src_width, int dst_width)
 {
 	xdma_channel_t *xchan;
+	xdma_config_t *conf;
 	int ret;
 
 	xchan = malloc(sizeof(xdma_channel_t), M_XDMA, M_WAITOK | M_ZERO);
+	if (xchan == NULL) {
+		printf("Cant alloc channel\n");
+		return (NULL);
+	}
+	xchan->xdma = xdma;
+
+	conf = &xchan->conf;
+	conf->direction = dir;
+	conf->src_addr = src_addr;
+	conf->dst_addr = dst_addr;
+	conf->block_len = block_len;
+	conf->block_num = block_num;
+	conf->src_width = src_width;
+	conf->dst_width = dst_width;
+
 	TAILQ_INIT(&xchan->ie_handlers);
 
-	XDMA_LOCK();
+	xchan->flags |= XCHAN_FLAG_CONFIGURED;
 
+	XDMA_LOCK();
 	/* Request a real channel from hardware driver. */
 	ret = XDMA_CHANNEL_ALLOC(xdma->dev, xchan);
 	if (ret != 0) {
@@ -88,11 +107,38 @@ xdma_channel_alloc(xdma_controller_t xdma)
 		free(xchan, M_XDMA);
 		return (NULL);
 	}
-
-	xchan->xdma = xdma;
 	XDMA_UNLOCK();
 
 	return (xchan);
+}
+
+int
+xdma_channel_free(xdma_channel_t *xchan)
+{
+	xdma_controller_t xdma;
+	struct xdma_intr_handler *ih;
+	int ret;
+
+	xdma = xchan->xdma;
+
+	XDMA_LOCK();
+
+	TAILQ_FOREACH(ih, &xchan->ie_handlers, ih_next) {
+		TAILQ_REMOVE(&xchan->ie_handlers, ih, ih_next);
+	}
+
+	ret = XDMA_CHANNEL_FREE(xdma->dev, xchan);
+	if (ret != 0) {
+		XDMA_UNLOCK();
+		return (-1);
+	}
+
+	contigfree(xchan->descs, xchan->descs_size, M_XDMA);
+	free(xchan, M_XDMA);
+
+	XDMA_UNLOCK();
+
+	return (ret);
 }
 
 int
@@ -123,6 +169,7 @@ int
 xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 {
 
+	/* Sanity check. */
 	if (ih == NULL) {
 		return (-1);
 	}
@@ -133,9 +180,10 @@ xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 }
 
 int
-xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
+xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz)
 {
 	xdma_controller_t xdma;
+	xdma_config_t *conf;
 	void *ret;
 
 	xdma = xchan->xdma;
@@ -143,7 +191,15 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
 		return (-1);
 	}
 
-	ret = contigmalloc(ndescs * desc_sz,
+	if ((xchan->flags & XCHAN_FLAG_CONFIGURED) == 0) {
+		return (-1);
+	}
+
+	conf = &xchan->conf;
+
+	xchan->descs_size = (conf->block_num * desc_sz);
+
+	ret = contigmalloc(xchan->descs_size,
 		M_DEVBUF,
 		(M_WAITOK | M_ZERO),
 		0UL /* low address */,
@@ -158,35 +214,27 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t ndescs, uint32_t desc_sz)
 
 	xchan->descs = ret;
 	xchan->descs_phys = vtophys(ret);
-	xchan->ndescs = ndescs;
 
 	return (0);
 }
 
 int
-xdma_prepare(xdma_channel_t *xchan, enum xdma_direction dir, uintptr_t src_addr,
-    uintptr_t dst_addr, int block_len, int block_num, int src_width, int dst_width)
+xdma_prepare(xdma_channel_t *xchan)
 {
 	xdma_controller_t xdma;
-	xdma_config_t *conf;
 	int ret;
 
 	xdma = xchan->xdma;
 
-	conf = &xchan->conf;
-	conf->direction = dir;
-	conf->src_addr = src_addr;
-	conf->dst_addr = dst_addr;
-	conf->block_len = block_len;
-	conf->block_num = block_num;
-	conf->src_width = src_width;
-	conf->dst_width = dst_width;
-
 	XDMA_LOCK();
 	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan);
+	if (ret != 0) {
+		XDMA_UNLOCK();
+		return (-1);
+	}
 	XDMA_UNLOCK();
 
-	return (ret);
+	return (0);
 }
 
 int
