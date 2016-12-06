@@ -103,6 +103,7 @@ int xdma_terminate(xdma_channel_t *xchan);
 /* Interrupt callback */
 int xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg, void **);
 int xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih);
+int xdma_teardown_all_intr(xdma_channel_t *xchan);
 int xdma_callback(struct xdma_channel *xchan);
 
 struct xdma_intr_handler {

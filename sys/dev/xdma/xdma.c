@@ -95,11 +95,10 @@ xdma_channel_alloc(xdma_controller_t xdma, enum xdma_direction dir,
 	conf->src_width = src_width;
 	conf->dst_width = dst_width;
 
-	TAILQ_INIT(&xchan->ie_handlers);
-
 	xchan->flags |= XCHAN_FLAG_CONFIGURED;
 
 	XDMA_LOCK();
+
 	/* Request a real channel from hardware driver. */
 	ret = XDMA_CHANNEL_ALLOC(xdma->dev, xchan);
 	if (ret != 0) {
@@ -107,6 +106,9 @@ xdma_channel_alloc(xdma_controller_t xdma, enum xdma_direction dir,
 		free(xchan, M_XDMA);
 		return (NULL);
 	}
+
+	TAILQ_INIT(&xchan->ie_handlers);
+
 	XDMA_UNLOCK();
 
 	return (xchan);
@@ -116,16 +118,13 @@ int
 xdma_channel_free(xdma_channel_t *xchan)
 {
 	xdma_controller_t xdma;
-	struct xdma_intr_handler *ih;
 	int ret;
 
 	xdma = xchan->xdma;
 
 	XDMA_LOCK();
 
-	TAILQ_FOREACH(ih, &xchan->ie_handlers, ih_next) {
-		TAILQ_REMOVE(&xchan->ie_handlers, ih, ih_next);
-	}
+	xdma_teardown_all_intr(xchan);
 
 	ret = XDMA_CHANNEL_FREE(xdma->dev, xchan);
 	if (ret != 0) {
@@ -161,6 +160,18 @@ xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg,
 	TAILQ_INSERT_TAIL(&xchan->ie_handlers, ih, ih_next);
 
 	*ihandler = ih;
+
+	return (0);
+}
+
+int
+xdma_teardown_all_intr(xdma_channel_t *xchan)
+{
+	struct xdma_intr_handler *ih;
+
+	TAILQ_FOREACH(ih, &xchan->ie_handlers, ih_next) {
+		TAILQ_REMOVE(&xchan->ie_handlers, ih, ih_next);
+	}
 
 	return (0);
 }
