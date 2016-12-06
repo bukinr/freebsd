@@ -317,7 +317,6 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 {
 	struct pdma_channel *chan;
 	struct pdma_softc *sc;
-	int ret;
 	int i;
 
 	sc = device_get_softc(dev);
@@ -329,12 +328,6 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 			xchan->chan = (void *)chan;
 			chan->used = 1;
 			chan->index = i;
-
-			ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc));
-			if (ret != 0) {
-				printf("Can't allocate descriptors");
-				return (-1);
-			}
 
 			return (0);
 		}
@@ -353,7 +346,7 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 	xdma_controller_t xdma;
 	xdma_config_t *conf;
 	int max_width;
-	//int reg;
+	int ret;
 	int i;
 
 	sc = device_get_softc(dev);
@@ -361,6 +354,13 @@ pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
 	conf = &xchan->conf;
 	printf("%s: block len %d, block num %d\n", __func__,
 	    conf->block_len, conf->block_num);
+
+	ret = xdma_desc_alloc(xchan, XDMA_ALLOC_CONTIG,
+	    sizeof(struct pdma_hwdesc), 1024);
+	if (ret != 0) {
+		printf("Can't allocate descriptors");
+		return (-1);
+	}
 
 	chan = (struct pdma_channel *)xchan->chan;
 

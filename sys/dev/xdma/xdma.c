@@ -71,12 +71,9 @@ static struct mtx xdma_mtx;
  * Allocate virtual xDMA channel.
  */
 xdma_channel_t *
-xdma_channel_alloc(xdma_controller_t xdma, enum xdma_direction dir,
-    uintptr_t src_addr, uintptr_t dst_addr, int block_len, int block_num,
-    int src_width, int dst_width)
+xdma_channel_alloc(xdma_controller_t xdma)
 {
 	xdma_channel_t *xchan;
-	xdma_config_t *conf;
 	int ret;
 
 	xchan = malloc(sizeof(xdma_channel_t), M_XDMA, M_WAITOK | M_ZERO);
@@ -85,17 +82,6 @@ xdma_channel_alloc(xdma_controller_t xdma, enum xdma_direction dir,
 		return (NULL);
 	}
 	xchan->xdma = xdma;
-
-	conf = &xchan->conf;
-	conf->direction = dir;
-	conf->src_addr = src_addr;
-	conf->dst_addr = dst_addr;
-	conf->block_len = block_len;
-	conf->block_num = block_num;
-	conf->src_width = src_width;
-	conf->dst_width = dst_width;
-
-	xchan->flags |= XCHAN_FLAG_CONFIGURED;
 
 	XDMA_LOCK();
 
@@ -190,8 +176,25 @@ xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 	return (0);
 }
 
+static void *
+xdma_desc_alloc_contig(uint32_t sz, uint32_t align)
+{
+	void *ret;
+
+	ret = contigmalloc(sz,
+		M_DEVBUF,
+		(M_WAITOK | M_ZERO),
+		0UL,	/* low address */
+		-1UL,	/* high address */
+		align,	/* alignment */
+		0UL);	/* boundary */
+
+	return (ret);
+}
+
 int
-xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz)
+xdma_desc_alloc(xdma_channel_t *xchan, uint32_t alloc_type,
+    uint32_t desc_sz, uint32_t align)
 {
 	xdma_controller_t xdma;
 	xdma_config_t *conf;
@@ -210,13 +213,12 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz)
 
 	xchan->descs_size = (conf->block_num * desc_sz);
 
-	ret = contigmalloc(xchan->descs_size,
-		M_DEVBUF,
-		(M_WAITOK | M_ZERO),
-		0UL /* low address */,
-		-1UL /* high address */,
-		1024 /* alignment */,
-		0UL /* boundary */);
+	if (alloc_type == XDMA_ALLOC_CONTIG) {
+		ret = xdma_desc_alloc_contig(xchan->descs_size, align);
+	} else {
+		/* Don't know how to allocate descriptors */
+		return (-1);
+	}
 
 	if (ret == NULL) {
 		printf("Can't allocate memory for descriptors");
@@ -230,19 +232,35 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz)
 }
 
 int
-xdma_prepare(xdma_channel_t *xchan)
+xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
+    uintptr_t src_addr, uintptr_t dst_addr, int block_len,
+    int block_num, int src_width, int dst_width)
 {
 	xdma_controller_t xdma;
+	xdma_config_t *conf;
 	int ret;
 
 	xdma = xchan->xdma;
 
+	conf = &xchan->conf;
+	conf->direction = dir;
+	conf->src_addr = src_addr;
+	conf->dst_addr = dst_addr;
+	conf->block_len = block_len;
+	conf->block_num = block_num;
+	conf->src_width = src_width;
+	conf->dst_width = dst_width;
+
+	xchan->flags |= XCHAN_FLAG_CONFIGURED;
+
 	XDMA_LOCK();
+
 	ret = XDMA_CHANNEL_CONFIGURE(xdma->dev, xchan);
 	if (ret != 0) {
 		XDMA_UNLOCK();
 		return (-1);
 	}
+
 	XDMA_UNLOCK();
 
 	return (0);
@@ -327,6 +345,7 @@ xdma_fdt_get(device_t dev, const char *prop)
 	int idx;
 
 	node = ofw_bus_get_node(dev);
+
 	error = ofw_bus_parse_xref_list_get_length(node, "dmas", "#dma-cells", &ndmas);
 	if (error) {
 		printf("Failed\n");

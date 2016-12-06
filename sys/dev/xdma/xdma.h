@@ -53,6 +53,10 @@ enum xdma_command {
 	XDMA_CMD_TERMINATE_ALL,
 };
 
+enum xdma_desc_alloc_method {
+	XDMA_ALLOC_CONTIG,
+};
+
 struct xdma_controller {
 	device_t dev;		/* A real DMA device_t. */
 	void *data;		/* MD part */
@@ -87,13 +91,11 @@ struct xdma_channel {
 typedef struct xdma_channel xdma_channel_t;
 
 xdma_controller_t xdma_fdt_get(device_t dev, const char *prop);
-
-xdma_channel_t * xdma_channel_alloc(xdma_controller_t xdma, enum xdma_direction,
+xdma_channel_t * xdma_channel_alloc(xdma_controller_t);
+int xdma_channel_free(xdma_channel_t *);
+int xdma_prep_cyclic(xdma_channel_t *, enum xdma_direction,
     uintptr_t, uintptr_t, int, int, int, int);
-int xdma_channel_free(xdma_channel_t *xchan);
-int xdma_prepare(xdma_channel_t *);
-
-int xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz);
+int xdma_desc_alloc(xdma_channel_t *, uint32_t, uint32_t, uint32_t);
 
 /* Channel Control */
 int xdma_begin(xdma_channel_t *xchan);
