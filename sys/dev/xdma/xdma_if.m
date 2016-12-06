@@ -47,7 +47,7 @@ CODE {
 	#include <sys/bus.h>
 
 	static int
-	xdma_channel_configure(device_t dev, struct xdma_channel *xchan)
+	xdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 	{
 
 		return (-1);
@@ -55,13 +55,16 @@ CODE {
 }
 
 #
-# Configure a channel
+# Prepare a channel for cyclic transfer.
 #
-METHOD int channel_configure {
+METHOD int channel_prep_cyclic {
 	device_t		dev;
 	struct xdma_channel	*xchan;
-} DEFAULT xdma_channel_configure;
+} DEFAULT xdma_channel_prep_cyclic;
 
+#
+# Notify driver we have some machine-dependend data.
+#
 METHOD int md_data {
 	device_t dev;
 	phandle_t *cells;
@@ -69,16 +72,25 @@ METHOD int md_data {
 	void **data;
 };
 
+#
+# Allocate both virtual and harware channels.
+#
 METHOD int channel_alloc {
 	device_t dev;
 	struct xdma_channel *xchan;
 };
 
+#
+# Free the channel, including descriptors.
+#
 METHOD int channel_free {
 	device_t dev;
 	struct xdma_channel *xchan;
 };
 
+#
+# Begin, pause or terminate the channel operation.
+#
 METHOD int channel_control {
 	device_t dev;
 	struct xdma_channel *xchan;

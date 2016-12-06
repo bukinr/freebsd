@@ -337,7 +337,7 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 }
 
 static int
-pdma_channel_configure(device_t dev, struct xdma_channel *xchan)
+pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 {
 	struct pdma_channel *chan;
 	struct pdma_hwdesc *desc;
@@ -507,7 +507,7 @@ static device_method_t pdma_methods[] = {
 	/* xDMA Interface */
 	DEVMETHOD(xdma_channel_alloc,		pdma_channel_alloc),
 	DEVMETHOD(xdma_channel_free,		pdma_channel_free),
-	DEVMETHOD(xdma_channel_configure,	pdma_channel_configure),
+	DEVMETHOD(xdma_channel_prep_cyclic,	pdma_channel_prep_cyclic),
 	DEVMETHOD(xdma_channel_control,		pdma_channel_control),
 	DEVMETHOD(xdma_md_data,			pdma_md_data),
 

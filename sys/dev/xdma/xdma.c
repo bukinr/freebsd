@@ -277,10 +277,10 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
 
 	XDMA_LOCK();
 
-	ret = XDMA_CHANNEL_CONFIGURE(xdma->dma_dev, xchan);
+	ret = XDMA_CHANNEL_PREP_CYCLIC(xdma->dma_dev, xchan);
 	if (ret != 0) {
 		device_printf(xdma->dev,
-		    "%s: Can't configure channel\n", __func__);
+		    "%s: Can't prepare cyclic transfer\n", __func__);
 		XDMA_UNLOCK();
 		return (-1);
 	}
@@ -356,10 +356,11 @@ xdma_callback(xdma_channel_t *xchan)
 	return (0);
 }
 
-/*
- * Notify the DMA driver we have some machine-dependent data.
- */
+#ifdef FDT
 
+/*
+ * Notify the DMA driver we have machine-dependent data.
+ */
 static int
 xdma_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 {
@@ -369,8 +370,6 @@ xdma_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 
 	return (ret);
 }
-
-#ifdef FDT
 
 xdma_controller_t
 xdma_fdt_get(device_t dev, const char *prop)
