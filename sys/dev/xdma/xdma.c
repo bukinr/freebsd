@@ -141,7 +141,8 @@ xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg,
 
 	xdma = xchan->xdma;
 
-	ih = malloc(sizeof(struct xdma_intr_handler), M_XDMA, M_WAITOK | M_ZERO);
+	ih = malloc(sizeof(struct xdma_intr_handler),
+	    M_XDMA, M_WAITOK | M_ZERO);
 	if (ih == NULL) {
 		device_printf(xdma->dev,
 		    "%s: Can't allocate memory for interrupt handler\n",
@@ -235,7 +236,8 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t alloc_type,
 		ret = xdma_desc_alloc_contig(xchan->descs_size, align);
 	} else {
 		device_printf(xdma->dev,
-		    "%s: Don't know how to allocate descriptors\n", __func__);
+		    "%s: Don't know how to allocate descriptors\n",
+		    __func__);
 		return (-1);
 	}
 
