@@ -289,6 +289,9 @@ chan_stop(struct pdma_softc *sc, struct pdma_channel *chan)
 	printf("%s: Stopping chan %d\n", __func__, chan->index);
 	mb();
 	WRITE4(sc, PDMA_DCS(chan->index), 0);
+
+	while (READ4(sc, PDMA_DCS(chan->index)) & DCS_CTE)
+		;
 	mb();
 
 	reg = READ4(sc, PDMA_DMAC);

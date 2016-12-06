@@ -86,6 +86,7 @@ struct xdma_channel {
 	void				*descs;
 	uint32_t			descs_size;
 	uintptr_t			descs_phys;
+	enum xdma_desc_alloc_method	descs_alloc_type;
 	TAILQ_HEAD(, xdma_intr_handler)	ie_handlers; /* Interrupt handlers. */
 };
 

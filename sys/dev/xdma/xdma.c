@@ -113,6 +113,16 @@ xdma_channel_free(xdma_channel_t *xchan)
 
 	XDMA_LOCK();
 
+	/* Deallocate descriptors first */
+	if (xchan->descs_alloc_type == XDMA_ALLOC_CONTIG) {
+		contigfree(xchan->descs, xchan->descs_size, M_XDMA);
+	} else {
+		device_printf(xdma->dev,
+		    "%s: Don't know how to free descriptors\n", __func__);
+		XDMA_UNLOCK();
+		return (-1);
+	}
+
 	xdma_teardown_all_intr(xchan);
 
 	/* Free the real DMA channel. */
@@ -124,7 +134,6 @@ xdma_channel_free(xdma_channel_t *xchan)
 		return (-1);
 	}
 
-	contigfree(xchan->descs, xchan->descs_size, M_XDMA);
 	free(xchan, M_XDMA);
 
 	XDMA_UNLOCK();
@@ -249,6 +258,7 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t alloc_type,
 
 	xchan->descs = ret;
 	xchan->descs_phys = vtophys(ret);
+	xchan->descs_alloc_type = alloc_type;
 
 	return (0);
 }

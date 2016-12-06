@@ -38,6 +38,9 @@
 #define	 DRT_AUTO	(1 << 3)		/* Auto-request. */
 #define	PDMA_DCS(n)	(0x10 + 0x20 * n)	/* Channel n Control/Status */
 #define	 DCS_DES8	(1 << 30)		/* Descriptor 8 Word. */
+#define	 DCS_AR		(1 << 4)		/* Address Error. */
+#define	 DCS_TT		(1 << 3)		/* Transfer Terminate. */
+#define	 DCS_HLT	(1 << 2)		/* DMA halt. */
 #define	 DCS_CTE	(1 << 0)		/* Channel transfer enable. */
 #define	PDMA_DCM(n)	(0x14 + 0x20 * n)	/* Channel n Command */
 #define	 DCM_SAI	(1 << 23) /* Source Address Increment. */
