@@ -63,6 +63,14 @@ METHOD int channel_prep_cyclic {
 } DEFAULT xdma_channel_prep_cyclic;
 
 #
+# Prepare a channel for memcpy transfer.
+#
+METHOD int channel_prep_memcpy {
+	device_t		dev;
+	struct xdma_channel	*xchan;
+};
+
+#
 # Notify driver we have some machine-dependend data.
 #
 METHOD int md_data {

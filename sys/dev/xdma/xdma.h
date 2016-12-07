@@ -82,6 +82,8 @@ struct xdma_channel {
 	xdma_config_t			conf;
 	uint8_t				flags;
 #define	XCHAN_FLAG_CONFIGURED		(1 << 0)
+#define	XCHAN_FLAG_CYCLIC		(1 << 1)
+#define	XCHAN_FLAG_MEMCPY		(1 << 2)
 	void				*chan;
 	void				*descs;
 	uint32_t			descs_size;
@@ -92,11 +94,16 @@ struct xdma_channel {
 
 typedef struct xdma_channel xdma_channel_t;
 
+/* xDMA controller alloc/free */
 xdma_controller_t xdma_fdt_get(device_t dev, const char *prop);
+int xdma_put(xdma_controller_t xdma);
+
 xdma_channel_t * xdma_channel_alloc(xdma_controller_t);
 int xdma_channel_free(xdma_channel_t *);
+
 int xdma_prep_cyclic(xdma_channel_t *, enum xdma_direction,
     uintptr_t, uintptr_t, int, int, int, int);
+int xdma_prep_memcpy(xdma_channel_t *, uintptr_t, uintptr_t, size_t len);
 int xdma_desc_alloc(xdma_channel_t *, uint32_t, uint32_t, uint32_t);
 
 /* Channel Control */
