@@ -62,14 +62,9 @@ __FBSDID("$FreeBSD$");
 
 #include "xdma_if.h"
 
-struct dma_device {
-	device_t		dev;
-};
-
 struct pdma_softc {
 	device_t		dev;
 	struct resource		*res[2];
-	struct dma_device	dd;
 	bus_space_tag_t		bst;
 	bus_space_handle_t	bsh;
 	void			*ih;
@@ -162,7 +157,6 @@ static int
 pdma_attach(device_t dev)
 {
 	struct pdma_softc *sc;
-	struct dma_device *dd;
 	int err;
 	int reg;
 
@@ -191,10 +185,6 @@ pdma_attach(device_t dev)
 	node = ofw_bus_get_node(dev);
 	xref = OF_xref_from_node(node);
 	OF_device_register_xref(xref, dev);
-
-	/* Configure DMA device */
-	dd = &sc->dd;
-	dd->dev = dev;
 
 	reg = READ4(sc, PDMA_DMAC);
 	reg &= ~(DMAC_HLT | DMAC_AR);
