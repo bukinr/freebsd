@@ -44,19 +44,125 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <sys/rman.h>
 
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/pmap.h>
+
 #include <machine/bus.h>
+#include <machine/cache.h>
+
+#include <dev/xdma/xdma.h>
 
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+//char src[PAGE_SIZE] __aligned(4096);
+//char dst[PAGE_SIZE] __aligned(4096);
+
 struct xdmatest_softc {
 	device_t		dev;
+	xdma_controller_t	xdma;
+	xdma_channel_t		*xchan;
+	void			*ih;
+	struct intr_config_hook test_intrhook;
+	char			*src;
+	char			*dst;
+	uint32_t		len;
 };
 
 static int xdmatest_probe(device_t dev);
 static int xdmatest_attach(device_t dev);
 static int xdmatest_detach(device_t dev);
+
+static int
+xdmatest_intr(void *arg)
+{
+	struct xdmatest_softc *sc;
+	int i;
+
+	sc = arg;
+
+	mips_dcache_wbinv_all();
+
+	for (i = 0; i < sc->len; i++) {
+		if (sc->dst[i] != sc->src[i]) {
+			device_printf(sc->dev, "Test failed\n");
+			return (0);
+		}
+	}
+
+	device_printf(sc->dev, "Test succeded.\n");
+
+	return (0);
+}
+
+static int
+xdmatest_test(struct xdmatest_softc *sc)
+{
+	uintptr_t src_phys, dst_phys;
+	int err;
+	int i;
+
+	/* Get xDMA controller. */
+	sc->xdma = xdma_fdt_get(sc->dev, "test");
+	if (sc->xdma == NULL) {
+		device_printf(sc->dev, "Can't find xDMA controller.\n");
+		return (-1);
+	}
+
+	/* Alloc xDMA virtual channel. */
+	sc->xchan = xdma_channel_alloc(sc->xdma);
+	if (sc->xchan == NULL) {
+		device_printf(sc->dev, "Can't alloc virtual DMA channel.\n");
+		return (-1);
+	}
+
+	/* Setup callback. */
+	err = xdma_setup_intr(sc->xchan, xdmatest_intr, sc, &sc->ih);
+	if (err) {
+		device_printf(sc->dev, "Can't setup xDMA interrupt handler.\n");
+		return (-1);
+	}
+
+	sc->len = PAGE_SIZE;
+	sc->src = malloc(sc->len, M_DEVBUF, M_WAITOK | M_ZERO);
+	sc->dst = malloc(sc->len, M_DEVBUF, M_WAITOK | M_ZERO);
+
+	for (i = 0; i < sc->len; i++) {
+		sc->src[i] = (i & 0xff);
+		sc->dst[i] = 0;
+	}
+
+	mips_dcache_wbinv_all();
+
+	src_phys = vtophys(sc->src);
+	dst_phys = vtophys(sc->dst);
+
+	/* Configure channel for memcpy transfer. */
+	err = xdma_prep_memcpy(sc->xchan, src_phys, dst_phys, sc->len);
+	if (err != 0) {
+		device_printf(sc->dev, "Can't configure virtual channel.\n");
+		return (-1);
+	}
+
+	xdma_begin(sc->xchan);
+
+	return (0);
+}
+
+static void
+delayed_attach(void *arg)
+{
+	struct xdmatest_softc *sc;
+
+	sc = arg;
+
+	xdmatest_test(sc);
+
+	config_intrhook_disestablish(&sc->test_intrhook);
+}
 
 static int
 xdmatest_probe(device_t dev)
@@ -80,6 +186,12 @@ xdmatest_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+
+	/* We'll run test later, but before / mount. */
+	sc->test_intrhook.ich_func = delayed_attach;
+	sc->test_intrhook.ich_arg = sc;
+	if (config_intrhook_establish(&sc->test_intrhook) != 0)
+		device_printf(dev, "test_intrhook_establish failed\n");
 
 	return (0);
 }

@@ -239,6 +239,12 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t alloc_type,
 
 	conf = &xchan->conf;
 
+	//if (xchan->flags & XCHAN_FLAG_CYCLIC) {
+	//	xchan->descs_size = (conf->block_num * desc_sz);
+	//} else if (xchan->flags & XCHAN_FLAG_MEMCPY) {
+	//	xchan->descs_size = (1 * desc_sz);
+	//}
+
 	xchan->descs_size = (conf->block_num * desc_sz);
 
 	if (alloc_type == XDMA_ALLOC_CONTIG) {
@@ -279,6 +285,8 @@ xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
 	conf->direction = XDMA_MEM_TO_MEM;
 	conf->src_addr = src_addr;
 	conf->dst_addr = dst_addr;
+	conf->block_len = len;
+	conf->block_num = 1;
 
 	xchan->flags |= XCHAN_FLAG_CONFIGURED | XCHAN_FLAG_MEMCPY;
 
@@ -289,6 +297,7 @@ xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
 		device_printf(xdma->dev,
 		    "%s: Can't prepare memcpy transfer.\n", __func__);
 		XDMA_UNLOCK();
+
 		return (-1);
 	}
 

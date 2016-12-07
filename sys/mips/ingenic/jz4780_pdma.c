@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <machine/bus.h>
+#include <machine/cache.h>
 
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
@@ -70,7 +71,7 @@ struct pdma_softc {
 	void			*ih;
 };
 
-struct pdma_data {
+struct pdma_fdt_data {
 	int tx;
 	int rx;
 	int chan;
@@ -78,10 +79,13 @@ struct pdma_data {
 
 struct pdma_channel {
 	xdma_channel_t		*xchan;
-	struct pdma_data	data;
+	struct pdma_fdt_data	data;
 	int			cur_desc;
 	int			used;
 	int			index;
+	int			flags;
+#define	TRANFER_TYPE_CYCLIC	(1 << 0)
+#define	TRANFER_TYPE_MEMCPY	(1 << 1)
 };
 
 #define	PDMA_NCHANNELS	32
@@ -112,7 +116,8 @@ pdma_intr(void *arg)
 
 	pending = READ4(sc, PDMA_DIRQP);
 
-	printf(".");
+	//printf(".");
+	//printf("PDMA intr");
 	//printf("%s: DIRQP %x\n", __func__, pending);
 
 	/* Ack all the channels */
@@ -129,9 +134,11 @@ pdma_intr(void *arg)
 			/* Disable channel */
 			WRITE4(sc, PDMA_DCS(chan->index), 0);
 
-			/* Enable again */
-			chan->cur_desc = (chan->cur_desc + 1) % conf->block_num;
-			chan_start(sc, chan);
+			if (chan->flags & TRANFER_TYPE_CYCLIC) {
+				/* Enable again */
+				chan->cur_desc = (chan->cur_desc + 1) % conf->block_num;
+				chan_start(sc, chan);
+			}
 
 			xdma_callback(chan->xchan);
 		}
@@ -157,6 +164,7 @@ static int
 pdma_attach(device_t dev)
 {
 	struct pdma_softc *sc;
+	phandle_t xref, node;
 	int err;
 	int reg;
 
@@ -180,8 +188,6 @@ pdma_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	phandle_t xref, node;
-
 	node = ofw_bus_get_node(dev);
 	xref = OF_xref_from_node(node);
 	OF_device_register_xref(xref, dev);
@@ -191,7 +197,6 @@ pdma_attach(device_t dev)
 	reg |= (DMAC_DMAE);
 	//reg |= (DMAC_FMSC);
 	WRITE4(sc, PDMA_DMAC, reg);
-
 	WRITE4(sc, PDMA_DMACP, 0);
 
 	return (0);
@@ -232,17 +237,25 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 	int reg;
 
 	xchan = chan->xchan;
-
 	reg = READ4(sc, PDMA_DMAC);
 	reg &= ~(DMAC_HLT | DMAC_AR);
 	reg |= (DMAC_DMAE);
 	WRITE4(sc, PDMA_DMAC, reg);
+
+	//printf("dcs %x\n", reg0);
+	//printf("dcs %x\n", PDMA_DCS(chan->index));
+
+	//printf("before %x\n", reg0);
+	//DELAY(1000000);
+	//DELAY(1000000);
+	//printf("after %x\n", READ4(sc, PDMA_DMAC));
 
 	/* 8 byte descriptor */
 	WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
 
 	//printf("descriptor address %x phys %x\n",
 	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
+	//printf("Starting transfer for %d curdesc %d\n", chan->index, chan->cur_desc);
 
 	desc = (struct pdma_hwdesc *)xchan->descs_phys;
 	WRITE4(sc, PDMA_DDA(chan->index), (uint32_t)&desc[chan->cur_desc]);
@@ -322,6 +335,8 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 			chan->used = 1;
 			chan->index = i;
 
+			printf("allocated pdma chan %d\n", i);
+
 			return (0);
 		}
 	}
@@ -330,13 +345,54 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 }
 
 static int
+pdma_channel_prep_memcpy(device_t dev, struct xdma_channel *xchan)
+{
+	struct pdma_channel *chan;
+	struct pdma_hwdesc *desc;
+	struct pdma_softc *sc;
+	xdma_config_t *conf;
+	int ret;
+
+	sc = device_get_softc(dev);
+
+	chan = (struct pdma_channel *)xchan->chan;
+	pdma_channel_reset(sc, chan->index);
+
+	ret = xdma_desc_alloc(xchan, XDMA_ALLOC_CONTIG,
+	    sizeof(struct pdma_hwdesc), 1024);
+	if (ret != 0) {
+		device_printf(sc->dev,
+		    "%s: Can't allocate descriptors.", __func__);
+		return (-1);
+	}
+
+	conf = &xchan->conf;
+	desc = (struct pdma_hwdesc *)xchan->descs;
+	desc[0].dsa = conf->src_addr;
+	desc[0].dta = conf->dst_addr;
+	desc[0].drt = DRT_AUTO;
+	desc[0].dcm = DCM_SAI | DCM_DAI;
+
+	/* 4 byte copy for now. */
+	desc[0].dtc = (conf->block_len / 4);
+	desc[0].dcm |= DCM_SP_4 | DCM_DP_4 | DCM_TSZ_4;
+	desc[0].dcm |= DCM_TIE;
+
+	mips_dcache_wbinv_all();
+
+	printf("src %x dst %x dtc %d\n", conf->src_addr, conf->dst_addr, desc[0].dtc);
+
+	return (0);
+}
+
+static int
 pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 {
 	struct pdma_channel *chan;
 	struct pdma_hwdesc *desc;
-	struct pdma_data *data;
-	struct pdma_softc *sc;
 	xdma_controller_t xdma;
+	struct pdma_fdt_data *data;
+	struct pdma_softc *sc;
 	xdma_config_t *conf;
 	int max_width;
 	int ret;
@@ -356,9 +412,10 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 	}
 
 	chan = (struct pdma_channel *)xchan->chan;
+	chan->flags = TRANFER_TYPE_CYCLIC;
 
 	xdma = xchan->xdma;
-	data = (struct pdma_data *)xdma->data;
+	data = (struct pdma_fdt_data *)xdma->data;
 
 	pdma_channel_reset(sc, chan->index);
 
@@ -444,6 +501,8 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 		mb();
 	}
 
+	mips_dcache_wbinv_all();
+
 	return (0);
 }
 
@@ -475,13 +534,13 @@ pdma_channel_control(device_t dev, xdma_channel_t *xchan, int cmd)
 static int
 pdma_md_data(device_t dev, phandle_t *cells, int ncells, void **ptr)
 {
-	struct pdma_data *data;
+	struct pdma_fdt_data *data;
 
 	if (ncells != 3) {
 		return (-1);
 	}
 
-	*ptr = malloc(sizeof(struct pdma_data), M_DEVBUF, (M_WAITOK | M_ZERO));
+	*ptr = malloc(sizeof(struct pdma_fdt_data), M_DEVBUF, (M_WAITOK | M_ZERO));
 
 	data = *ptr;
 	data->tx = cells[0];
@@ -501,6 +560,7 @@ static device_method_t pdma_methods[] = {
 	DEVMETHOD(xdma_channel_alloc,		pdma_channel_alloc),
 	DEVMETHOD(xdma_channel_free,		pdma_channel_free),
 	DEVMETHOD(xdma_channel_prep_cyclic,	pdma_channel_prep_cyclic),
+	DEVMETHOD(xdma_channel_prep_memcpy,	pdma_channel_prep_memcpy),
 	DEVMETHOD(xdma_channel_control,		pdma_channel_control),
 	DEVMETHOD(xdma_md_data,			pdma_md_data),
 

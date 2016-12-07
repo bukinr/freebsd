@@ -121,6 +121,13 @@
 			linux,default-trigger = "none";
 		};
 	};
+
+	xdma_test {
+		compatible = "freebsd,xdma-test";
+
+		dmas = <&dma 0 0 0xffffffff>;
+		dma-names = "test";
+	};
 };
 
 &ext {
