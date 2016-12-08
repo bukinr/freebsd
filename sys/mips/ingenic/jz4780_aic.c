@@ -117,16 +117,12 @@ static int setup_dma(struct sc_pcminfo *scp);
 
 struct aic_rate {
         uint32_t speed;
-        uint32_t mfi; /* PLL4 Multiplication Factor Integer */
-        uint32_t mfn; /* PLL4 Multiplication Factor Numerator */
-        uint32_t mfd; /* PLL4 Multiplication Factor Denominator */
-        /* More dividers to configure can be added here */
 };
 
 static struct aic_rate rate_map[] = {
-	{ 96000, 49, 152, 1000 }, /* PLL4 49.152 Mhz */
+	{ 96000 },
 	/* TODO: add more frequences */
-	{ 0, 0 },
+	{ 0 },
 };
 
 /*
@@ -368,12 +364,6 @@ setup_dma(struct sc_pcminfo *scp)
 
 	KASSERT(fmt & AFMT_16BIT, ("16-bit audio supported only."));
 
-#if 0
-	sc->buf_base[0] = 0x12345678;
-	conf->direction = XDMA_MEM_TO_MEM;
-	conf->dst_start = (uint32_t)z;
-#endif
-
 	err = xdma_prep_cyclic(sc->xchan,
 	    XDMA_MEM_TO_DEV,			/* direction */
 	    sc->buf_base_phys,			/* src addr */
@@ -411,19 +401,11 @@ aic_start(struct sc_pcminfo *scp)
 
 	setup_dma(scp);
 
-	reg = 0;
-	reg |= (1 << 19); // OSS 16 bit
+	reg = (1 << 19); // OSS 16 bit
 	reg |= (1 << 16); // ISS 16 bit
-	//reg |= (4 << 19); // OSS 24 bit
-	//reg |= (4 << 16); // ISS 24 bit
 	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
-	//reg |= (AICCR_ENLBF); //enable loopback
-	//reg |= (1 << 6); //EROR
-	//reg |= (1 << 5); //ETUR
-	//reg |= (1 << 4); //ERFS
-	//reg |= (1 << 3); //ETFS
 	WRITE4(sc, AICCR, reg);
 
 	return (0);
@@ -446,10 +428,6 @@ aic_stop(struct sc_pcminfo *scp)
 	xdma_terminate(sc->xchan);
 
 	sc->pos = 0;
-
-	printf("AICSR %x\n", READ4(sc, AICSR));
-	printf("I2SSR %x\n", READ4(sc, I2SSR));
-	printf("I2SCR %x\n", READ4(sc, I2SCR));
 
 	bzero(sc->buf_base, sc->dma_size);
 
@@ -508,8 +486,6 @@ aicchan_getptr(kobj_t obj, void *data)
 	scp = ch->parent;
 	sc = scp->sc;
 
-	//device_printf(scp->dev, "%s: %d\n", __func__, sc->pos);
-
 	return (sc->pos);
 }
 
@@ -552,22 +528,6 @@ aic_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 	*addr = segs[0].ds_addr;
 }
 
-#if 0
-static void
-aic_intr(void *arg)  
-{
-	struct aic_softc *sc;
-	int i;
-
-	sc = arg;
-
-	printf("aic intr1 %x, i2sSR %x\n", READ4(sc, AICSR), READ4(sc, I2SSR));
-	for (i = 0; i < 32; i++)
-		WRITE4(sc, AICDR, i);
-	printf("aic intr2 %x, i2sSR %x\n", READ4(sc, AICSR), READ4(sc, I2SSR));
-}
-#endif
-
 static int
 aic_probe(device_t dev)
 {
@@ -592,14 +552,9 @@ aic_attach(device_t dev)
 	uint32_t reg;
 	int err;
 
-	//sc = device_get_softc(dev);
-	//sc->dev = dev;
-
 	sc = malloc(sizeof(*sc), M_DEVBUF, M_WAITOK | M_ZERO);  
 	sc->dev = dev;
-	//sc->sr = &rate_map[0];
 	sc->pos = 0;
-	//sc->conf = malloc(sizeof(struct sdma_conf), M_DEVBUF, M_WAITOK | M_ZERO);
 
 	/* Get xDMA controller */
 	sc->xdma_tx = xdma_fdt_get(sc->dev, "tx");
@@ -616,14 +571,11 @@ aic_attach(device_t dev)
 	}
 
 	/* Setup sound subsystem */
-
-	printf("%s cl\n", __func__);
 	sc->lock = snd_mtxcreate(device_get_nameunit(dev), "aic softc");
 	if (sc->lock == NULL) {
 		device_printf(dev, "Can't create mtx.\n");
 		return (ENXIO);
 	}
-	printf("%s lc\n", __func__);
 
 	if (bus_alloc_resources(dev, aic_spec, sc->res)) {
 		device_printf(dev, "could not allocate resources for device\n");
@@ -635,25 +587,12 @@ aic_attach(device_t dev)
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 	sc->aic_fifo_paddr = rman_get_start(sc->res[0]) + AICDR;
 
-#if 0
-	/* Setup interrupt handler */
-	err = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC | INTR_MPSAFE,
-	    NULL, aic_intr, sc, &sc->ih);
-	if (err) {
-		device_printf(dev, "Unable to alloc interrupt resource.\n");
-		return (ENXIO);
-	}
-#endif
-
 	/* Setup PCM */
 	scp = malloc(sizeof(struct sc_pcminfo), M_DEVBUF, M_NOWAIT | M_ZERO);
 	scp->sc = sc;
 	scp->dev = dev;
 
-	/*
-	 * Maximum possible DMA buffer.
-	 * Will be used partially to match 24 bit word.
-	 */
+	/* DMA buffer size. */
 	sc->dma_size = 131072;
 
 	/*
@@ -731,6 +670,8 @@ aic_attach(device_t dev)
 
 	uint64_t aic_freq;
 	uint64_t i2s_freq;
+	int internal_codec;
+
 	clk_get_freq(sc->clk_aic, &aic_freq);
 	clk_get_freq(sc->clk_i2s, &i2s_freq);
 
@@ -741,7 +682,6 @@ aic_attach(device_t dev)
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
 	reg = 0;
-	int internal_codec;
 	internal_codec = 1;
 	if (internal_codec) {
 		reg |= (AICFR_ICDC);	/* Internal CODEC. */
