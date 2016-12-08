@@ -135,8 +135,6 @@ aicmixer_init(struct snd_mixer *m)
 	struct aic_softc *sc;
 	int mask;
 
-	printf("%s\n", __func__);
-
 	scp = mix_getdevinfo(m);
 	sc = scp->sc;
 
@@ -162,7 +160,7 @@ aicmixer_set(struct snd_mixer *m, unsigned dev,
 	scp = mix_getdevinfo(m);
 
 	/* Here we can configure hardware volume on our DAC */
-#if 1
+#if 0
 	device_printf(scp->dev, "aicmixer_set() %d %d\n",
 	    left, right);
 #endif
@@ -187,8 +185,6 @@ aicchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b,
 	struct sc_pcminfo *scp;
 	struct sc_chinfo *ch;
 	struct aic_softc *sc;
-
-	printf("%s\n", __func__);
 
 	scp = (struct sc_pcminfo *)devinfo;
 	sc = scp->sc;
@@ -217,7 +213,7 @@ aicchan_free(kobj_t obj, void *data)
 	struct sc_pcminfo *scp = ch->parent;
 	struct aic_softc *sc = scp->sc;
 
-#if 1
+#if 0
 	device_printf(scp->dev, "aicchan_free()\n");
 #endif
 
@@ -237,7 +233,9 @@ aicchan_setformat(kobj_t obj, void *data, uint32_t format)
 	ch = data;
 	scp = ch->parent;
 
+#if 0
 	device_printf(scp->dev, "%s\n", __func__);
+#endif
 
 	ch->format = format;
 
@@ -258,7 +256,9 @@ aicchan_setspeed(kobj_t obj, void *data, uint32_t speed)
 	scp = ch->parent;
 	sc = scp->sc;
 
+#if 0
 	device_printf(scp->dev, "%s\n", __func__);
+#endif
 
 	sr = NULL;
 
@@ -288,20 +288,6 @@ aicchan_setspeed(kobj_t obj, void *data, uint32_t speed)
 	return (sr->speed);
 }
 
-#if 0
-static void
-aic_configure_clock(struct aic_softc *sc)
-{
-	struct aic_rate *sr;
-
-	sr = sc->sr;
-
-	pll4_configure_output(sr->mfi, sr->mfn, sr->mfd);
-
-	/* Configure other dividers here, if any */
-}
-#endif
-
 static uint32_t
 aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 {
@@ -313,7 +299,9 @@ aicchan_setblocksize(kobj_t obj, void *data, uint32_t blocksize)
 	scp = ch->parent;
 	sc = scp->sc;
 
+#if 0
 	device_printf(scp->dev, "%s\n", __func__);
+#endif
 
 	sndbuf_resize(ch->buffer, sc->dma_size / blocksize, blocksize);
 
@@ -325,9 +313,9 @@ aic_intr(void *arg)
 {
 	struct sc_pcminfo *scp;
 	xdma_channel_t *xchan;
-	xdma_config_t *conf;
 	struct sc_chinfo *ch;
 	struct aic_softc *sc;
+	xdma_config_t *conf;
 	int bufsize;
 
 	scp = arg;
@@ -391,7 +379,9 @@ aic_start(struct sc_pcminfo *scp)
 	sc = scp->sc;
 	sc->pos = 0;
 
+#if 0
 	device_printf(scp->dev, "%s\n", __func__);
+#endif
 
 	reg = READ4(sc, I2SCR);
 	reg |= (I2SCR_ESCLK);
@@ -419,7 +409,9 @@ aic_stop(struct sc_pcminfo *scp)
 
 	sc = scp->sc;
 
+#if 0
 	device_printf(scp->dev, "%s\n", __func__);
+#endif
 
 	reg = READ4(sc, AICCR);
 	reg &= ~(AICCR_TDMS | AICCR_ERPL);
@@ -449,7 +441,7 @@ aicchan_trigger(kobj_t obj, void *data, int go)
 
 	switch (go) {
 	case PCMTRIG_START:
-#if 1
+#if 0
 		device_printf(scp->dev, "trigger start\n");
 #endif
 		ch->run = 1;
@@ -460,7 +452,7 @@ aicchan_trigger(kobj_t obj, void *data, int go)
 
 	case PCMTRIG_STOP:
 	case PCMTRIG_ABORT:
-#if 1
+#if 0
 		device_printf(scp->dev, "trigger stop or abort\n");
 #endif
 		ch->run = 0;
@@ -559,14 +551,14 @@ aic_attach(device_t dev)
 	/* Get xDMA controller */
 	sc->xdma_tx = xdma_fdt_get(sc->dev, "tx");
 	if (sc->xdma_tx == NULL) {
-		printf("Can't find xDMA controller.\n");
+		device_printf(dev, "Can't find xDMA controller.\n");
 		return (-1);
 	}
 
 	/* Alloc xDMA virtual channel. */
 	sc->xchan = xdma_channel_alloc(sc->xdma_tx);
 	if (sc->xchan == NULL) {
-		printf("Can't alloc virtual DMA channel.\n");
+		device_printf(dev, "Can't alloc virtual DMA channel.\n");
 		return (-1);
 	}
 
@@ -679,10 +671,11 @@ aic_attach(device_t dev)
 
 	WRITE4(sc, AICFR, AICFR_RST);
 
+	internal_codec = 1;
+
 	/* Configure AIC */
 	reg = READ4(sc, AICFR);
 	reg = 0;
-	internal_codec = 1;
 	if (internal_codec) {
 		reg |= (AICFR_ICDC);	/* Internal CODEC. */
 	} else {
@@ -697,8 +690,6 @@ aic_attach(device_t dev)
 	reg = READ4(sc, AICFR);
 	reg |= (AICFR_ENB);	/* Enable the controller. */
 	WRITE4(sc, AICFR, reg);
-
-	printf("AICFR %x\n", READ4(sc, AICFR));
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 
