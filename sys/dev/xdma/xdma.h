@@ -93,7 +93,6 @@ struct xdma_channel {
 	bus_dmamap_t			dma_map;
 	void				*descs;
 	uintptr_t			*descs_phys;
-	uint32_t			desc_size;
 };
 
 typedef struct xdma_channel xdma_channel_t;

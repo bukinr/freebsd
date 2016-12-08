@@ -130,6 +130,7 @@ xdma_channel_free(xdma_channel_t *xchan)
 	/* Deallocate descriptors. */
 	bus_dmamap_unload(xchan->dma_tag, xchan->dma_map);
 	bus_dmamem_free(xchan->dma_tag, xchan->descs, xchan->dma_map);
+	free(xchan->descs_phys, M_XDMA);
 
 	free(xchan, M_XDMA);
 
@@ -216,11 +217,12 @@ xdma_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 }
 
 static int
-xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t align)
+xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t desc_size,
+    uint32_t align)
 {
 	xdma_controller_t xdma;
+	bus_size_t all_desc_sz;
 	xdma_config_t *conf;
-	bus_size_t descs_sz;
 	int nsegments;
 	int err;
 
@@ -228,16 +230,16 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t align)
 	conf = &xchan->conf;
 
 	nsegments = conf->block_num;
-	descs_sz = (conf->block_num * xchan->desc_size);
+	all_desc_sz = (conf->block_num * desc_size);
 
 	err = bus_dma_tag_create(
 	    bus_get_dma_tag(xdma->dev),
-	    align, xchan->desc_size,	/* alignment, boundary */
+	    align, desc_size,		/* alignment, boundary */
 	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 	    BUS_SPACE_MAXADDR,		/* highaddr */
 	    NULL, NULL,			/* filter, filterarg */
-	    descs_sz, conf->block_num,	/* maxsize, nsegments*/
-	    xchan->desc_size, 0,	/* maxsegsize, flags */
+	    all_desc_sz, nsegments,	/* maxsize, nsegments*/
+	    desc_size, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &xchan->dma_tag);
 
@@ -253,7 +255,7 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t align)
 	    (M_NOWAIT | M_ZERO));
 
 	err = bus_dmamap_load(xchan->dma_tag, xchan->dma_map, xchan->descs,
-	    descs_sz, xdma_dmamap_cb, xchan, BUS_DMA_NOWAIT);
+	    all_desc_sz, xdma_dmamap_cb, xchan, BUS_DMA_NOWAIT);
 	if (err) {
 		device_printf(xdma->dev,
 		    "%s: Can't load DMA map.\n", __func__);
@@ -285,10 +287,7 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_size, uint32_t align)
 
 	conf = &xchan->conf;
 
-	//xchan->descs_size = (conf->block_num * desc_sz);
-	xchan->desc_size = desc_size;
-
-	ret = xdma_desc_alloc_bus_dma(xchan, align);
+	ret = xdma_desc_alloc_bus_dma(xchan, desc_size, align);
 	if (ret != 0) {
 		device_printf(xdma->dev,
 		    "%s: Can't allocate memory for descriptors.\n",
