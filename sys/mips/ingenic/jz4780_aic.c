@@ -388,7 +388,7 @@ setup_dma(struct sc_pcminfo *scp)
 	    2,					/* src port width */
 	    2);					/* dst port width */
 	if (err != 0) {
-		printf("Cant configure virtual channel\n");
+		device_printf(sc->dev, "Can't configure virtual channel\n");
 		return (-1);
 	}
 

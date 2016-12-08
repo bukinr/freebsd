@@ -362,7 +362,7 @@ pdma_channel_prep_memcpy(device_t dev, struct xdma_channel *xchan)
 	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 8);
 	if (ret != 0) {
 		device_printf(sc->dev,
-		    "%s: Can't allocate descriptors.", __func__);
+		    "%s: Can't allocate descriptors.\n", __func__);
 		return (-1);
 	}
 
@@ -404,7 +404,8 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 
 	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 8);
 	if (ret != 0) {
-		printf("Can't allocate descriptors");
+		device_printf(sc->dev,
+		    "%s: Can't allocate descriptors.\n", __func__);
 		return (-1);
 	}
 

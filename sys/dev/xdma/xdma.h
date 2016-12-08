@@ -78,9 +78,10 @@ struct xdma_channel {
 	xdma_config_t			conf;
 
 	uint8_t				flags;
-#define	XCHAN_FLAG_CONFIGURED		(1 << 0)
-#define	XCHAN_FLAG_CYCLIC		(1 << 1)
-#define	XCHAN_FLAG_MEMCPY		(1 << 2)
+#define	XCHAN_FLAG_DESC_ALLOCATED	(1 << 0)
+#define	XCHAN_FLAG_CONFIGURED		(1 << 1)
+#define	XCHAN_FLAG_CYCLIC		(1 << 2)
+#define	XCHAN_FLAG_MEMCPY		(1 << 3)
 
 	/* A real hardware driver channel. */
 	void				*chan;
@@ -108,6 +109,7 @@ int xdma_prep_cyclic(xdma_channel_t *, enum xdma_direction,
     uintptr_t, uintptr_t, int, int, int, int);
 int xdma_prep_memcpy(xdma_channel_t *, uintptr_t, uintptr_t, size_t len);
 int xdma_desc_alloc(xdma_channel_t *, uint32_t, uint32_t);
+int xdma_desc_free(xdma_channel_t *xchan);
 
 /* Channel Control */
 int xdma_begin(xdma_channel_t *xchan);

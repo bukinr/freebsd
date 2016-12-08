@@ -67,8 +67,9 @@ __FBSDID("$FreeBSD$");
 MALLOC_DEFINE(M_XDMA, "xdma", "xDMA framework");
 
 static struct mtx xdma_mtx;
-#define	XDMA_LOCK()	mtx_lock(&xdma_mtx)
-#define	XDMA_UNLOCK()	mtx_unlock(&xdma_mtx)
+#define	XDMA_LOCK()		mtx_lock(&xdma_mtx)
+#define	XDMA_UNLOCK()		mtx_unlock(&xdma_mtx)
+#define	XDMA_ASSERT_LOCKED()	mtx_assert(&xdma_mtx, MA_OWNED)
 
 /*
  * Allocate virtual xDMA channel.
@@ -127,10 +128,8 @@ xdma_channel_free(xdma_channel_t *xchan)
 
 	xdma_teardown_all_intr(xchan);
 
-	/* Deallocate descriptors. */
-	bus_dmamap_unload(xchan->dma_tag, xchan->dma_map);
-	bus_dmamem_free(xchan->dma_tag, xchan->descs, xchan->dma_map);
-	free(xchan->descs_phys, M_XDMA);
+	/* Deallocate descriptors, if any. */
+	xdma_desc_free(xchan);
 
 	free(xchan, M_XDMA);
 
@@ -272,10 +271,18 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_size, uint32_t align)
 	xdma_config_t *conf;
 	int ret;
 
+	XDMA_ASSERT_LOCKED();
+
 	xdma = xchan->xdma;
 	if (xdma == NULL) {
 		device_printf(xdma->dev,
 		    "%s: Channel was not allocated properly.\n", __func__);
+		return (-1);
+	}
+
+	if (xchan->flags & XCHAN_FLAG_DESC_ALLOCATED) {
+		device_printf(xdma->dev,
+		    "%s: Descriptors already allocated.\n", __func__);
 		return (-1);
 	}
 
@@ -295,7 +302,28 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_size, uint32_t align)
 		return (-1);
 	}
 
+	xchan->flags |= XCHAN_FLAG_DESC_ALLOCATED;
+
+	/* We are going to write to descriptors. */
+	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_PREWRITE);
+
 	return (0);
+}
+
+int
+xdma_desc_free(xdma_channel_t *xchan)
+{
+
+	if (xchan->flags & XCHAN_FLAG_DESC_ALLOCATED) {
+		bus_dmamap_unload(xchan->dma_tag, xchan->dma_map);
+		bus_dmamem_free(xchan->dma_tag, xchan->descs, xchan->dma_map);
+		free(xchan->descs_phys, M_XDMA);
+		xchan->flags &= ~(XCHAN_FLAG_DESC_ALLOCATED);
+
+		return (0);
+	}
+
+	return (-1);
 }
 
 int
@@ -306,8 +334,16 @@ xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
 	xdma_config_t *conf;
 	int ret;
 
+#if 0
+	if (xchan->flags & XCHAN_FLAG_CONFIGURED) {
+		device_printf(xdma->dev,
+		    "%s: Channel is already configured.\n", __func__);
+		return (-1);
+	}
+#endif
+
 	xdma = xchan->xdma;
-	KASSERT(xdma != NULL, ("Panic"));
+	KASSERT(xdma != NULL, ("Panic."));
 
 	conf = &xchan->conf;
 	conf->direction = XDMA_MEM_TO_MEM;
@@ -320,8 +356,8 @@ xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
 
 	XDMA_LOCK();
 
-	/* We are going to write to descriptors. */
-	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_PREWRITE);
+	/* Deallocate old descriptors, if any. */
+	xdma_desc_free(xchan);
 
 	ret = XDMA_CHANNEL_PREP_MEMCPY(xdma->dma_dev, xchan);
 	if (ret != 0) {
@@ -350,6 +386,15 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
 	int ret;
 
 	xdma = xchan->xdma;
+	KASSERT(xdma != NULL, ("Panic."));
+
+#if 0
+	if (xchan->flags & XCHAN_FLAG_CONFIGURED) {
+		device_printf(xdma->dev,
+		    "%s: Channel is already configured.\n", __func__);
+		return (-1);
+	}
+#endif
 
 	conf = &xchan->conf;
 	conf->direction = dir;
@@ -364,8 +409,8 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
 
 	XDMA_LOCK();
 
-	/* We are going to write to descriptors. */
-	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_PREWRITE);
+	/* Deallocate old descriptors, if any. */
+	xdma_desc_free(xchan);
 
 	ret = XDMA_CHANNEL_PREP_CYCLIC(xdma->dma_dev, xchan);
 	if (ret != 0) {
