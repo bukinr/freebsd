@@ -411,6 +411,7 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 
 	chan = (struct pdma_channel *)xchan->chan;
 	chan->flags = TRANFER_TYPE_CYCLIC;
+	chan->cur_desc = 0;
 
 	xdma = xchan->xdma;
 	data = (struct pdma_fdt_data *)xdma->data;
@@ -493,10 +494,8 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 		}
 #endif
 
-		printf("desc: %x -> %x, data->tx %d, dtc %d\n",
-		    desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
-
-		mb();
+		//printf("desc: %x -> %x, data->tx %d, dtc %d\n",
+			//   desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
 	}
 
 	return (0);
