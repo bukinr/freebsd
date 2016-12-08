@@ -53,14 +53,11 @@ __FBSDID("$FreeBSD$");
 #include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_codec.h>
 
-#define ARRAY_SIZE(x)		(sizeof(x)/sizeof(x[0]))
-
 struct codec_softc {
 	device_t		dev;
 	struct resource		*res[1];
 	bus_space_tag_t		bst;
 	bus_space_handle_t	bsh;
-	void			*ih;
 };
 
 static struct resource_spec codec_spec[] = {
@@ -68,45 +65,10 @@ static struct resource_spec codec_spec[] = {
 	{ -1, 0 }
 };
 
-struct reg_default {
-	uint32_t reg;
-	uint32_t val;
-};
-static struct reg_default jz4780_codec_reg_defaults[] = {
-	//{ AICR_DAC,		0xd3 },
-	//{ AICR_ADC,		0xd3 },
-	{ AICR_DAC,		0x03 },
-	{ AICR_ADC,		0x03 },
-
-	{ FCR_DAC,		7 },
-	{ CR_CK,		0 },
-
-	//{ CR_LO,		0x90 },
-	{ CR_LO,		0x0 },
-	//{ CR_HP,		0x90 },
-	{ CR_MIC1,		0xb0 },
-	{ CR_MIC2,		0x30 },
-	{ CR_LI1,		0x10 },
-	{ CR_LI2,		0x10 },
-	//{ CR_DAC,		0x90 },
-	{ CR_DAC,		0x0 },
-	//{ CR_ADC,		0x90 },
-	{ CR_ADC,		0x0 },
-	//{ CR_VIC,		0x03 },
-	{ IMR,			0xff },
-	{ IMR2,			0xff },
-	{ GCR_HPL,		31 },
-	{ GCR_HPR,		31 },
-	{ GCR_LIBYL,		31 },
-	{ GCR_LIBYR,		31 },
-
-	{ CR_VIC,		0x0 },
-	{ CR_HP,		0x0 },
-};
-
 static int codec_probe(device_t dev);
 static int codec_attach(device_t dev);
 static int codec_detach(device_t dev);
+void codec_print_registers(struct codec_softc *sc);
 
 static int
 codec_write(struct codec_softc *sc, uint32_t reg, uint32_t val)
@@ -138,68 +100,9 @@ codec_read(struct codec_softc *sc, uint32_t reg)
 	return (tmp);
 }
 
-static int
-codec_probe(device_t dev)
+void
+codec_print_registers(struct codec_softc *sc)
 {
-
-	if (!ofw_bus_status_okay(dev))
-		return (ENXIO);
-
-	if (!ofw_bus_is_compatible(dev, "ingenic,jz4780-codec"))
-		return (ENXIO);
-
-	device_set_desc(dev, "Ingenic JZ4780 CODEC");
-
-	return (BUS_PROBE_DEFAULT);
-}
-
-static int
-codec_attach(device_t dev)
-{
-	struct codec_softc *sc;
-
-	sc = device_get_softc(dev);
-	sc->dev = dev;
-
-	if (bus_alloc_resources(dev, codec_spec, sc->res)) {
-		device_printf(dev, "could not allocate resources for device\n");
-		return (ENXIO);
-	}
-
-	/* Memory interface */
-	sc->bst = rman_get_bustag(sc->res[0]);
-	sc->bsh = rman_get_bushandle(sc->res[0]);
-
-	printf("sizeof %d\n", ARRAY_SIZE(jz4780_codec_reg_defaults));
-
-	//WRITE4(sc, CODEC_RGADW, RGADW_ICRST);
-	//DELAY(10000);
-	//WRITE4(sc, CODEC_RGADW, 0);
-
-#if 0
-	int i;
-	for (i = 0; i < 19; i++) {
-		printf("write reg %x val %x\n", jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
-		codec_write(sc, jz4780_codec_reg_defaults[i].reg, jz4780_codec_reg_defaults[i].val);
-	}
-#endif
-
-	codec_write(sc, CR_VIC, 0);
-	DELAY(10000);
-	codec_write(sc, CR_DAC, 0);
-	DELAY(10000);
-	//codec_write(sc, AICR_DAC, (0x3 | (1 << 5))); /* I2S, slave */
-	//codec_write(sc, AICR_DAC, (0x3 | (3 << 6))); /* I2S, 24 bit */
-	codec_write(sc, AICR_DAC, 0x3); /* I2S */
-	DELAY(10000);
-	codec_write(sc, FCR_DAC, 10); /* 96000 */
-	//codec_write(sc, FCR_DAC, 7); /* 44100 */
-	codec_write(sc, CR_HP, 0);
-
-	DELAY(10000);
-	//codec_write(sc, GCR_DACL, 25);
-	//codec_write(sc, GCR_DACR, 25);
-	DELAY(10000);
 
 	printf("codec SR %x\n", codec_read(sc, SR));
 	printf("codec SR2 %x\n", codec_read(sc, SR2));
@@ -244,6 +147,46 @@ codec_attach(device_t dev)
 	printf("codec GCR_MIXADCR %x\n", codec_read(sc, GCR_MIXADCR));
 	printf("codec CR_ADC_AGC %x\n", codec_read(sc, CR_ADC_AGC));
 	printf("codec DR_ADC_AGC %x\n", codec_read(sc, DR_ADC_AGC));
+}
+
+static int
+codec_probe(device_t dev)
+{
+
+	if (!ofw_bus_status_okay(dev))
+		return (ENXIO);
+
+	if (!ofw_bus_is_compatible(dev, "ingenic,jz4780-codec"))
+		return (ENXIO);
+
+	device_set_desc(dev, "Ingenic JZ4780 CODEC");
+
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+codec_attach(device_t dev)
+{
+	struct codec_softc *sc;
+
+	sc = device_get_softc(dev);
+	sc->dev = dev;
+
+	if (bus_alloc_resources(dev, codec_spec, sc->res)) {
+		device_printf(dev, "could not allocate resources for device\n");
+		return (ENXIO);
+	}
+
+	/* Memory interface */
+	sc->bst = rman_get_bustag(sc->res[0]);
+	sc->bsh = rman_get_bushandle(sc->res[0]);
+
+	/* Initialize codec. */
+	codec_write(sc, CR_VIC, 0);
+	codec_write(sc, CR_DAC, 0);
+	codec_write(sc, AICR_DAC, 0x3); /* I2S, 16 bit, master */
+	codec_write(sc, FCR_DAC, 10); /* 96000 hz */
+	codec_write(sc, CR_HP, 0); /* Unmute headphones. */
 
 	return (0);
 }
