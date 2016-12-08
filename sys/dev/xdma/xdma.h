@@ -76,17 +76,24 @@ typedef struct xdma_channel_config xdma_config_t;
 struct xdma_channel {
 	xdma_controller_t		xdma;
 	xdma_config_t			conf;
+
 	uint8_t				flags;
 #define	XCHAN_FLAG_CONFIGURED		(1 << 0)
 #define	XCHAN_FLAG_CYCLIC		(1 << 1)
 #define	XCHAN_FLAG_MEMCPY		(1 << 2)
+
+	/* A real hardware driver channel. */
 	void				*chan;
-	void				*descs;
+
+	/* Interrupt handlers. */
+	TAILQ_HEAD(, xdma_intr_handler)	ie_handlers;
+
+	/* Descriptors. */
 	bus_dma_tag_t			dma_tag;
 	bus_dmamap_t			dma_map;
-	uint32_t			descs_size;
-	uintptr_t			descs_phys;
-	TAILQ_HEAD(, xdma_intr_handler)	ie_handlers; /* Interrupt handlers. */
+	void				*descs;
+	uintptr_t			*descs_phys;
+	uint32_t			desc_size;
 };
 
 typedef struct xdma_channel xdma_channel_t;

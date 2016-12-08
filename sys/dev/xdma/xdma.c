@@ -200,15 +200,19 @@ xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 static void
 xdma_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 {
-	bus_addr_t *addr;
+	xdma_channel_t *xchan;
+	int i;
 
-	printf("xdma_dmamap_cb %d\n", nseg);
+	xchan = (xdma_channel_t *)arg;
 
-	if (err)
+	/* TODO: handle error. */
+	if (err) {
 		return;
+	}
 
-	addr = (bus_addr_t *)arg;
-	*addr = segs[0].ds_addr;
+	for (i = 0; i < nseg; i++) {
+		xchan->descs_phys[i] = segs[i].ds_addr;
+	}
 }
 
 static int
@@ -216,22 +220,24 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t align)
 {
 	xdma_controller_t xdma;
 	xdma_config_t *conf;
-	bus_size_t desc_sz;
+	bus_size_t descs_sz;
+	int nsegments;
 	int err;
 
 	xdma = xchan->xdma;
 	conf = &xchan->conf;
 
-	desc_sz = (conf->block_num * conf->block_len);
+	nsegments = conf->block_num;
+	descs_sz = (conf->block_num * xchan->desc_size);
 
 	err = bus_dma_tag_create(
 	    bus_get_dma_tag(xdma->dev),
-	    align, desc_sz,		/* alignment, boundary */
+	    align, xchan->desc_size,	/* alignment, boundary */
 	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 	    BUS_SPACE_MAXADDR,		/* highaddr */
 	    NULL, NULL,			/* filter, filterarg */
-	    desc_sz, conf->block_num,	/* maxsize, nsegments*/
-	    conf->block_len, 0,		/* maxsegsize, flags */
+	    descs_sz, conf->block_num,	/* maxsize, nsegments*/
+	    xchan->desc_size, 0,	/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &xchan->dma_tag);
 
@@ -243,8 +249,11 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t align)
 		return (-1);
 	}
 
+	xchan->descs_phys = malloc(nsegments * sizeof(uintptr_t), M_XDMA,
+	    (M_NOWAIT | M_ZERO));
+
 	err = bus_dmamap_load(xchan->dma_tag, xchan->dma_map, xchan->descs,
-	    desc_sz, xdma_dmamap_cb, &xchan->descs_phys, BUS_DMA_NOWAIT);
+	    descs_sz, xdma_dmamap_cb, xchan, BUS_DMA_NOWAIT);
 	if (err) {
 		device_printf(xdma->dev,
 		    "%s: Can't load DMA map.\n", __func__);
@@ -255,7 +264,7 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t align)
 }
 
 int
-xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz, uint32_t align)
+xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_size, uint32_t align)
 {
 	xdma_controller_t xdma;
 	xdma_config_t *conf;
@@ -276,7 +285,8 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz, uint32_t align)
 
 	conf = &xchan->conf;
 
-	xchan->descs_size = (conf->block_num * desc_sz);
+	//xchan->descs_size = (conf->block_num * desc_sz);
+	xchan->desc_size = desc_size;
 
 	ret = xdma_desc_alloc_bus_dma(xchan, align);
 	if (ret != 0) {

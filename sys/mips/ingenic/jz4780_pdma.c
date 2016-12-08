@@ -233,7 +233,7 @@ static int
 chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 {
 	struct xdma_channel *xchan;
-	struct pdma_hwdesc *desc;
+	//struct pdma_hwdesc *desc;
 	int reg;
 
 	xchan = chan->xchan;
@@ -256,9 +256,10 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 	//printf("descriptor address %x phys %x\n",
 	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
 	//printf("Starting transfer for %d curdesc %d\n", chan->index, chan->cur_desc);
+	//desc = (struct pdma_hwdesc *)xchan->descs_phys;
+	//printf("DESC phys %x\n", xchan->descs_phys[chan->cur_desc]);
 
-	desc = (struct pdma_hwdesc *)xchan->descs_phys;
-	WRITE4(sc, PDMA_DDA(chan->index), (uint32_t)&desc[chan->cur_desc]);
+	WRITE4(sc, PDMA_DDA(chan->index), xchan->descs_phys[chan->cur_desc]);
 	mb();
 	WRITE4(sc, PDMA_DDS, (1 << chan->index));
 
@@ -358,7 +359,7 @@ pdma_channel_prep_memcpy(device_t dev, struct xdma_channel *xchan)
 	chan = (struct pdma_channel *)xchan->chan;
 	pdma_channel_reset(sc, chan->index);
 
-	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 1024);
+	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 8);
 	if (ret != 0) {
 		device_printf(sc->dev,
 		    "%s: Can't allocate descriptors.", __func__);
@@ -401,7 +402,7 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 	printf("%s: block len %d, block num %d\n", __func__,
 	    conf->block_len, conf->block_num);
 
-	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 1024);
+	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 8);
 	if (ret != 0) {
 		printf("Can't allocate descriptors");
 		return (-1);
