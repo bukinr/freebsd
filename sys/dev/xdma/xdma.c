@@ -368,8 +368,11 @@ xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
 		return (-1);
 	}
 
-	/* We have descriptors updated. */
-	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_POSTWRITE);
+	if (xchan->flags & XCHAN_FLAG_DESC_ALLOCATED) {
+		/* Driver created xDMA decsriptors. */
+		bus_dmamap_sync(xchan->dma_tag, xchan->dma_map,
+		    BUS_DMASYNC_POSTWRITE);
+	}
 
 	XDMA_UNLOCK();
 
@@ -420,8 +423,11 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
 		return (-1);
 	}
 
-	/* We have descriptors updated. */
-	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_POSTWRITE);
+	if (xchan->flags & XCHAN_FLAG_DESC_ALLOCATED) {
+		/* Driver created xDMA decsriptors. */
+		bus_dmamap_sync(xchan->dma_tag, xchan->dma_map,
+		    BUS_DMASYNC_POSTWRITE);
+	}
 
 	XDMA_UNLOCK();
 
@@ -488,7 +494,9 @@ xdma_callback(xdma_channel_t *xchan)
 	struct xdma_intr_handler *entry;
 
 	TAILQ_FOREACH(entry, &xchan->ie_handlers, ih_next) {
-		entry->cb(entry->cb_user);
+		if (entry->cb != NULL) {
+			entry->cb(entry->cb_user);
+		}
 	}
 
 	return (0);
