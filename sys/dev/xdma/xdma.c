@@ -586,11 +586,13 @@ xdma_fdt_get(device_t dev, const char *prop)
 #endif
 
 /*
- * Free xdma controller object.
+ * Free xDMA controller object.
  */
 int
 xdma_put(xdma_controller_t xdma)
 {
+
+	/* TODO: ensure no channels allocated */
 
 	free(xdma, M_XDMA);
 
