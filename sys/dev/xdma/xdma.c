@@ -45,11 +45,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/sx.h>
+#include <sys/bus_dma.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/pmap.h>
+
+#include <machine/bus.h>
 
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
@@ -107,38 +110,32 @@ int
 xdma_channel_free(xdma_channel_t *xchan)
 {
 	xdma_controller_t xdma;
-	int ret;
+	int err;
 
 	xdma = xchan->xdma;
 
 	XDMA_LOCK();
 
-	/* Deallocate descriptors first */
-	if (xchan->descs_alloc_type == XDMA_ALLOC_CONTIG) {
-		contigfree(xchan->descs, xchan->descs_size, M_XDMA);
-	} else {
-		device_printf(xdma->dev,
-		    "%s: Don't know how to free descriptors.\n", __func__);
-		XDMA_UNLOCK();
-		return (-1);
-	}
-
-	xdma_teardown_all_intr(xchan);
-
 	/* Free the real DMA channel. */
-	ret = XDMA_CHANNEL_FREE(xdma->dma_dev, xchan);
-	if (ret != 0) {
+	err = XDMA_CHANNEL_FREE(xdma->dma_dev, xchan);
+	if (err != 0) {
 		device_printf(xdma->dev,
 		    "%s: Can't free real hw channel.\n", __func__);
 		XDMA_UNLOCK();
 		return (-1);
 	}
 
+	xdma_teardown_all_intr(xchan);
+
+	/* Deallocate descriptors. */
+	bus_dmamap_unload(xchan->dma_tag, xchan->dma_map);
+	bus_dmamem_free(xchan->dma_tag, xchan->descs, xchan->dma_map);
+
 	free(xchan, M_XDMA);
 
 	XDMA_UNLOCK();
 
-	return (ret);
+	return (0);
 }
 
 int
@@ -200,29 +197,69 @@ xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 	return (0);
 }
 
-static void *
-xdma_desc_alloc_contig(uint32_t sz, uint32_t align)
+static void
+xdma_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 {
-	void *ret;
+	bus_addr_t *addr;
 
-	ret = contigmalloc(sz,
-		M_DEVBUF,
-		(M_WAITOK | M_ZERO),
-		0UL,	/* low address */
-		-1UL,	/* high address */
-		align,	/* alignment */
-		0UL);	/* boundary */
+	printf("xdma_dmamap_cb %d\n", nseg);
 
-	return (ret);
+	if (err)
+		return;
+
+	addr = (bus_addr_t *)arg;
+	*addr = segs[0].ds_addr;
 }
 
-int
-xdma_desc_alloc(xdma_channel_t *xchan, uint32_t alloc_type,
-    uint32_t desc_sz, uint32_t align)
+static int
+xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t align)
 {
 	xdma_controller_t xdma;
 	xdma_config_t *conf;
-	void *ret;
+	bus_size_t desc_sz;
+	int err;
+
+	xdma = xchan->xdma;
+	conf = &xchan->conf;
+
+	desc_sz = (conf->block_num * conf->block_len);
+
+	err = bus_dma_tag_create(
+	    bus_get_dma_tag(xdma->dev),
+	    align, desc_sz,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	    BUS_SPACE_MAXADDR,		/* highaddr */
+	    NULL, NULL,			/* filter, filterarg */
+	    desc_sz, conf->block_num,	/* maxsize, nsegments*/
+	    conf->block_len, 0,		/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &xchan->dma_tag);
+
+	err = bus_dmamem_alloc(xchan->dma_tag, (void **)&xchan->descs,
+	    BUS_DMA_NOWAIT | BUS_DMA_COHERENT, &xchan->dma_map);
+	if (err) {
+		device_printf(xdma->dev,
+		    "%s: Can't allocate descriptors.\n", __func__);
+		return (-1);
+	}
+
+	err = bus_dmamap_load(xchan->dma_tag, xchan->dma_map, xchan->descs,
+	    desc_sz, xdma_dmamap_cb, &xchan->descs_phys, BUS_DMA_NOWAIT);
+	if (err) {
+		device_printf(xdma->dev,
+		    "%s: Can't load DMA map.\n", __func__);
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_sz, uint32_t align)
+{
+	xdma_controller_t xdma;
+	xdma_config_t *conf;
+	int ret;
 
 	xdma = xchan->xdma;
 	if (xdma == NULL) {
@@ -239,33 +276,15 @@ xdma_desc_alloc(xdma_channel_t *xchan, uint32_t alloc_type,
 
 	conf = &xchan->conf;
 
-	//if (xchan->flags & XCHAN_FLAG_CYCLIC) {
-	//	xchan->descs_size = (conf->block_num * desc_sz);
-	//} else if (xchan->flags & XCHAN_FLAG_MEMCPY) {
-	//	xchan->descs_size = (1 * desc_sz);
-	//}
-
 	xchan->descs_size = (conf->block_num * desc_sz);
 
-	if (alloc_type == XDMA_ALLOC_CONTIG) {
-		ret = xdma_desc_alloc_contig(xchan->descs_size, align);
-	} else {
-		device_printf(xdma->dev,
-		    "%s: Don't know how to allocate descriptors.\n",
-		    __func__);
-		return (-1);
-	}
-
-	if (ret == NULL) {
+	ret = xdma_desc_alloc_bus_dma(xchan, align);
+	if (ret != 0) {
 		device_printf(xdma->dev,
 		    "%s: Can't allocate memory for descriptors.\n",
 		    __func__);
 		return (-1);
 	}
-
-	xchan->descs = ret;
-	xchan->descs_phys = vtophys(ret);
-	xchan->descs_alloc_type = alloc_type;
 
 	return (0);
 }
@@ -292,6 +311,9 @@ xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
 
 	XDMA_LOCK();
 
+	/* We are going to write to descriptors. */
+	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_PREWRITE);
+
 	ret = XDMA_CHANNEL_PREP_MEMCPY(xdma->dma_dev, xchan);
 	if (ret != 0) {
 		device_printf(xdma->dev,
@@ -300,6 +322,9 @@ xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
 
 		return (-1);
 	}
+
+	/* We have descriptors updated. */
+	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_POSTWRITE);
 
 	XDMA_UNLOCK();
 
@@ -330,6 +355,9 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
 
 	XDMA_LOCK();
 
+	/* We are going to write to descriptors. */
+	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_PREWRITE);
+
 	ret = XDMA_CHANNEL_PREP_CYCLIC(xdma->dma_dev, xchan);
 	if (ret != 0) {
 		device_printf(xdma->dev,
@@ -337,6 +365,9 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
 		XDMA_UNLOCK();
 		return (-1);
 	}
+
+	/* We have descriptors updated. */
+	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_POSTWRITE);
 
 	XDMA_UNLOCK();
 

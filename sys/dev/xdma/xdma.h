@@ -53,10 +53,6 @@ enum xdma_command {
 	XDMA_CMD_TERMINATE_ALL,
 };
 
-enum xdma_desc_alloc_method {
-	XDMA_ALLOC_CONTIG,
-};
-
 struct xdma_controller {
 	device_t dev;		/* DMA consumer device_t. */
 	device_t dma_dev;	/* A real DMA device_t. */
@@ -86,9 +82,10 @@ struct xdma_channel {
 #define	XCHAN_FLAG_MEMCPY		(1 << 2)
 	void				*chan;
 	void				*descs;
+	bus_dma_tag_t			dma_tag;
+	bus_dmamap_t			dma_map;
 	uint32_t			descs_size;
 	uintptr_t			descs_phys;
-	enum xdma_desc_alloc_method	descs_alloc_type;
 	TAILQ_HEAD(, xdma_intr_handler)	ie_handlers; /* Interrupt handlers. */
 };
 
@@ -104,7 +101,7 @@ int xdma_channel_free(xdma_channel_t *);
 int xdma_prep_cyclic(xdma_channel_t *, enum xdma_direction,
     uintptr_t, uintptr_t, int, int, int, int);
 int xdma_prep_memcpy(xdma_channel_t *, uintptr_t, uintptr_t, size_t len);
-int xdma_desc_alloc(xdma_channel_t *, uint32_t, uint32_t, uint32_t);
+int xdma_desc_alloc(xdma_channel_t *, uint32_t, uint32_t);
 
 /* Channel Control */
 int xdma_begin(xdma_channel_t *xchan);

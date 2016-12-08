@@ -358,8 +358,7 @@ pdma_channel_prep_memcpy(device_t dev, struct xdma_channel *xchan)
 	chan = (struct pdma_channel *)xchan->chan;
 	pdma_channel_reset(sc, chan->index);
 
-	ret = xdma_desc_alloc(xchan, XDMA_ALLOC_CONTIG,
-	    sizeof(struct pdma_hwdesc), 1024);
+	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 1024);
 	if (ret != 0) {
 		device_printf(sc->dev,
 		    "%s: Can't allocate descriptors.", __func__);
@@ -377,8 +376,6 @@ pdma_channel_prep_memcpy(device_t dev, struct xdma_channel *xchan)
 	desc[0].dtc = (conf->block_len / 4);
 	desc[0].dcm |= DCM_SP_4 | DCM_DP_4 | DCM_TSZ_4;
 	desc[0].dcm |= DCM_TIE;
-
-	mips_dcache_wbinv_all();
 
 	printf("src %x dst %x dtc %d\n", conf->src_addr, conf->dst_addr, desc[0].dtc);
 
@@ -404,8 +401,7 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 	printf("%s: block len %d, block num %d\n", __func__,
 	    conf->block_len, conf->block_num);
 
-	ret = xdma_desc_alloc(xchan, XDMA_ALLOC_CONTIG,
-	    sizeof(struct pdma_hwdesc), 1024);
+	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 1024);
 	if (ret != 0) {
 		printf("Can't allocate descriptors");
 		return (-1);
@@ -500,8 +496,6 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 
 		mb();
 	}
-
-	mips_dcache_wbinv_all();
 
 	return (0);
 }
