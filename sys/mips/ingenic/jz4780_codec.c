@@ -168,6 +168,7 @@ static int
 codec_attach(device_t dev)
 {
 	struct codec_softc *sc;
+	uint8_t reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -182,11 +183,29 @@ codec_attach(device_t dev)
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 
 	/* Initialize codec. */
-	codec_write(sc, CR_VIC, 0);		/* Active. */
-	codec_write(sc, CR_DAC, 0);		/* Active. */
-	codec_write(sc, AICR_DAC, 0x3);		/* I2S, 16 bit, Master. */
-	codec_write(sc, FCR_DAC, 10);		/* 96 kHz. */
-	codec_write(sc, CR_HP, 0);		/* Unmute headphones. */
+	reg = codec_read(sc, CR_VIC);
+	reg &= ~(VIC_SB_SLEEP | VIC_SB);
+	codec_write(sc, CR_VIC, reg);
+
+	reg = codec_read(sc, CR_DAC);
+	reg &= ~(DAC_SB | DAC_MUTE);
+	codec_write(sc, CR_DAC, reg);
+
+	/* I2S, 16-bit, 96 kHz. */
+	reg = codec_read(sc, AICR_DAC);
+	reg &= ~(AICR_DAC_SB | DAC_ADWL_M);
+	reg |= DAC_ADWL_16;
+	reg &= ~(AUDIOIF_M);
+	reg |= AUDIOIF_I2S;
+	codec_write(sc, AICR_DAC, reg);
+
+	reg = FCR_DAC_96;
+	codec_write(sc, FCR_DAC, reg);
+
+	/* Unmute headphones. */
+	reg = codec_read(sc, CR_HP);
+	reg &= ~(HP_SB | HP_MUTE);
+	codec_write(sc, CR_HP, 0);
 
 	return (0);
 }
