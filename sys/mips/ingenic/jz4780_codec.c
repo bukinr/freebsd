@@ -182,11 +182,11 @@ codec_attach(device_t dev)
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 
 	/* Initialize codec. */
-	codec_write(sc, CR_VIC, 0);
-	codec_write(sc, CR_DAC, 0);
-	codec_write(sc, AICR_DAC, 0x3); /* I2S, 16 bit, master */
-	codec_write(sc, FCR_DAC, 10); /* 96000 hz */
-	codec_write(sc, CR_HP, 0); /* Unmute headphones. */
+	codec_write(sc, CR_VIC, 0);		/* Active. */
+	codec_write(sc, CR_DAC, 0);		/* Active. */
+	codec_write(sc, AICR_DAC, 0x3);		/* I2S, 16 bit, Master. */
+	codec_write(sc, FCR_DAC, 10);		/* 96 kHz. */
+	codec_write(sc, CR_HP, 0);		/* Unmute headphones. */
 
 	return (0);
 }
