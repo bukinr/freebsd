@@ -209,10 +209,12 @@ xdma_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 
 	/* TODO: handle error. */
 	if (err) {
+		panic("error %d\n", err);
 		return;
 	}
 
 	for (i = 0; i < nseg; i++) {
+		//printf("seg %d: %x (%d bytes)\n", i, segs[i].ds_addr, segs[i].ds_len);
 		xchan->descs_phys[i] = segs[i].ds_addr;
 	}
 }
@@ -243,9 +245,14 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t desc_size,
 	    desc_size, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &xchan->dma_tag);
+	if (err) {
+		device_printf(xdma->dev,
+		    "%s: Can't create bus_dma tag.\n", __func__);
+		return (-1);
+	}
 
 	err = bus_dmamem_alloc(xchan->dma_tag, (void **)&xchan->descs,
-	    BUS_DMA_NOWAIT | BUS_DMA_COHERENT, &xchan->dma_map);
+	    BUS_DMA_WAITOK | BUS_DMA_COHERENT, &xchan->dma_map);
 	if (err) {
 		device_printf(xdma->dev,
 		    "%s: Can't allocate descriptors.\n", __func__);
@@ -253,10 +260,10 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t desc_size,
 	}
 
 	xchan->descs_phys = malloc(nsegments * sizeof(uintptr_t), M_XDMA,
-	    (M_NOWAIT | M_ZERO));
+	    (M_WAITOK | M_ZERO));
 
 	err = bus_dmamap_load(xchan->dma_tag, xchan->dma_map, xchan->descs,
-	    all_desc_sz, xdma_dmamap_cb, xchan, BUS_DMA_NOWAIT);
+	    all_desc_sz, xdma_dmamap_cb, xchan, BUS_DMA_WAITOK);
 	if (err) {
 		device_printf(xdma->dev,
 		    "%s: Can't load DMA map.\n", __func__);
