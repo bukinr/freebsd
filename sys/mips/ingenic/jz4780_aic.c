@@ -62,11 +62,9 @@ __FBSDID("$FreeBSD$");
 
 #define	AIC_NCHANNELS		1
 
-char z[131072] __aligned(32*1024);
-
 struct aic_softc {
 	device_t		dev;
-	struct resource		*res[2];
+	struct resource		*res[1];
 	bus_space_tag_t		bst;
 	bus_space_handle_t	bsh;
 	struct mtx		*lock;
@@ -102,7 +100,6 @@ struct sc_chinfo {
 /* PCM device private data */
 struct sc_pcminfo {
 	device_t		dev;
-	//uint32_t		(*ih)(struct sc_pcminfo *scp);
 	uint32_t		chnum;
 	struct sc_chinfo	chan[AIC_NCHANNELS];
 	struct aic_softc	*sc;
@@ -110,7 +107,6 @@ struct sc_pcminfo {
 
 static struct resource_spec aic_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
-	//{ SYS_RES_IRQ,		0,	RF_ACTIVE },
 	{ -1, 0 }
 };
 
@@ -152,7 +148,6 @@ aicmixer_init(struct snd_mixer *m)
 		return -1;
 
 	mask = SOUND_MASK_PCM;
-	//mask |= SOUND_MASK_VOLUME;
 
 	snd_mtxlock(sc->lock);
 	pcm_setflags(scp->dev, pcm_getflags(scp->dev) | SD_F_SOFTPCMVOL);
@@ -452,7 +447,6 @@ aic_stop(struct sc_pcminfo *scp)
 
 	sc->pos = 0;
 
-	printf("z is %x\n", *(uint32_t *)z);
 	printf("AICSR %x\n", READ4(sc, AICSR));
 	printf("I2SSR %x\n", READ4(sc, I2SSR));
 	printf("I2SCR %x\n", READ4(sc, I2SCR));
@@ -524,7 +518,6 @@ static uint32_t aic_pfmt[] = {
 	0
 };
 
-//static struct pcmchan_caps aic_pcaps = {44100, 192000, aic_pfmt, 0};
 static struct pcmchan_caps aic_pcaps = {96000, 96000, aic_pfmt, 0};
 
 static struct pcmchan_caps *
