@@ -43,21 +43,38 @@
 #define	SR2		0x01	/* Status Register 2 */
 #define	MR		0x07	/* Mode status register */
 #define	AICR_DAC	0x08	/* DAC Audio Interface Control Register */
+#define	 DAC_ADWL_S	6	/* Audio Data Word Length for DAC path. */
+#define	 DAC_ADWL_M	(0x3 << DAC_ADWL_S)
+#define	 DAC_ADWL_16	(0 << DAC_ADWL_S)
+#define	 AICR_DAC_SB	(1 << 4)	/* DAC audio interface in power-down mode */
+#define	 AUDIOIF_S	0
+#define	 AUDIOIF_M	(0x3 << AUDIOIF_S)
+#define	 AUDIOIF_I2S	0x3	/* I2S interface */
+#define	 AUDIOIF_DSP	0x2	/* DSP interface */
+#define	 AUDIOIF_LJ	0x1	/* Left-justified interface */
+#define	 AUDIOIF_P	0x0	/* Parallel interface */
 #define	AICR_ADC	0x09	/* ADC Audio Interface Control Register */
 #define	CR_LO		0x0B	/* Differential line-out Control Register */
 #define	CR_HP		0x0D	/* HeadPhone Control Register */
+#define	 HP_MUTE	(1 << 7)	/* no signal on headphone outputs */
+#define	 HP_SB		(1 << 4)	/* power-down */
 #define	CR_DMIC		0x10	/* Digital Microphone register */
 #define	CR_MIC1		0x11	/* Microphone1 Control register */
 #define	CR_MIC2		0x12	/* Microphone2 Control register */
 #define	CR_LI1		0x13	/* Control Register for line1 inputs */
 #define	CR_LI2		0x14	/* Control Register for line2 inputs */
 #define	CR_DAC		0x17	/* DAC Control Register */
+#define	 DAC_MUTE	(1 << 7)	/* puts the DAC in soft mute mode */
+#define	 DAC_SB		(1 << 4)	/* power-down */
 #define	CR_ADC		0x18	/* ADC Control Register */
 #define	CR_MIX		0x19	/* Digital Mixer Control Register */
 #define	DR_MIX		0x1A	/* Digital Mixer Data Register */
 #define	CR_VIC		0x1B	/* Control Register for the ViC */
+#define	 VIC_SB_SLEEP	(1 << 1)	/* sleep mode */
+#define	 VIC_SB		(1 << 0)	/* complete power-down */
 #define	CR_CK		0x1C	/* Clock Control Register */
 #define	FCR_DAC		0x1D	/* DAC Frequency Control Register */
+#define	 FCR_DAC_96	10	/* 96 kHz. */
 #define	FCR_ADC		0x20	/* ADC Frequency Control Register */
 #define	CR_TIMER_MSB	0x21	/* MSB of programmable counter */
 #define	CR_TIMER_LSB	0x22	/* LSB of programmable counter */
