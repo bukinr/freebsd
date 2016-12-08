@@ -97,6 +97,7 @@ xdma_channel_alloc(xdma_controller_t xdma)
 		    "%s: Can't request real hardware channel.\n", __func__);
 		XDMA_UNLOCK();
 		free(xchan, M_XDMA);
+
 		return (NULL);
 	}
 
@@ -153,6 +154,7 @@ xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg,
 		device_printf(xdma->dev,
 		    "%s: Can't allocate memory for interrupt handler.\n",
 		    __func__);
+
 		return (-1);
 	}
 
