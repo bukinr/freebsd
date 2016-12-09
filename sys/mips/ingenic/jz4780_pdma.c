@@ -384,15 +384,68 @@ pdma_channel_prep_memcpy(device_t dev, struct xdma_channel *xchan)
 }
 
 static int
+access_width(xdma_config_t *conf, uint32_t *dcm, uint32_t *max_width)
+{
+
+	*dcm = 0;
+	*max_width = max(conf->src_width, conf->dst_width);
+
+	switch (conf->src_width) {
+	case 1:
+		*dcm |= DCM_SP_1;
+		break;
+	case 2:
+		*dcm |= DCM_SP_2;
+		break;
+	case 4:
+		*dcm |= DCM_SP_4;
+		break;
+	default:
+		return (-1);
+	}
+
+	switch (conf->dst_width) {
+	case 1:
+		*dcm |= DCM_DP_1;
+		break;
+	case 2:
+		*dcm |= DCM_DP_2;
+		break;
+	case 4:
+		*dcm |= DCM_DP_4;
+		break;
+	default:
+		return (-1);
+	}
+
+	switch (*max_width) {
+	case 1:
+		*dcm |= DCM_TSZ_1;
+		break;
+	case 2:
+		*dcm |= DCM_TSZ_2;
+		break;
+	case 4:
+		*dcm |= DCM_TSZ_4;
+		break;
+	default:
+		return (-1);
+	};
+
+	return (0);
+}
+
+static int
 pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 {
+	struct pdma_fdt_data *data;
 	struct pdma_channel *chan;
 	struct pdma_hwdesc *desc;
 	xdma_controller_t xdma;
-	struct pdma_fdt_data *data;
 	struct pdma_softc *sc;
 	xdma_config_t *conf;
 	int max_width;
+	uint32_t dcm;
 	int ret;
 	int i;
 
@@ -441,51 +494,14 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 			desc[i].dcm = DCM_SAI | DCM_DAI;
 		}
 
-		switch (conf->src_width) {
-		case 1:
-			desc[i].dcm |= DCM_SP_1;
-			break;
-		case 2:
-			desc[i].dcm |= DCM_SP_2;
-			break;
-		case 4:
-			desc[i].dcm |= DCM_SP_4;
-			break;
-		default:
+		if (access_width(conf, &dcm, &max_width) != 0) {
+			device_printf(dev,
+			    "%s: can't configure access width\n", __func__);
 			return (-1);
 		}
 
-		switch (conf->dst_width) {
-		case 1:
-			desc[i].dcm |= DCM_DP_1;
-			break;
-		case 2:
-			desc[i].dcm |= DCM_DP_2;
-			break;
-		case 4:
-			desc[i].dcm |= DCM_DP_4;
-			break;
-		default:
-			return (-1);
-		}
-
-		max_width = max(conf->src_width, conf->dst_width);
-		switch (max_width) {
-		case 1:
-			desc[i].dcm |= DCM_TSZ_1;
-			break;
-		case 2:
-			desc[i].dcm |= DCM_TSZ_2;
-			break;
-		case 4:
-			desc[i].dcm |= DCM_TSZ_4;
-			break;
-		default:
-			return (-1);
-		};
-
+		desc[i].dcm |= dcm | DCM_TIE;
 		desc[i].dtc = (conf->block_len / max_width);
-		desc[i].dcm |= DCM_TIE;
 		
 #if 0
 		if (i != (conf->block_num - 1)) {
@@ -493,9 +509,6 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 			desc[i].dtc |= (((i + 1) * sizeof(struct pdma_hwdesc)) >> 4) << 24;
 		}
 #endif
-
-		//printf("desc: %x -> %x, data->tx %d, dtc %d\n",
-			//   desc[i].dsa, desc[i].dta, data->tx, desc[i].dtc);
 	}
 
 	return (0);
