@@ -85,7 +85,6 @@ struct pdma_channel {
 	int			index;
 	int			flags;
 #define	TRANFER_TYPE_CYCLIC	(1 << 0)
-#define	TRANFER_TYPE_MEMCPY	(1 << 1)
 };
 
 #define	PDMA_NCHANNELS	32
@@ -116,10 +115,6 @@ pdma_intr(void *arg)
 
 	pending = READ4(sc, PDMA_DIRQP);
 
-	//printf(".");
-	//printf("PDMA intr");
-	//printf("%s: DIRQP %x\n", __func__, pending);
-
 	/* Ack all the channels */
 	WRITE4(sc, PDMA_DIRQP, 0);
 
@@ -128,8 +123,6 @@ pdma_intr(void *arg)
 			chan = &pdma_channels[i];
 			xchan = chan->xchan;
 			conf = &xchan->conf;
-
-			//printf("dsa %x\n", READ4(sc, PDMA_DSA(chan->index)));
 
 			/* Disable channel */
 			WRITE4(sc, PDMA_DCS(chan->index), 0);
@@ -195,7 +188,6 @@ pdma_attach(device_t dev)
 	reg = READ4(sc, PDMA_DMAC);
 	reg &= ~(DMAC_HLT | DMAC_AR);
 	reg |= (DMAC_DMAE);
-	//reg |= (DMAC_FMSC);
 	WRITE4(sc, PDMA_DMAC, reg);
 	WRITE4(sc, PDMA_DMACP, 0);
 
@@ -233,54 +225,16 @@ static int
 chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 {
 	struct xdma_channel *xchan;
-	//struct pdma_hwdesc *desc;
-	int reg;
 
 	xchan = chan->xchan;
-	reg = READ4(sc, PDMA_DMAC);
-	reg &= ~(DMAC_HLT | DMAC_AR);
-	reg |= (DMAC_DMAE);
-	WRITE4(sc, PDMA_DMAC, reg);
-
-	//printf("dcs %x\n", reg0);
-	//printf("dcs %x\n", PDMA_DCS(chan->index));
-
-	//printf("before %x\n", reg0);
-	//DELAY(1000000);
-	//DELAY(1000000);
-	//printf("after %x\n", READ4(sc, PDMA_DMAC));
 
 	/* 8 byte descriptor */
 	WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
-
-	//printf("descriptor address %x phys %x\n",
-	//    (uint32_t)desc, (uint32_t)vtophys(&desc[chan->cur_desc]));
-	//printf("Starting transfer for %d curdesc %d\n", chan->index, chan->cur_desc);
-	//desc = (struct pdma_hwdesc *)xchan->descs_phys;
-	//printf("DESC phys %x\n", xchan->descs_phys[chan->cur_desc]);
-
 	WRITE4(sc, PDMA_DDA(chan->index), xchan->descs_phys[chan->cur_desc]);
-	mb();
 	WRITE4(sc, PDMA_DDS, (1 << chan->index));
 
-#if 0
-	int i;
-	for (i = 0; i < 1; i++) {
-		printf("PDMA_DSA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSA(chan->index)));
-		printf("PDMA_DTA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DTA(chan->index)));
-		printf("PDMA_DTC(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DTC(chan->index)));
-		printf("PDMA_DRT(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DRT(chan->index)));
-		printf("PDMA_DCS(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DCS(chan->index)));
-		printf("PDMA_DCM(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DCM(chan->index)));
-		printf("PDMA_DDA(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DDA(chan->index)));
-		printf("PDMA_DSD(%d) 0x%x\n", chan->index, READ4(sc, PDMA_DSD(chan->index)));
-	}
-#endif
-
 	/* Channel transfer enable */
-	mb();
 	WRITE4(sc, PDMA_DCS(chan->index), (DCS_DES8 | DCS_CTE));
-	mb();
 
 	return (0);
 }
@@ -288,15 +242,23 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 static int
 chan_stop(struct pdma_softc *sc, struct pdma_channel *chan)
 {
+	int timeout;
 	int reg;
 
 	printf("%s: Stopping chan %d\n", __func__, chan->index);
-	mb();
+
 	WRITE4(sc, PDMA_DCS(chan->index), 0);
 
-	while (READ4(sc, PDMA_DCS(chan->index)) & DCS_CTE)
-		;
-	mb();
+	for (timeout = 100; timeout > 0; timeout--) {
+		if ((READ4(sc, PDMA_DCS(chan->index)) & DCS_CTE) == 0) {
+			break;
+		}
+	}
+
+	if (timeout == 0) {
+		device_printf(sc->dev,
+		    "%s: Can't stop channel %d\n", __func__, chan->index);
+	}
 
 	reg = READ4(sc, PDMA_DMAC);
 	reg &= ~(DMAC_HLT | DMAC_AR);
