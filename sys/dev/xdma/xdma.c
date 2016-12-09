@@ -147,6 +147,16 @@ xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg,
 	xdma_controller_t xdma;
 
 	xdma = xchan->xdma;
+	KASSERT(xdma != NULL, ("Panic."));
+
+	/* Sanity check. */
+	if (cb == NULL) {
+		device_printf(xdma->dev,
+		    "%s: Can't setup interrupt handler.\n",
+		    __func__);
+
+		return (-1);
+	}
 
 	ih = malloc(sizeof(struct xdma_intr_handler),
 	    M_XDMA, M_WAITOK | M_ZERO);
@@ -186,6 +196,7 @@ xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 	xdma_controller_t xdma;
 
 	xdma = xchan->xdma;
+	KASSERT(xdma != NULL, ("Panic."));
 
 	/* Sanity check. */
 	if (ih == NULL) {
