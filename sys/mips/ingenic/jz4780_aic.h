@@ -31,6 +31,12 @@
  */
 
 #define	AICFR		0x00	/* AIC Configuration Register */
+#define	 AICFR_TFTH_S	16	/* Transmit FIFO threshold for interrupt or DMA request. */
+#define	 AICFR_TFTH_M	(0x1f << AICFR_TFTH_S)
+#define	 AICFR_TFTH(x)	((x) << AICFR_TFTH_S)
+#define	 AICFR_RFTH_S	24	/* Receive FIFO threshold for interrupt or DMA request. */
+#define	 AICFR_RFTH_M	(0x0f << AICFR_RFTH_S)
+#define	 AICFR_RFTH(x)	((x) << AICFR_RFTH_S)
 #define	 AICFR_ICDC	(1 << 5) /* Internal CODEC used. */
 #define	 AICFR_AUSEL	(1 << 4) /* Audio Unit Select */
 #define	 AICFR_RST	(1 << 3) /* Reset AIC. */
@@ -43,6 +49,12 @@
 #define	 AICCR_CHANNEL_S	24
 #define	 AICCR_CHANNEL_M	(0x7 << AICCR_CHANNEL_S)
 #define	 AICCR_CHANNEL_2	(0x1 << AICCR_CHANNEL_S) /* 2 channels, stereo */
+#define	 AICCR_ISS_S		16	/* Input Sample Size. */
+#define	 AICCR_ISS_M		(0x7 << AICCR_ISS_S)
+#define	 AICCR_ISS_16		(0x1 << AICCR_ISS_S)
+#define	 AICCR_OSS_S		19	/* Output Sample Size. */
+#define	 AICCR_OSS_M		(0x7 << AICCR_OSS_S)
+#define	 AICCR_OSS_16		(0x1 << AICCR_OSS_S)
 #define	 AICCR_RDMS		(1 << 15) /* Receive DMA enable. */
 #define	 AICCR_TDMS		(1 << 14) /* Transmit DMA enable. */
 #define	 AICCR_ENLBF		(1 << 2) /* Enable AIC Loop Back Function. */

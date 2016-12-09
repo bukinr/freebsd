@@ -391,8 +391,7 @@ aic_start(struct sc_pcminfo *scp)
 
 	setup_dma(scp);
 
-	reg = (1 << 19); // OSS 16 bit
-	reg |= (1 << 16); // ISS 16 bit
+	reg = (AICCR_OSS_16 | AICCR_ISS_16);
 	reg |= (AICCR_CHANNEL_2);
 	reg |= (AICCR_TDMS);
 	reg |= (AICCR_ERPL);
@@ -683,8 +682,8 @@ aic_attach(device_t dev)
 		reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
 	}
 	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
-	reg |= (8 << 16);	/* TFTH  Transmit FIFO threshold */
-	reg |= (7 << 24);	/* RFTH  Receive FIFO threshold */
+	reg |= (AICFR_TFTH(8));	/* Transmit FIFO threshold */
+	reg |= (AICFR_RFTH(7));	/* Receive FIFO threshold */
 	WRITE4(sc, AICFR, reg);
 
 	reg = READ4(sc, AICFR);
