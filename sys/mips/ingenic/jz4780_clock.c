@@ -540,9 +540,6 @@ jz4780_clock_attach(device_t dev)
 	if (bootverbose)
 		clkdom_dump(sc->clkdom);
 
-	CSR_WRITE_4(sc, JZ_CLKGR0, 0);
-	CSR_WRITE_4(sc, JZ_CLKGR1, 0);
-
 	return (0);
 fail:
 	bus_release_resources(dev, jz4780_clock_spec, sc->res);
@@ -592,7 +589,7 @@ jz4780_clock_modify_4(device_t dev, bus_addr_t addr, uint32_t clear_mask,
 
 	sc = device_get_softc(dev);
 	val = CSR_READ_4(sc, addr);
-	val &= clear_mask;
+	val &= ~clear_mask;
 	val |= set_mask;
 	CSR_WRITE_4(sc, addr, val);
 	return (0);
