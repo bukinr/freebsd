@@ -464,7 +464,7 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 
 		desc[i].dcm |= dcm | DCM_TIE;
 		desc[i].dtc = (conf->block_len / max_width);
-		
+
 #if 0
 		if (i != (conf->block_num - 1)) {
 			desc[i].dcm |= DCM_LINK;
