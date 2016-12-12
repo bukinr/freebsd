@@ -99,7 +99,7 @@ struct xdma_channel {
 typedef struct xdma_channel xdma_channel_t;
 
 /* xDMA controller alloc/free */
-xdma_controller_t xdma_fdt_get(device_t dev, const char *prop);
+xdma_controller_t xdma_ofw_get(device_t dev, const char *prop);
 int xdma_put(xdma_controller_t xdma);
 
 xdma_channel_t * xdma_channel_alloc(xdma_controller_t);

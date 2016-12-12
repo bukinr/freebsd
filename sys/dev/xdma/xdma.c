@@ -524,17 +524,17 @@ xdma_callback(xdma_channel_t *xchan)
  * Notify the DMA driver we have machine-dependent data in FDT.
  */
 static int
-xdma_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
+xdma_ofw_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 {
 	uint32_t ret;
 
-	ret = XDMA_MD_DATA(xdma->dma_dev, cells, ncells, &xdma->data);
+	ret = XDMA_OFW_MD_DATA(xdma->dma_dev, cells, ncells, &xdma->data);
 
 	return (ret);
 }
 
 xdma_controller_t
-xdma_fdt_get(device_t dev, const char *prop)
+xdma_ofw_get(device_t dev, const char *prop)
 {
 	phandle_t parent, *cells;
 	xdma_controller_t xdma;
@@ -596,7 +596,7 @@ xdma_fdt_get(device_t dev, const char *prop)
 	xdma->dev = dev;
 	xdma->dma_dev = dma_dev;
 
-	xdma_md_data(xdma, cells, ncells);
+	xdma_ofw_md_data(xdma, cells, ncells);
 
 	return (xdma);
 }
