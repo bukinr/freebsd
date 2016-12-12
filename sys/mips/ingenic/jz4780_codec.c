@@ -43,12 +43,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/resource.h>
 #include <sys/rman.h>
+#include <sys/gpio.h>
 
 #include <machine/bus.h>
 
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+
+#include <dev/gpio/gpiobusvar.h>
 
 #include <mips/ingenic/jz4780_common.h>
 #include <mips/ingenic/jz4780_codec.h>
@@ -150,6 +153,39 @@ codec_print_registers(struct codec_softc *sc)
 }
 
 static int
+ci20_hp_unmute(struct codec_softc *sc)
+{
+	device_t dev;
+	int port;
+	int err;
+	int pin;
+
+	/* CI20 board-specific */
+	pin = 13;
+	port = 3;
+
+	dev = devclass_get_device(devclass_find("gpio"), port);
+	if (dev == NULL)
+		return (0);
+
+	err = GPIO_PIN_SETFLAGS(dev, pin, GPIO_PIN_OUTPUT);
+	if (err != 0) {
+		device_printf(dev, "Cannot configure GPIO pin %d on %s\n",
+		    pin, device_get_nameunit(dev));
+		return (err);
+	}
+
+	err = GPIO_PIN_SET(dev, pin, 0);
+	if (err != 0) {
+		device_printf(dev, "Cannot configure GPIO pin %d on %s\n",
+		    pin, device_get_nameunit(dev));
+		return (err);
+	}
+
+	return (0);
+}
+
+static int
 codec_probe(device_t dev)
 {
 
@@ -205,7 +241,9 @@ codec_attach(device_t dev)
 	/* Unmute headphones. */
 	reg = codec_read(sc, CR_HP);
 	reg &= ~(HP_SB | HP_MUTE);
-	codec_write(sc, CR_HP, 0);
+	codec_write(sc, CR_HP, reg);
+
+	ci20_hp_unmute(sc);
 
 	return (0);
 }
