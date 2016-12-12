@@ -47,11 +47,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sx.h>
 #include <sys/bus_dma.h>
 
-#include <vm/vm.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_kern.h>
-#include <vm/pmap.h>
-
 #include <machine/bus.h>
 
 #ifdef FDT
@@ -266,7 +261,7 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t desc_size,
 	    BUS_DMA_WAITOK | BUS_DMA_COHERENT, &xchan->dma_map);
 	if (err) {
 		device_printf(xdma->dev,
-		    "%s: Can't allocate descriptors.\n", __func__);
+		    "%s: Can't allocate memory for descriptors.\n", __func__);
 		return (-1);
 	}
 
