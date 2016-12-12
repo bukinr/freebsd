@@ -113,7 +113,7 @@ static struct resource_spec aic_spec[] = {
 static int aic_probe(device_t dev);
 static int aic_attach(device_t dev);
 static int aic_detach(device_t dev);
-static int setup_dma(struct sc_pcminfo *scp);
+static int setup_xdma(struct sc_pcminfo *scp);
 
 struct aic_rate {
         uint32_t speed;
@@ -338,7 +338,7 @@ aic_intr(void *arg)
 }
 
 static int
-setup_dma(struct sc_pcminfo *scp)
+setup_xdma(struct sc_pcminfo *scp)
 {
 	struct aic_softc *sc;
 	struct sc_chinfo *ch;
@@ -388,7 +388,7 @@ aic_start(struct sc_pcminfo *scp)
 	reg |= (I2SCR_ESCLK);
 	WRITE4(sc, I2SCR, reg);
 
-	setup_dma(scp);
+	setup_xdma(scp);
 
 	reg = (AICCR_OSS_16 | AICCR_ISS_16);
 	reg |= (AICCR_CHANNEL_2);
