@@ -343,7 +343,9 @@ pdma_channel_prep_memcpy(device_t dev, struct xdma_channel *xchan)
 	desc[0].dcm |= DCM_SP_4 | DCM_DP_4 | DCM_TSZ_4;
 	desc[0].dcm |= DCM_TIE;
 
+#if 0
 	printf("src %x dst %x dtc %d\n", conf->src_addr, conf->dst_addr, desc[0].dtc);
+#endif
 
 	return (0);
 }
