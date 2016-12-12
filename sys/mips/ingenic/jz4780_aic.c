@@ -676,15 +676,15 @@ aic_attach(device_t dev)
 	/* Get xDMA controller */
 	sc->xdma_tx = xdma_fdt_get(sc->dev, "tx");
 	if (sc->xdma_tx == NULL) {
-		device_printf(dev, "Can't find xDMA controller.\n");
-		return (-1);
+		device_printf(dev, "Can't find DMA controller.\n");
+		return (ENXIO);
 	}
 
 	/* Alloc xDMA virtual channel. */
 	sc->xchan = xdma_channel_alloc(sc->xdma_tx);
 	if (sc->xchan == NULL) {
 		device_printf(dev, "Can't alloc virtual DMA channel.\n");
-		return (-1);
+		return (ENXIO);
 	}
 
 	/* Setup sound subsystem */
