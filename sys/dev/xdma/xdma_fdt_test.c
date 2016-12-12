@@ -74,15 +74,13 @@ static int xdmatest_detach(device_t dev);
 static int
 xdmatest_intr(void *arg)
 {
-	xdma_channel_t *xchan;
 	struct xdmatest_softc *sc;
 	int i;
 
 	sc = arg;
-	xchan = sc->xchan;
 
 	/* We have memory updated by DMA controller. */
-	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(sc->dma_tag, sc->dma_map, BUS_DMASYNC_POSTWRITE);
 
 	for (i = 0; i < sc->len; i++) {
 		if (sc->dst[i] != sc->src[i]) {
@@ -171,7 +169,6 @@ xdmatest_alloc_test_memory(struct xdmatest_softc *sc)
 static int
 xdmatest_test(struct xdmatest_softc *sc)
 {
-	xdma_channel_t *xchan;
 	int err;
 	int i;
 
@@ -204,8 +201,7 @@ xdmatest_test(struct xdmatest_softc *sc)
 	}
 
 	/* We are going to fill memory. */
-	xchan = sc->xchan;
-	bus_dmamap_sync(xchan->dma_tag, xchan->dma_map, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->dma_tag, sc->dma_map, BUS_DMASYNC_PREWRITE);
 
 	/* Fill memory. */
 	for (i = 0; i < sc->len; i++) {
