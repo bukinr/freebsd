@@ -238,6 +238,8 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t desc_size,
 	xdma = xchan->xdma;
 	conf = &xchan->conf;
 
+	XDMA_ASSERT_LOCKED();
+
 	nsegments = conf->block_num;
 	all_desc_sz = (conf->block_num * desc_size);
 

@@ -298,8 +298,6 @@ pdma_channel_alloc(device_t dev, struct xdma_channel *xchan)
 			chan->used = 1;
 			chan->index = i;
 
-			printf("allocated pdma chan %d\n", i);
-
 			return (0);
 		}
 	}
@@ -413,9 +411,15 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 
 	sc = device_get_softc(dev);
 
+	xdma = xchan->xdma;
+	data = (struct pdma_fdt_data *)xdma->data;
+
 	conf = &xchan->conf;
+
+#if 0
 	printf("%s: block len %d, block num %d\n", __func__,
 	    conf->block_len, conf->block_num);
+#endif
 
 	ret = xdma_desc_alloc(xchan, sizeof(struct pdma_hwdesc), 8);
 	if (ret != 0) {
@@ -428,15 +432,13 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 	chan->flags = TRANFER_TYPE_CYCLIC;
 	chan->cur_desc = 0;
 
-	xdma = xchan->xdma;
-	data = (struct pdma_fdt_data *)xdma->data;
-
 	pdma_channel_reset(sc, chan->index);
-
 	desc = (struct pdma_hwdesc *)xchan->descs;
 
+#if 0
 	printf("xchan->descs is %x, block_num %d, data->tx %d\n",
 	    vtophys(xchan->descs), conf->block_num, data->tx);
+#endif
 
 	for (i = 0; i < conf->block_num; i++) {
 		if (conf->direction == XDMA_MEM_TO_DEV) {
