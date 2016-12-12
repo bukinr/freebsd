@@ -110,8 +110,6 @@
 			dmas = <&dma 0 JZ4780_DMA_I2S0_RX 0xffffffff>, <&dma JZ4780_DMA_I2S0_TX 0 0xffffffff>;
 			dma-names = "rx" , "tx";
 
-			interrupt-parent = <&intc>;
-			interrupts = <1>;
 		};
 
 		codec: codec@100200a4 {
@@ -219,18 +217,6 @@
 
 			pincfg_pull_down: pull_down {
 				bias-pull-down;
-			};
-
-			pinfunc_i2s: i2s {
-				pins_i2s_data: i2s-data {
-					ingenic,pins = <&gpe   5 2 &pincfg_nobias
-							&gpd  12 1 &pincfg_nobias
-							&gpd  13 4 &pincfg_nobias
-							&gpe   6 0 &pincfg_nobias
-							&gpe   7 0 &pincfg_nobias
-							&gpe   8 1 &pincfg_nobias
-							&gpe   9 1 &pincfg_nobias >;
-				};
 			};
 
 			pinfunc_uart0: uart0 {
