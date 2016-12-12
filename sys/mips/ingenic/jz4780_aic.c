@@ -282,7 +282,7 @@ aicchan_setspeed(kobj_t obj, void *data, uint32_t speed)
 	sc->sr = sr;
 
 #if 0
-	aic_configure_clock(sc);
+	/* Clocks can be reconfigured here. */
 #endif
 
 	return (sr->speed);
@@ -617,6 +617,36 @@ aic_configure_clocks(struct aic_softc *sc)
 }
 
 static int
+aic_configure(struct aic_softc *sc)
+{
+	int internal_codec;
+	int reg;
+
+	internal_codec = 1;
+
+	WRITE4(sc, AICFR, AICFR_RST);
+
+	/* Configure AIC */
+	reg = 0;
+	if (internal_codec) {
+		reg |= (AICFR_ICDC);	/* Internal CODEC. */
+	} else {
+		reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
+		reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
+	}
+	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
+	reg |= (AICFR_TFTH(8));	/* Transmit FIFO threshold */
+	reg |= (AICFR_RFTH(7));	/* Receive FIFO threshold */
+	WRITE4(sc, AICFR, reg);
+
+	reg = READ4(sc, AICFR);
+	reg |= (AICFR_ENB);	/* Enable the controller. */
+	WRITE4(sc, AICFR, reg);
+
+	return (0);
+}
+
+static int
 aic_probe(device_t dev)
 {
 
@@ -637,7 +667,6 @@ aic_attach(device_t dev)
 	char status[SND_STATUSLEN];
 	struct sc_pcminfo *scp;
 	struct aic_softc *sc;
-	uint32_t reg;
 	int err;
 
 	sc = malloc(sizeof(*sc), M_DEVBUF, M_WAITOK | M_ZERO);  
@@ -694,29 +723,11 @@ aic_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	int internal_codec;
-
-	WRITE4(sc, AICFR, AICFR_RST);
-
-	internal_codec = 1;
-
-	/* Configure AIC */
-	reg = READ4(sc, AICFR);
-	reg = 0;
-	if (internal_codec) {
-		reg |= (AICFR_ICDC);	/* Internal CODEC. */
-	} else {
-		reg |= (AICFR_SYNCD);	/* SYNC is generated internally and driven out to the CODEC. */
-		reg |= (AICFR_BCKD);	/* BIT_CLK is generated internally and driven out to the CODEC. */
+	err = aic_configure(sc);
+	if (err != 0) {
+		device_printf(dev, "Can't configure AIC.\n");
+		return (ENXIO);
 	}
-	reg |= (AICFR_AUSEL);	/* Select I2S/MSB-justified format. */
-	reg |= (AICFR_TFTH(8));	/* Transmit FIFO threshold */
-	reg |= (AICFR_RFTH(7));	/* Receive FIFO threshold */
-	WRITE4(sc, AICFR, reg);
-
-	reg = READ4(sc, AICFR);
-	reg |= (AICFR_ENB);	/* Enable the controller. */
-	WRITE4(sc, AICFR, reg);
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_MPSAFE);
 
