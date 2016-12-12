@@ -383,11 +383,10 @@ aic_start(struct sc_pcminfo *scp)
 	device_printf(scp->dev, "%s\n", __func__);
 #endif
 
+	/* Ensure clock enabled. */
 	reg = READ4(sc, I2SCR);
 	reg |= (I2SCR_ESCLK);
 	WRITE4(sc, I2SCR, reg);
-
-	//WRITE4(sc, I2SDIV, 1);
 
 	setup_dma(scp);
 
@@ -520,6 +519,104 @@ aic_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 }
 
 static int
+aic_dma_setup(struct aic_softc *sc)
+{
+	device_t dev;
+	int err;
+
+	dev = sc->dev;
+
+	/* DMA buffer size. */
+	sc->dma_size = 131072;
+
+	/*
+	 * Must use dma_size boundary as modulo feature required.
+	 * Modulo feature allows setup circular buffer.
+	 */
+	err = bus_dma_tag_create(
+	    bus_get_dma_tag(sc->dev),
+	    4, sc->dma_size,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	    BUS_SPACE_MAXADDR,		/* highaddr */
+	    NULL, NULL,			/* filter, filterarg */
+	    sc->dma_size, 1,		/* maxsize, nsegments */
+	    sc->dma_size, 0,		/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->dma_tag);
+	if (err) {
+		device_printf(dev, "cannot create bus dma tag\n");
+		return (-1);
+	}
+
+	err = bus_dmamem_alloc(sc->dma_tag, (void **)&sc->buf_base,
+	    BUS_DMA_NOWAIT | BUS_DMA_COHERENT, &sc->dma_map);
+	if (err) {
+		device_printf(dev, "cannot allocate memory\n");
+		return (-1);
+	}
+
+	err = bus_dmamap_load(sc->dma_tag, sc->dma_map, sc->buf_base,
+	    sc->dma_size, aic_dmamap_cb, &sc->buf_base_phys, BUS_DMA_NOWAIT);
+	if (err) {
+		device_printf(dev, "cannot load DMA map\n");
+		return (-1);
+	}
+
+	bzero(sc->buf_base, sc->dma_size);
+
+	return (0);
+}
+
+static int
+aic_configure_clocks(struct aic_softc *sc)
+{
+	uint64_t aic_freq;
+	uint64_t i2s_freq;
+	device_t dev;
+	int err;
+
+	dev = sc->dev;
+
+	err = clk_get_by_ofw_name(sc->dev, 0, "aic", &sc->clk_aic);
+	if (err != 0) {
+		device_printf(dev, "Can't find aic clock.\n");
+		return (-1);
+	}
+
+	err = clk_enable(sc->clk_aic);
+	if (err != 0) {
+		device_printf(dev, "Can't enable aic clock.\n");
+		return (-1);
+	}
+
+	err = clk_get_by_ofw_name(sc->dev, 0, "i2s", &sc->clk_i2s);
+	if (err != 0) {
+		device_printf(dev, "Can't find i2s clock.\n");
+		return (-1);
+	}
+
+	err = clk_enable(sc->clk_i2s);
+	if (err != 0) {
+		device_printf(dev, "Can't enable i2s clock.\n");
+		return (-1);
+	}
+
+	err = clk_set_freq(sc->clk_i2s, 12000000, 0);
+	if (err != 0) {
+		device_printf(dev, "Can't set i2s frequency.\n");
+		return (-1);
+	}
+
+	clk_get_freq(sc->clk_aic, &aic_freq);
+	clk_get_freq(sc->clk_i2s, &i2s_freq);
+
+	device_printf(dev, "Frequency aic %d i2s %d\n",
+	    (uint32_t)aic_freq, (uint32_t)i2s_freq);
+
+	return (0);
+}
+
+static int
 aic_probe(device_t dev)
 {
 
@@ -578,95 +675,26 @@ aic_attach(device_t dev)
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 	sc->aic_fifo_paddr = rman_get_start(sc->res[0]) + AICDR;
 
-	/* Setup PCM */
+	/* Setup PCM. */
 	scp = malloc(sizeof(struct sc_pcminfo), M_DEVBUF, M_NOWAIT | M_ZERO);
 	scp->sc = sc;
 	scp->dev = dev;
 
-	/* DMA buffer size. */
-	sc->dma_size = 131072;
-
-	/*
-	 * Must use dma_size boundary as modulo feature required.
-	 * Modulo feature allows setup circular buffer.
-	 */
-	err = bus_dma_tag_create(
-	    bus_get_dma_tag(sc->dev),
-	    4, sc->dma_size,		/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
-	    BUS_SPACE_MAXADDR,		/* highaddr */
-	    NULL, NULL,			/* filter, filterarg */
-	    sc->dma_size, 1,		/* maxsize, nsegments */
-	    sc->dma_size, 0,		/* maxsegsize, flags */
-	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->dma_tag);
-
-	err = bus_dmamem_alloc(sc->dma_tag, (void **)&sc->buf_base,
-	    BUS_DMA_NOWAIT | BUS_DMA_COHERENT, &sc->dma_map);
-	if (err) {
-		device_printf(dev, "cannot allocate framebuffer\n");
+	/* Setup DMA. */
+	err = aic_dma_setup(sc);
+	if (err != 0) {
+		device_printf(dev, "Can't setup sound buffer.\n");
 		return (ENXIO);
 	}
 
-	err = bus_dmamap_load(sc->dma_tag, sc->dma_map, sc->buf_base,
-	    sc->dma_size, aic_dmamap_cb, &sc->buf_base_phys, BUS_DMA_NOWAIT);
-	if (err) {
-		device_printf(dev, "cannot load DMA map\n");
+	/* Setup clocks. */
+	err = aic_configure_clocks(sc);
+	if (err != 0) {
+		device_printf(dev, "Can't configure clocks.\n");
 		return (ENXIO);
 	}
 
-	bzero(sc->buf_base, sc->dma_size);
-
-	err = clk_get_by_ofw_name(sc->dev, 0, "aic", &sc->clk_aic);
-	if (err == 0) {
-		printf("aic clk found. enable\n");
-		err = clk_enable(sc->clk_aic);
-	}
-	if (err != 0)
-		printf("failed to enable aic clk\n");
-
-	err = clk_get_by_ofw_name(sc->dev, 0, "i2s", &sc->clk_i2s);
-	if (err == 0) {
-		printf("i2s clk found\n");
-	}
-
-#if 0
-	clk_t pclk;
-	clk_t eclk;
-	clk_t sclk;
-
-	clk_get_by_name(dev, "epll", &eclk);
-	clk_get_by_name(dev, "sclk_a", &sclk);
-	clk_get_by_name(dev, "i2s_pll", &pclk);
-
-	err = clk_set_parent_by_clk(pclk, sclk);
-	if (err == 0) {
-		printf("parent to pclk (sclk) set\n");
-	}
-
-	clk_t extclk;
-	clk_get_by_name(dev, "ext", &extclk);
-	err = clk_set_parent_by_clk(sc->clk_i2s, extclk);
-#endif
-
-	if (err == 0) {
-		printf("i2s clk found. enable\n");
-		err = clk_enable(sc->clk_i2s);
-	}
-
-	if (err != 0)
-		printf("failed to enable i2s clk\n");
-
-	clk_set_freq(sc->clk_i2s, 12000000, 0);
-
-	uint64_t aic_freq;
-	uint64_t i2s_freq;
 	int internal_codec;
-
-	clk_get_freq(sc->clk_aic, &aic_freq);
-	clk_get_freq(sc->clk_i2s, &i2s_freq);
-
-	printf("clocks aic %d i2s %d\n", (uint32_t)aic_freq, (uint32_t)i2s_freq);
 
 	WRITE4(sc, AICFR, AICFR_RST);
 
@@ -714,9 +742,6 @@ aic_attach(device_t dev)
 
 	mixer_init(dev, &aicmixer_class, scp);
 
-	//for detach
-	//xdma_channel_free(sc->xchan);
-
 	return (0);
 }
 
@@ -726,6 +751,8 @@ aic_detach(device_t dev)
 	struct aic_softc *sc;
 
 	sc = device_get_softc(dev);
+
+	xdma_channel_free(sc->xchan);
 
 	bus_release_resources(dev, aic_spec, sc->res);
 
