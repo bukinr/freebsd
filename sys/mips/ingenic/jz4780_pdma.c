@@ -129,7 +129,8 @@ pdma_intr(void *arg)
 
 			if (chan->flags & TRANFER_TYPE_CYCLIC) {
 				/* Enable again */
-				chan->cur_desc = (chan->cur_desc + 1) % conf->block_num;
+				chan->cur_desc = (chan->cur_desc + 1) % \
+				    conf->block_num;
 				chan_start(sc, chan);
 			}
 
@@ -228,12 +229,12 @@ chan_start(struct pdma_softc *sc, struct pdma_channel *chan)
 
 	xchan = chan->xchan;
 
-	/* 8 byte descriptor */
+	/* 8 byte descriptor. */
 	WRITE4(sc, PDMA_DCS(chan->index), DCS_DES8);
 	WRITE4(sc, PDMA_DDA(chan->index), xchan->descs_phys[chan->cur_desc]);
 	WRITE4(sc, PDMA_DDS, (1 << chan->index));
 
-	/* Channel transfer enable */
+	/* Channel transfer enable. */
 	WRITE4(sc, PDMA_DCS(chan->index), (DCS_DES8 | DCS_CTE));
 
 	return (0);
@@ -245,19 +246,23 @@ chan_stop(struct pdma_softc *sc, struct pdma_channel *chan)
 	int timeout;
 	int reg;
 
+#if 0
 	printf("%s: Stopping chan %d\n", __func__, chan->index);
+#endif
 
 	WRITE4(sc, PDMA_DCS(chan->index), 0);
 
-	for (timeout = 100; timeout > 0; timeout--) {
+	timeout = 100;
+
+	do {
 		if ((READ4(sc, PDMA_DCS(chan->index)) & DCS_CTE) == 0) {
 			break;
 		}
-	}
+	} while (timeout--);
 
 	if (timeout == 0) {
-		device_printf(sc->dev,
-		    "%s: Can't stop channel %d\n", __func__, chan->index);
+		device_printf(sc->dev, "%s: Can't stop channel %d\n",
+		    __func__, chan->index);
 	}
 
 	reg = READ4(sc, PDMA_DMAC);
@@ -504,7 +509,7 @@ pdma_channel_control(device_t dev, xdma_channel_t *xchan, int cmd)
 }
 
 static int
-pdma_md_data(device_t dev, phandle_t *cells, int ncells, void **ptr)
+pdma_ofw_md_data(device_t dev, phandle_t *cells, int ncells, void **ptr)
 {
 	struct pdma_fdt_data *data;
 
@@ -534,7 +539,7 @@ static device_method_t pdma_methods[] = {
 	DEVMETHOD(xdma_channel_prep_cyclic,	pdma_channel_prep_cyclic),
 	DEVMETHOD(xdma_channel_prep_memcpy,	pdma_channel_prep_memcpy),
 	DEVMETHOD(xdma_channel_control,		pdma_channel_control),
-	DEVMETHOD(xdma_md_data,			pdma_md_data),
+	DEVMETHOD(xdma_ofw_md_data,		pdma_ofw_md_data),
 
 	DEVMETHOD_END
 };

@@ -27,6 +27,7 @@ options 	ROOTDEVNAME=\"ufs:mmcsd0\"
 
 device		sound
 device		xdma
+device		xdma_test
 
 makeoptions	TRAMPLOADADDR=0x88000000
 

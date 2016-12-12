@@ -173,7 +173,7 @@ xdmatest_test(struct xdmatest_softc *sc)
 	int i;
 
 	/* Get xDMA controller. */
-	sc->xdma = xdma_fdt_get(sc->dev, "test");
+	sc->xdma = xdma_ofw_get(sc->dev, "test");
 	if (sc->xdma == NULL) {
 		device_printf(sc->dev, "Can't find xDMA controller.\n");
 		return (-1);

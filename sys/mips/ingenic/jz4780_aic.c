@@ -674,7 +674,7 @@ aic_attach(device_t dev)
 	sc->pos = 0;
 
 	/* Get xDMA controller */
-	sc->xdma_tx = xdma_fdt_get(sc->dev, "tx");
+	sc->xdma_tx = xdma_ofw_get(sc->dev, "tx");
 	if (sc->xdma_tx == NULL) {
 		device_printf(dev, "Can't find DMA controller.\n");
 		return (ENXIO);

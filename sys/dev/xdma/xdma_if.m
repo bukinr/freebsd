@@ -71,9 +71,9 @@ METHOD int channel_prep_memcpy {
 };
 
 #
-# Notify driver we have some machine-dependend data.
+# Notify driver we have machine-dependend data.
 #
-METHOD int md_data {
+METHOD int ofw_md_data {
 	device_t dev;
 	phandle_t *cells;
 	int ncells;
