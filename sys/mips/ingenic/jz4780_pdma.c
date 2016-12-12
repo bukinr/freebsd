@@ -545,4 +545,5 @@ static driver_t pdma_driver = {
 
 static devclass_t pdma_devclass;
 
-EARLY_DRIVER_MODULE(pdma, simplebus, pdma_driver, pdma_devclass, 0, 0, BUS_PASS_INTERRUPT+BUS_PASS_ORDER_LAST);
+EARLY_DRIVER_MODULE(pdma, simplebus, pdma_driver, pdma_devclass, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);

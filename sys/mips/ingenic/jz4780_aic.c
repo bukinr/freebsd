@@ -709,7 +709,7 @@ aic_attach(device_t dev)
 	scp->sc = sc;
 	scp->dev = dev;
 
-	/* Setup DMA. */
+	/* Setup audio buffer. */
 	err = aic_dma_setup(sc);
 	if (err != 0) {
 		device_printf(dev, "Can't setup sound buffer.\n");
