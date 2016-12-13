@@ -335,16 +335,17 @@ int
 xdma_desc_free(xdma_channel_t *xchan)
 {
 
-	if (xchan->flags & XCHAN_FLAG_DESC_ALLOCATED) {
-		bus_dmamap_unload(xchan->dma_tag, xchan->dma_map);
-		bus_dmamem_free(xchan->dma_tag, xchan->descs, xchan->dma_map);
-		free(xchan->descs_phys, M_XDMA);
-		xchan->flags &= ~(XCHAN_FLAG_DESC_ALLOCATED);
-
-		return (0);
+	if ((xchan->flags & XCHAN_FLAG_DESC_ALLOCATED) == 0) {
+		/* No descriptors allocated. */
+		return (-1);
 	}
 
-	return (-1);
+	bus_dmamap_unload(xchan->dma_tag, xchan->dma_map);
+	bus_dmamem_free(xchan->dma_tag, xchan->descs, xchan->dma_map);
+	free(xchan->descs_phys, M_XDMA);
+	xchan->flags &= ~(XCHAN_FLAG_DESC_ALLOCATED);
+
+	return (0);
 }
 
 int
