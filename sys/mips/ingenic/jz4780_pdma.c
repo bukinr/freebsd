@@ -281,6 +281,7 @@ pdma_channel_free(device_t dev, struct xdma_channel *xchan)
 	sc = device_get_softc(dev);
 
 	chan = (struct pdma_channel *)xchan->chan;
+	pdma_channel_reset(sc, chan->index);
 	chan->used = 0;
 
 	return (0);
