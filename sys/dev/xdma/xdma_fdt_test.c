@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/kthread.h>
 #include <sys/module.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -57,7 +58,7 @@ struct xdmatest_softc {
 	xdma_controller_t	*xdma;
 	xdma_channel_t		*xchan;
 	void			*ih;
-	struct intr_config_hook test_intrhook;
+	struct intr_config_hook config_intrhook;
 	char			*src;
 	char			*dst;
 	uint32_t		len;
@@ -65,6 +66,9 @@ struct xdmatest_softc {
 	uintptr_t		dst_phys;
 	bus_dma_tag_t		dma_tag;
 	bus_dmamap_t		dma_map;
+	struct mtx		mtx;
+	int			done;
+	struct proc		*newp;
 };
 
 static int xdmatest_probe(device_t dev);
@@ -75,36 +79,12 @@ static int
 xdmatest_intr(void *arg)
 {
 	struct xdmatest_softc *sc;
-	int err;
-	int i;
 
 	sc = arg;
 
-	/* We have memory updated by DMA controller. */
-	bus_dmamap_sync(sc->dma_tag, sc->dma_map, BUS_DMASYNC_POSTWRITE);
+	sc->done = 1;
 
-	for (i = 0; i < sc->len; i++) {
-		if (sc->dst[i] != sc->src[i]) {
-			device_printf(sc->dev, "%s: Test failed.\n", __func__);
-			return (0);
-		}
-	}
-
-	err = xdma_channel_free(sc->xchan);
-	if (err != 0) {
-		device_printf(sc->dev,
-		    "%s: Test failed: can't deallocate channel.\n", __func__);
-		return (0);
-	}
-
-	err = xdma_put(sc->xdma);
-	if (err != 0) {
-		device_printf(sc->dev,
-		    "%s: Test failed: can't deallocate xDMA.\n", __func__);
-		return (0);
-	}
-
-	device_printf(sc->dev, "Test succeded.\n");
+	wakeup(sc);
 
 	return (0);
 }
@@ -237,16 +217,87 @@ xdmatest_test(struct xdmatest_softc *sc)
 	return (0);
 }
 
+static int
+xdmatest_verify(struct xdmatest_softc *sc)
+{
+	int err;
+	int i;
+
+	/* We have memory updated by DMA controller. */
+	bus_dmamap_sync(sc->dma_tag, sc->dma_map, BUS_DMASYNC_POSTWRITE);
+
+	for (i = 0; i < sc->len; i++) {
+		if (sc->dst[i] != sc->src[i]) {
+			device_printf(sc->dev, "%s: Test failed.\n", __func__);
+			return (-1);
+		}
+	}
+
+	err = xdma_channel_free(sc->xchan);
+	if (err != 0) {
+		device_printf(sc->dev,
+		    "%s: Test failed: can't deallocate channel.\n", __func__);
+		return (-1);
+	}
+
+	err = xdma_put(sc->xdma);
+	if (err != 0) {
+		device_printf(sc->dev,
+		    "%s: Test failed: can't deallocate xDMA.\n", __func__);
+		return (-1);
+	}
+
+	//device_printf(sc->dev, "Test succeded.\n");
+	printf(".");
+
+	return (0);
+}
+
 static void
-delayed_attach(void *arg)
+xdmatest_worker(void *arg)
+{
+	struct xdmatest_softc *sc;
+	int timeout;
+	int err;
+
+	sc = arg;
+
+	while (1) {
+		sc->done = 0;
+		err = -1;
+
+		mtx_lock(&sc->mtx);
+
+		xdmatest_test(sc);
+
+		timeout = 100;
+
+		do {
+			mtx_sleep(sc, &sc->mtx, 0, "xdmatest_wait", hz);
+		} while (timeout-- && sc->done == 0);
+
+		if (timeout != 0) {
+			err = xdmatest_verify(sc);
+		}
+
+		mtx_unlock(&sc->mtx);
+	}
+}
+
+static void
+xdmatest_delayed_attach(void *arg)
 {
 	struct xdmatest_softc *sc;
 
 	sc = arg;
 
-	xdmatest_test(sc);
+	if (kproc_create(xdmatest_worker, (void *)sc, &sc->newp, 0, 0,
+            "xdmatest_worker") != 0) {
+		device_printf(sc->dev,
+		    "%s: Failed to create worker thread.\n", __func__);
+	}
 
-	config_intrhook_disestablish(&sc->test_intrhook);
+	config_intrhook_disestablish(&sc->config_intrhook);
 }
 
 static int
@@ -272,11 +323,13 @@ xdmatest_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
+	mtx_init(&sc->mtx, device_get_nameunit(dev), "xdmatet", MTX_DEF);
+
 	/* We'll run test later, but before / mount. */
-	sc->test_intrhook.ich_func = delayed_attach;
-	sc->test_intrhook.ich_arg = sc;
-	if (config_intrhook_establish(&sc->test_intrhook) != 0)
-		device_printf(dev, "test_intrhook_establish failed\n");
+	sc->config_intrhook.ich_func = xdmatest_delayed_attach;
+	sc->config_intrhook.ich_arg = sc;
+	if (config_intrhook_establish(&sc->config_intrhook) != 0)
+		device_printf(dev, "config_intrhook_establish failed\n");
 
 	return (0);
 }
