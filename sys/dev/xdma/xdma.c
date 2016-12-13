@@ -178,18 +178,6 @@ xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg,
 }
 
 int
-xdma_teardown_all_intr(xdma_channel_t *xchan)
-{
-	struct xdma_intr_handler *ih;
-
-	TAILQ_FOREACH(ih, &xchan->ie_handlers, ih_next) {
-		TAILQ_REMOVE(&xchan->ie_handlers, ih, ih_next);
-	}
-
-	return (0);
-}
-
-int
 xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 {
 	xdma_controller_t *xdma;
@@ -205,6 +193,25 @@ xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 	}
 
 	TAILQ_REMOVE(&xchan->ie_handlers, ih, ih_next);
+	free(ih, M_XDMA);
+
+	return (0);
+}
+
+int
+xdma_teardown_all_intr(xdma_channel_t *xchan)
+{
+	struct xdma_intr_handler *ih_tmp;
+	struct xdma_intr_handler *ih;
+	xdma_controller_t *xdma;
+
+	xdma = xchan->xdma;
+	KASSERT(xdma != NULL, ("Panic."));
+
+	TAILQ_FOREACH_SAFE(ih, &xchan->ie_handlers, ih_next, ih_tmp) {
+		TAILQ_REMOVE(&xchan->ie_handlers, ih, ih_next);
+		free(ih, M_XDMA);
+	}
 
 	return (0);
 }
@@ -342,6 +349,7 @@ xdma_desc_free(xdma_channel_t *xchan)
 
 	bus_dmamap_unload(xchan->dma_tag, xchan->dma_map);
 	bus_dmamem_free(xchan->dma_tag, xchan->descs, xchan->dma_map);
+	bus_dma_tag_destroy(xchan->dma_tag);
 	free(xchan->descs_phys, M_XDMA);
 	xchan->flags &= ~(XCHAN_FLAG_DESC_ALLOCATED);
 
@@ -518,6 +526,9 @@ xdma_callback(xdma_channel_t *xchan)
 	TAILQ_FOREACH(entry, &xchan->ie_handlers, ih_next) {
 		if (entry->cb != NULL) {
 			entry->cb(entry->cb_user);
+
+			/* TODO: At this point xchan can be destroyed by user already. */
+			return (0);
 		}
 	}
 
