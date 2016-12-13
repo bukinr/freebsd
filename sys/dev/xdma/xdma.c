@@ -98,7 +98,7 @@ xdma_channel_alloc(xdma_controller_t *xdma)
 
 	TAILQ_INIT(&xchan->ie_handlers);
 
-	TAILQ_INSERT_TAIL(&xdma->channels, xchan, xchan_link);
+	TAILQ_INSERT_TAIL(&xdma->channels, xchan, xchan_next);
 
 	XDMA_UNLOCK();
 
@@ -128,6 +128,8 @@ xdma_channel_free(xdma_channel_t *xchan)
 
 	/* Deallocate descriptors, if any. */
 	xdma_desc_free(xchan);
+
+	TAILQ_REMOVE(&xdma->channels, xchan, xchan_next);
 
 	free(xchan, M_XDMA);
 
@@ -620,7 +622,11 @@ int
 xdma_put(xdma_controller_t *xdma)
 {
 
-	/* TODO: ensure no channels allocated */
+	/* Ensure no channels allocated. */
+	if (!TAILQ_EMPTY(&xdma->channels)) {
+		device_printf(xdma->dev, "%s: Can't free xDMA\n", __func__);
+		return (-1);
+	}
 
 	free(xdma, M_XDMA);
 

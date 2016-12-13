@@ -75,6 +75,7 @@ static int
 xdmatest_intr(void *arg)
 {
 	struct xdmatest_softc *sc;
+	int err;
 	int i;
 
 	sc = arg;
@@ -84,9 +85,23 @@ xdmatest_intr(void *arg)
 
 	for (i = 0; i < sc->len; i++) {
 		if (sc->dst[i] != sc->src[i]) {
-			device_printf(sc->dev, "Test failed\n");
+			device_printf(sc->dev, "%s: Test failed.\n", __func__);
 			return (0);
 		}
+	}
+
+	err = xdma_channel_free(sc->xchan);
+	if (err != 0) {
+		device_printf(sc->dev,
+		    "%s: Test failed: can't deallocate channel.\n", __func__);
+		return (0);
+	}
+
+	err = xdma_put(sc->xdma);
+	if (err != 0) {
+		device_printf(sc->dev,
+		    "%s: Test failed: can't deallocate xDMA.\n", __func__);
+		return (0);
 	}
 
 	device_printf(sc->dev, "Test succeded.\n");

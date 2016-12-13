@@ -98,7 +98,7 @@ struct xdma_channel {
 	void				*descs;
 	uintptr_t			*descs_phys;
 
-	TAILQ_ENTRY(xdma_channel)	xchan_link;
+	TAILQ_ENTRY(xdma_channel)	xchan_next;
 };
 
 typedef struct xdma_channel xdma_channel_t;
