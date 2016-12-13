@@ -54,7 +54,7 @@ __FBSDID("$FreeBSD$");
 
 struct xdmatest_softc {
 	device_t		dev;
-	xdma_controller_t	xdma;
+	xdma_controller_t	*xdma;
 	xdma_channel_t		*xchan;
 	void			*ih;
 	struct intr_config_hook test_intrhook;

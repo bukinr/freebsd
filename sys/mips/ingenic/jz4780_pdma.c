@@ -408,7 +408,7 @@ pdma_channel_prep_cyclic(device_t dev, struct xdma_channel *xchan)
 	struct pdma_fdt_data *data;
 	struct pdma_channel *chan;
 	struct pdma_hwdesc *desc;
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	struct pdma_softc *sc;
 	xdma_config_t *conf;
 	int max_width;

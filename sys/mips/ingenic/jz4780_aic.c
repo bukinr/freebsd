@@ -80,7 +80,7 @@ struct aic_softc {
 	struct aic_rate		*sr;
 	void			*ih;
 	struct xdma_channel	*xchan;
-	xdma_controller_t	xdma_tx;
+	xdma_controller_t	*xdma_tx;
 };
 
 /* Channel registers */

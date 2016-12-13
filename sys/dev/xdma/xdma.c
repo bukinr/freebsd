@@ -70,7 +70,7 @@ static struct mtx xdma_mtx;
  * Allocate virtual xDMA channel.
  */
 xdma_channel_t *
-xdma_channel_alloc(xdma_controller_t xdma)
+xdma_channel_alloc(xdma_controller_t *xdma)
 {
 	xdma_channel_t *xchan;
 	int ret;
@@ -108,7 +108,7 @@ xdma_channel_alloc(xdma_controller_t xdma)
 int
 xdma_channel_free(xdma_channel_t *xchan)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	int err;
 
 	xdma = xchan->xdma;
@@ -141,7 +141,7 @@ xdma_setup_intr(xdma_channel_t *xchan, int (*cb)(void *), void *arg,
     void **ihandler)
 {
 	struct xdma_intr_handler *ih;
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 
 	xdma = xchan->xdma;
 	KASSERT(xdma != NULL, ("Panic."));
@@ -190,7 +190,7 @@ xdma_teardown_all_intr(xdma_channel_t *xchan)
 int
 xdma_teardown_intr(xdma_channel_t *xchan, struct xdma_intr_handler *ih)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 
 	xdma = xchan->xdma;
 	KASSERT(xdma != NULL, ("Panic."));
@@ -231,7 +231,7 @@ static int
 xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t desc_size,
     uint32_t align)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	bus_size_t all_desc_sz;
 	xdma_config_t *conf;
 	int nsegments;
@@ -286,7 +286,7 @@ xdma_desc_alloc_bus_dma(xdma_channel_t *xchan, uint32_t desc_size,
 int
 xdma_desc_alloc(xdma_channel_t *xchan, uint32_t desc_size, uint32_t align)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	xdma_config_t *conf;
 	int ret;
 
@@ -349,7 +349,7 @@ int
 xdma_prep_memcpy(xdma_channel_t *xchan, uintptr_t src_addr,
     uintptr_t dst_addr, size_t len)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	xdma_config_t *conf;
 	int ret;
 
@@ -403,7 +403,7 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
     uintptr_t src_addr, uintptr_t dst_addr, int block_len,
     int block_num, int src_width, int dst_width)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	xdma_config_t *conf;
 	int ret;
 
@@ -456,7 +456,7 @@ xdma_prep_cyclic(xdma_channel_t *xchan, enum xdma_direction dir,
 int
 xdma_begin(xdma_channel_t *xchan)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	int ret;
 
 	xdma = xchan->xdma;
@@ -474,7 +474,7 @@ xdma_begin(xdma_channel_t *xchan)
 int
 xdma_terminate(xdma_channel_t *xchan)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	int ret;
 
 	xdma = xchan->xdma;
@@ -492,7 +492,7 @@ xdma_terminate(xdma_channel_t *xchan)
 int
 xdma_pause(xdma_channel_t *xchan)
 {
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	int ret;
 
 	xdma = xchan->xdma;
@@ -526,7 +526,7 @@ xdma_callback(xdma_channel_t *xchan)
  * Notify the DMA driver we have machine-dependent data in FDT.
  */
 static int
-xdma_ofw_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
+xdma_ofw_md_data(xdma_controller_t *xdma, phandle_t *cells, int ncells)
 {
 	uint32_t ret;
 
@@ -538,11 +538,11 @@ xdma_ofw_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 /*
  * Allocate xdma controller.
  */
-xdma_controller_t
+xdma_controller_t *
 xdma_ofw_get(device_t dev, const char *prop)
 {
 	phandle_t parent, *cells;
-	xdma_controller_t xdma;
+	xdma_controller_t *xdma;
 	device_t dma_dev;
 	phandle_t node;
 	int ncells;
@@ -617,7 +617,7 @@ xdma_ofw_get(device_t dev, const char *prop)
  * Free xDMA controller object.
  */
 int
-xdma_put(xdma_controller_t xdma)
+xdma_put(xdma_controller_t *xdma)
 {
 
 	/* TODO: ensure no channels allocated */

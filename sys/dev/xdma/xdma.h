@@ -62,7 +62,7 @@ struct xdma_controller {
 	TAILQ_HEAD(xdma_channel_list, xdma_channel)	channels;
 };
 
-typedef struct xdma_controller *xdma_controller_t;
+typedef struct xdma_controller xdma_controller_t;
 
 struct xdma_channel_config {
 	enum xdma_direction	direction;
@@ -77,7 +77,7 @@ struct xdma_channel_config {
 typedef struct xdma_channel_config xdma_config_t;
 
 struct xdma_channel {
-	xdma_controller_t		xdma;
+	xdma_controller_t		*xdma;
 	xdma_config_t			conf;
 
 	uint8_t				flags;
@@ -104,10 +104,10 @@ struct xdma_channel {
 typedef struct xdma_channel xdma_channel_t;
 
 /* xDMA controller alloc/free */
-xdma_controller_t xdma_ofw_get(device_t dev, const char *prop);
-int xdma_put(xdma_controller_t xdma);
+xdma_controller_t *xdma_ofw_get(device_t dev, const char *prop);
+int xdma_put(xdma_controller_t *xdma);
 
-xdma_channel_t * xdma_channel_alloc(xdma_controller_t);
+xdma_channel_t * xdma_channel_alloc(xdma_controller_t *);
 int xdma_channel_free(xdma_channel_t *);
 
 int xdma_prep_cyclic(xdma_channel_t *, enum xdma_direction,
