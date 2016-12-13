@@ -108,7 +108,8 @@ xdmatest_alloc_test_memory(struct xdmatest_softc *sc)
 {
 	int err;
 
-	sc->len = (3 * PAGE_SIZE);
+	sc->len = (0x1000000 - 8); /* 16mb */
+	sc->len = 8;
 
 	/* Source memory. */
 
