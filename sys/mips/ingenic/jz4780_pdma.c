@@ -519,12 +519,17 @@ pdma_ofw_md_data(device_t dev, phandle_t *cells, int ncells, void **ptr)
 		return (-1);
 	}
 
-	*ptr = malloc(sizeof(struct pdma_fdt_data), M_DEVBUF, (M_WAITOK | M_ZERO));
+	data = malloc(sizeof(struct pdma_fdt_data), M_DEVBUF, (M_WAITOK | M_ZERO));
+	if (data == NULL) {
+		device_printf(dev, "%s: Cant allocate memory\n", __func__);
+		return (-1);
+	}
 
-	data = *ptr;
 	data->tx = cells[0];
 	data->rx = cells[1];
 	data->chan = cells[2];
+
+	*ptr = data;
 
 	return (0);
 }

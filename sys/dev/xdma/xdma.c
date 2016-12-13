@@ -98,6 +98,8 @@ xdma_channel_alloc(xdma_controller_t xdma)
 
 	TAILQ_INIT(&xchan->ie_handlers);
 
+	TAILQ_INSERT_TAIL(&xdma->channels, xchan, xchan_link);
+
 	XDMA_UNLOCK();
 
 	return (xchan);
@@ -528,11 +530,14 @@ xdma_ofw_md_data(xdma_controller_t xdma, phandle_t *cells, int ncells)
 {
 	uint32_t ret;
 
-	ret = XDMA_OFW_MD_DATA(xdma->dma_dev, cells, ncells, &xdma->data);
+	ret = XDMA_OFW_MD_DATA(xdma->dma_dev, cells, ncells, (void **)&xdma->data);
 
 	return (ret);
 }
 
+/*
+ * Allocate xdma controller.
+ */
 xdma_controller_t
 xdma_ofw_get(device_t dev, const char *prop)
 {
@@ -587,7 +592,9 @@ xdma_ofw_get(device_t dev, const char *prop)
 		return (NULL);
 	}
 
-	xdma = malloc(sizeof(xdma_controller_t), M_XDMA, M_WAITOK | M_ZERO);
+	XDMA_LOCK();
+
+	xdma = malloc(sizeof(struct xdma_controller), M_XDMA, M_WAITOK | M_ZERO);
 	if (xdma == NULL) {
 		device_printf(dev,
 		    "%s can't allocate memory for xdma.\n", __func__);
@@ -596,7 +603,11 @@ xdma_ofw_get(device_t dev, const char *prop)
 	xdma->dev = dev;
 	xdma->dma_dev = dma_dev;
 
+	TAILQ_INIT(&xdma->channels);
+
 	xdma_ofw_md_data(xdma, cells, ncells);
+
+	XDMA_UNLOCK();
 
 	return (xdma);
 }

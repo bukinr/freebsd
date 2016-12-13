@@ -56,7 +56,10 @@ enum xdma_command {
 struct xdma_controller {
 	device_t dev;		/* DMA consumer device_t. */
 	device_t dma_dev;	/* A real DMA device_t. */
-	void *data;		/* MD part */
+	void *data;		/* OFW MD part. */
+
+	/* Allocated virtual channels. */
+	TAILQ_HEAD(xdma_channel_list, xdma_channel)	channels;
 };
 
 typedef struct xdma_controller *xdma_controller_t;
@@ -94,6 +97,8 @@ struct xdma_channel {
 	bus_dmamap_t			dma_map;
 	void				*descs;
 	uintptr_t			*descs_phys;
+
+	TAILQ_ENTRY(xdma_channel)	xchan_link;
 };
 
 typedef struct xdma_channel xdma_channel_t;
