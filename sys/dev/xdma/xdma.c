@@ -623,13 +623,18 @@ int
 xdma_put(xdma_controller_t *xdma)
 {
 
+	XDMA_LOCK();
+
 	/* Ensure no channels allocated. */
 	if (!TAILQ_EMPTY(&xdma->channels)) {
 		device_printf(xdma->dev, "%s: Can't free xDMA\n", __func__);
 		return (-1);
 	}
 
+	free(xdma->data, M_DEVBUF);
 	free(xdma, M_XDMA);
+
+	XDMA_UNLOCK();
 
 	return (0);
 }
