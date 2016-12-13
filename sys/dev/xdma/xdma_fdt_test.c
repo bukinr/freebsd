@@ -64,8 +64,10 @@ struct xdmatest_softc {
 	uint32_t		len;
 	uintptr_t		src_phys;
 	uintptr_t		dst_phys;
-	bus_dma_tag_t		dma_tag;
-	bus_dmamap_t		dma_map;
+	bus_dma_tag_t		src_dma_tag;
+	bus_dmamap_t		src_dma_map;
+	bus_dma_tag_t		dst_dma_tag;
+	bus_dmamap_t		dst_dma_map;
 	struct mtx		mtx;
 	int			done;
 	struct proc		*newp;
@@ -108,6 +110,8 @@ xdmatest_alloc_test_memory(struct xdmatest_softc *sc)
 
 	sc->len = (3 * PAGE_SIZE);
 
+	/* Source memory. */
+
 	err = bus_dma_tag_create(
 	    bus_get_dma_tag(sc->dev),
 	    1024, 0,			/* alignment, boundary */
@@ -117,23 +121,22 @@ xdmatest_alloc_test_memory(struct xdmatest_softc *sc)
 	    sc->len, 1,			/* maxsize, nsegments*/
 	    sc->len, 0,			/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->dma_tag);
+	    &sc->src_dma_tag);
 	if (err) {
 		device_printf(sc->dev,
 		    "%s: Can't create bus_dma tag.\n", __func__);
 		return (-1);
 	}
 
-	/* Source memory. */
-	err = bus_dmamem_alloc(sc->dma_tag, (void **)&sc->src,
-	    BUS_DMA_WAITOK | BUS_DMA_COHERENT, &sc->dma_map);
+	err = bus_dmamem_alloc(sc->src_dma_tag, (void **)&sc->src,
+	    BUS_DMA_WAITOK | BUS_DMA_COHERENT, &sc->src_dma_map);
 	if (err) {
 		device_printf(sc->dev,
 		    "%s: Can't allocate memory.\n", __func__);
 		return (-1);
 	}
 
-	err = bus_dmamap_load(sc->dma_tag, sc->dma_map, sc->src,
+	err = bus_dmamap_load(sc->src_dma_tag, sc->src_dma_map, sc->src,
 	    sc->len, xdmatest_dmamap_cb, &sc->src_phys, BUS_DMA_WAITOK);
 	if (err) {
 		device_printf(sc->dev,
@@ -142,15 +145,32 @@ xdmatest_alloc_test_memory(struct xdmatest_softc *sc)
 	}
 
 	/* Destination memory. */
-	err = bus_dmamem_alloc(sc->dma_tag, (void **)&sc->dst,
-	    BUS_DMA_WAITOK | BUS_DMA_COHERENT, &sc->dma_map);
+
+	err = bus_dma_tag_create(
+	    bus_get_dma_tag(sc->dev),
+	    1024, 0,			/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	    BUS_SPACE_MAXADDR,		/* highaddr */
+	    NULL, NULL,			/* filter, filterarg */
+	    sc->len, 1,			/* maxsize, nsegments*/
+	    sc->len, 0,			/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->dst_dma_tag);
+	if (err) {
+		device_printf(sc->dev,
+		    "%s: Can't create bus_dma tag.\n", __func__);
+		return (-1);
+	}
+
+	err = bus_dmamem_alloc(sc->dst_dma_tag, (void **)&sc->dst,
+	    BUS_DMA_WAITOK | BUS_DMA_COHERENT, &sc->dst_dma_map);
 	if (err) {
 		device_printf(sc->dev,
 		    "%s: Can't allocate memory.\n", __func__);
 		return (-1);
 	}
 
-	err = bus_dmamap_load(sc->dma_tag, sc->dma_map, sc->dst,
+	err = bus_dmamap_load(sc->dst_dma_tag, sc->dst_dma_map, sc->dst,
 	    sc->len, xdmatest_dmamap_cb, &sc->dst_phys, BUS_DMA_WAITOK);
 	if (err) {
 		device_printf(sc->dev,
@@ -188,15 +208,9 @@ xdmatest_test(struct xdmatest_softc *sc)
 		return (-1);
 	}
 
-	/* Allocate test memory */
-	err = xdmatest_alloc_test_memory(sc);
-	if (err != 0) {
-		device_printf(sc->dev, "Can't allocate test memory.\n");
-		return (-1);
-	}
-
 	/* We are going to fill memory. */
-	bus_dmamap_sync(sc->dma_tag, sc->dma_map, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->src_dma_tag, sc->src_dma_map, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->dst_dma_tag, sc->dst_dma_map, BUS_DMASYNC_PREWRITE);
 
 	/* Fill memory. */
 	for (i = 0; i < sc->len; i++) {
@@ -224,7 +238,8 @@ xdmatest_verify(struct xdmatest_softc *sc)
 	int i;
 
 	/* We have memory updated by DMA controller. */
-	bus_dmamap_sync(sc->dma_tag, sc->dma_map, BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(sc->src_dma_tag, sc->src_dma_map, BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(sc->dst_dma_tag, sc->dst_dma_map, BUS_DMASYNC_POSTWRITE);
 
 	for (i = 0; i < sc->len; i++) {
 		if (sc->dst[i] != sc->src[i]) {
@@ -319,11 +334,19 @@ static int
 xdmatest_attach(device_t dev)
 {
 	struct xdmatest_softc *sc;
+	int err;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
 	mtx_init(&sc->mtx, device_get_nameunit(dev), "xdmatet", MTX_DEF);
+
+	/* Allocate test memory */
+	err = xdmatest_alloc_test_memory(sc);
+	if (err != 0) {
+		device_printf(sc->dev, "Can't allocate test memory.\n");
+		return (-1);
+	}
 
 	/* We'll run test later, but before / mount. */
 	sc->config_intrhook.ich_func = xdmatest_delayed_attach;
@@ -340,6 +363,12 @@ xdmatest_detach(device_t dev)
 	struct xdmatest_softc *sc;
 
 	sc = device_get_softc(dev);
+
+	bus_dmamap_unload(sc->src_dma_tag, sc->src_dma_map);
+	bus_dmamem_free(sc->src_dma_tag, sc->src, sc->src_dma_map);
+
+	bus_dmamap_unload(sc->dst_dma_tag, sc->dst_dma_map);
+	bus_dmamem_free(sc->dst_dma_tag, sc->dst, sc->dst_dma_map);
 
 	return (0);
 }
