@@ -496,7 +496,10 @@ vm_loop(struct vmctx *ctx, struct vcpu *vcpu)
 {
 	struct vm_exit vme;
 	struct vm_run vmrun;
+#if 0
 	int error, rc;
+#endif
+	int error;
 	enum vm_exitcode exitcode;
 	cpuset_t active_cpus, dmask;
 
@@ -513,6 +516,9 @@ vm_loop(struct vmctx *ctx, struct vcpu *vcpu)
 			break;
 
 		exitcode = vme.exitcode;
+
+		warnx("vm_loop: exitcode 0x%x", exitcode);
+#if 0
 		if (exitcode >= VM_EXITCODE_MAX ||
 		    vmexit_handlers[exitcode] == NULL) {
 			warnx("vm_loop: unexpected exitcode 0x%x", exitcode);
@@ -529,6 +535,7 @@ vm_loop(struct vmctx *ctx, struct vcpu *vcpu)
 		default:
 			exit(4);
 		}
+#endif
 	}
 	EPRINTLN("vm_run error %d, errno %d", error, errno);
 }
@@ -600,9 +607,11 @@ do_open(const char *vmname)
 		exit(4);
 	}
 
+#if 0
 #ifndef WITHOUT_CAPSICUM
 	if (vm_limit_rights(ctx) != 0)
 		err(EX_OSERR, "vm_limit_rights");
+#endif
 #endif
 
 	if (reinit) {
@@ -612,9 +621,11 @@ do_open(const char *vmname)
 			exit(4);
 		}
 	}
+#if 0
 	error = vm_set_topology(ctx, cpu_sockets, cpu_cores, cpu_threads, 0);
 	if (error)
 		errx(EX_OSERR, "vm_set_topology");
+#endif
 	return (ctx);
 }
 
@@ -745,11 +756,13 @@ main(int argc, char *argv[])
 		case 'C':
 			set_config_bool("memory.guest_in_core", true);
 			break;
+#if 0
 		case 'f':
 			if (qemu_fwcfg_parse_cmdline_arg(optarg) != 0) {
 			    errx(EX_USAGE, "invalid fwcfg item '%s'", optarg);
 			}
 			break;
+#endif
 #ifdef BHYVE_GDB
 		case 'G':
 			parse_gdb_options(optarg);
@@ -777,6 +790,7 @@ main(int argc, char *argv[])
 			restore_file = optarg;
 			break;
 #endif
+#if 0
 		case 's':
 			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
 				pci_print_supported_devices();
@@ -785,6 +799,7 @@ main(int argc, char *argv[])
 				exit(4);
 			else
 				break;
+#endif
 		case 'S':
 			set_config_bool("memory.wired", true);
 			break;
@@ -936,6 +951,7 @@ main(int argc, char *argv[])
 	if (bhyve_init_platform(ctx, bsp) != 0)
 		exit(4);
 
+#if 0
 	if (qemu_fwcfg_init(ctx) != 0) {
 		fprintf(stderr, "qemu fwcfg initialization error\n");
 		exit(4);
@@ -946,7 +962,9 @@ main(int argc, char *argv[])
 		fprintf(stderr, "Could not add qemu fwcfg opt/bhyve/hw.ncpu\n");
 		exit(4);
 	}
+#endif
 
+#if 0
 	/*
 	 * Exit if a device emulation finds an error in its initialization
 	 */
@@ -955,17 +973,23 @@ main(int argc, char *argv[])
 		    strerror(errno));
 		exit(4);
 	}
+#endif
+
+#if 0
 	if (init_tpm(ctx) != 0) {
 		EPRINTLN("Failed to init TPM device");
 		exit(4);
 	}
+#endif
 
 	/*
 	 * Initialize after PCI, to allow a bootrom file to reserve the high
 	 * region.
 	 */
+#if 0
 	if (get_config_bool("acpi_tables"))
 		vmgenc_init(ctx);
+#endif
 
 #ifdef BHYVE_GDB
 	init_gdb(ctx);
@@ -1027,6 +1051,7 @@ main(int argc, char *argv[])
 		errx(EX_OSERR, "Failed to start checkpoint thread");
 #endif
 
+#if 0
 #ifndef WITHOUT_CAPSICUM
 	caph_cache_catpages();
 
@@ -1035,6 +1060,7 @@ main(int argc, char *argv[])
 
 	if (caph_enter() == -1)
 		errx(EX_OSERR, "cap_enter() failed");
+#endif
 #endif
 
 #ifdef BHYVE_SNAPSHOT
