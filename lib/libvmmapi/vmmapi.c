@@ -610,7 +610,6 @@ done:
 	return (ptr);
 }
 
-#ifdef __amd64__
 static int
 vcpu_ioctl(struct vcpu *vcpu, u_long cmd, void *arg)
 {
@@ -623,6 +622,7 @@ vcpu_ioctl(struct vcpu *vcpu, u_long cmd, void *arg)
 	return (ioctl(vcpu->ctx->fd, cmd, arg));
 }
 
+#ifdef __amd64__
 int
 vm_set_desc(struct vcpu *vcpu, int reg,
 	    uint64_t base, uint32_t limit, uint32_t access)
