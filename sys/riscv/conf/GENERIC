@@ -209,7 +209,7 @@ include		"std.starfive"
 
 # Uncomment for memory disk
 options 	MD_ROOT
-options 	MD_ROOT_SIZE=8192	# 32MB ram disk
+options 	MD_ROOT_SIZE=32768	# 32MB ram disk
 makeoptions 	MFS_IMAGE=/home/br/dev/freebsd/mdroot.img
 options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 
