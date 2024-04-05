@@ -1,14 +1,10 @@
 /*-
- * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Portions of this software were developed by SRI International and the
- * University of Cambridge Computer Laboratory under DARPA/AFRL contract
- * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
+ * Copyright (c) 2021 Andrew Turner
  *
- * Portions of this software were developed by the University of Cambridge
- * Computer Laboratory as part of the CTSRD Project, with support from the
- * UK Higher Education Innovation Fund (HEIF).
+ * This work was supported by Innovate UK project 105694, "Digital Security
+ * by Design (DSbD) Technology Platform Prototype".
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,19 +28,12 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _MACHINE_MACHDEP_H_
-#define	_MACHINE_MACHDEP_H_
+#include <machine/param.h>
 
-struct riscv_bootparams {
-	vm_offset_t	kern_l1pt;	/* Kernel L1 base */
-	vm_offset_t	kern_phys;	/* Kernel base (physical) addr */
-	vm_offset_t	kern_stack;
-	vm_offset_t	dtbp_virt;	/* Device tree blob virtual addr */
-	vm_offset_t	dtbp_phys;	/* Device tree blob physical addr */
-	vm_offset_t	modulep;	/* loader(8) metadata */
-};
-
-void initriscv(struct riscv_bootparams *);
-bool has_hyp(void);
-
-#endif /* _MACHINE_MACHDEP_H_ */
+	.rodata
+	.align PAGE_SHIFT
+	.globl vmm_hyp_code
+vmm_hyp_code:
+	.incbin "vmm_hyp_blob.bin"
+	.globl vmm_hyp_code_end
+vmm_hyp_code_end:

@@ -215,3 +215,5 @@ options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 
 # Uncomment for virtio block device
 # options 	ROOTDEVNAME=\"ufs:/dev/vtbd0\"
+
+device		vmm

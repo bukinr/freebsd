@@ -126,6 +126,13 @@ extern int *end;
 
 static char static_kenv[PAGE_SIZE];
 
+bool
+has_hyp(void)
+{
+
+	return (true);
+}
+
 static void
 cpu_startup(void *dummy)
 {

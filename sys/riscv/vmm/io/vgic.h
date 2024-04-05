@@ -1,14 +1,7 @@
 /*-
- * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Portions of this software were developed by SRI International and the
- * University of Cambridge Computer Laboratory under DARPA/AFRL contract
- * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
- *
- * Portions of this software were developed by the University of Cambridge
- * Computer Laboratory as part of the CTSRD Project, with support from the
- * UK Higher Education Innovation Fund (HEIF).
+ * Copyright (c) 2023 Arm Ltd
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,7 +15,7 @@
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -32,19 +25,28 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _MACHINE_MACHDEP_H_
-#define	_MACHINE_MACHDEP_H_
+#ifndef _VGIC_H_
+#define	_VGIC_H_
 
-struct riscv_bootparams {
-	vm_offset_t	kern_l1pt;	/* Kernel L1 base */
-	vm_offset_t	kern_phys;	/* Kernel base (physical) addr */
-	vm_offset_t	kern_stack;
-	vm_offset_t	dtbp_virt;	/* Device tree blob virtual addr */
-	vm_offset_t	dtbp_phys;	/* Device tree blob physical addr */
-	vm_offset_t	modulep;	/* loader(8) metadata */
-};
+struct hyp;
+struct hypctx;
+struct vm_vgic_descr;
 
-void initriscv(struct riscv_bootparams *);
-bool has_hyp(void);
+extern device_t vgic_dev;
 
-#endif /* _MACHINE_MACHDEP_H_ */
+bool vgic_present(void);
+void vgic_init(void);
+int vgic_attach_to_vm(struct hyp *hyp, struct vm_vgic_descr *descr);
+void vgic_detach_from_vm(struct hyp *hyp);
+void vgic_vminit(struct hyp *hyp);
+void vgic_cpuinit(struct hypctx *hypctx);
+void vgic_cpucleanup(struct hypctx *hypctx);
+void vgic_vmcleanup(struct hyp *hyp);
+int vgic_max_cpu_count(struct hyp *hyp);
+bool vgic_has_pending_irq(struct hypctx *hypctx);
+int vgic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level);
+int vgic_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr);
+void vgic_flush_hwstate(struct hypctx *hypctx);
+void vgic_sync_hwstate(struct hypctx *hypctx);
+
+#endif /* _VGIC_H_ */

@@ -35,6 +35,15 @@ INCLUDES+= -I$S/contrib/libfdt -I$S/contrib/device-tree/include
 KERNEL_LMA?=	0x80200000
 LDFLAGS+= --defsym='kernel_lma=${KERNEL_LMA}'
 
+SYSTEM_LD= \
+	${SYSTEM_LD_BASECMD} \
+	    --defsym='text_start=kernbase' \
+	    -o ${.TARGET} ${SYSTEM_OBJS} vers.o; \
+	$(OBJCOPY) \
+	    --wildcard \
+	    --strip-symbol='$$[adtx]*' \
+	    ${.TARGET}
+
 .if !empty(DDB_ENABLED) || !empty(DTRACE_ENABLED) || !empty(HWPMC_ENABLED)
 CFLAGS += -fno-omit-frame-pointer -fno-optimize-sibling-calls
 .endif
