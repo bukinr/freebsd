@@ -1009,12 +1009,12 @@ static const char *capstrmap[] = {
 #ifdef __amd64__
 	[VM_CAP_ENABLE_INVPCID] = "enable_invpcid",
 	[VM_CAP_BPT_EXIT] = "bpt_exit",
-#endif
 	[VM_CAP_RDPID] = "rdpid",
 	[VM_CAP_RDTSCP] = "rdtscp",
 	[VM_CAP_IPI_EXIT] = "ipi_exit",
 	[VM_CAP_MASK_HWINTR] = "mask_hwintr",
 	[VM_CAP_RFLAGS_TF] = "rflags_tf",
+#endif
 };
 
 int
