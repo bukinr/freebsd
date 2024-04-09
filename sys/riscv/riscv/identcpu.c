@@ -247,6 +247,7 @@ parse_riscv_isa(struct cpu_desc *desc, char *isa, int len)
 		case 'c':
 		case 'd':
 		case 'f':
+		case 'h':
 		case 'i':
 		case 'm':
 			desc->isa_extensions |= HWCAP_ISA_BIT(isa[i]);
@@ -511,6 +512,7 @@ printcpuinfo(u_int cpu)
 		    "\03Compressed"
 		    "\04Double"
 		    "\06Float"
+		    "\10Hypervisor"
 		    "\15Mult/Div");
 	}
 
