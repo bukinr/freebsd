@@ -94,7 +94,6 @@ extern char hyp_init_vectors[];
 extern char hyp_vectors[];
 extern char hyp_stub_vectors[];
 
-#if 0
 static vm_paddr_t hyp_code_base;
 static size_t hyp_code_len;
 
@@ -103,6 +102,7 @@ static vm_offset_t stack_hyp_va[MAXCPU];
 
 static vmem_t *el2_mem_alloc;
 
+#if 0
 static void arm_setup_vectors(void *arg);
 static void vmm_pmap_clean_stage2_tlbi(void);
 static void vmm_pmap_invalidate_range(uint64_t, vm_offset_t, vm_offset_t, bool);
@@ -231,11 +231,14 @@ vmmops_modinit(int ipinum)
 {
 #if 0
 	struct vmm_init_regs el2_regs;
+#endif
 	vm_offset_t next_hyp_va;
 	vm_paddr_t vmm_base;
+#if 0
 	uint64_t id_aa64mmfr0_el1, pa_range_bits, pa_range_field;
 	uint64_t cnthctl_el2;
 	register_t daif;
+#endif
 	int cpu, i;
 	bool rv __diagused;
 
@@ -245,6 +248,7 @@ vmmops_modinit(int ipinum)
 		return (ENXIO);
 	}
 
+#if 0
 	/* TODO: Support VHE */
 	if (in_vhe()) {
 		printf("vmm: VHE is unsupported\n");
@@ -279,6 +283,7 @@ vmmops_modinit(int ipinum)
 		break;
 	}
 	pa_range_bits = pa_range_field >> ID_AA64MMFR0_PARange_SHIFT;
+#endif
 
 	/* Initialise the EL2 MMU */
 	if (!vmmpmap_init()) {
@@ -286,11 +291,13 @@ vmmops_modinit(int ipinum)
 		return (ENOMEM);
 	}
 
+#if 0
 	/* Set up the stage 2 pmap callbacks */
 	MPASS(pmap_clean_stage2_tlbi == NULL);
 	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
 	pmap_stage2_invalidate_range = vmm_pmap_invalidate_range;
 	pmap_stage2_invalidate_all = vmm_pmap_invalidate_all;
+#endif
 
 	/*
 	 * Create an allocator for the virtual address space used by EL2.
@@ -324,6 +331,7 @@ vmmops_modinit(int ipinum)
 		next_hyp_va += L2_SIZE;
 	}
 
+#if 0
 	el2_regs.tcr_el2 = TCR_EL2_RES1;
 	el2_regs.tcr_el2 |= min(pa_range_bits << TCR_EL2_PS_SHIFT,
 	    TCR_EL2_PS_52BITS);
@@ -383,6 +391,9 @@ vmmops_modinit(int ipinum)
 #endif
 
 	smp_rendezvous(NULL, arm_setup_vectors, NULL, &el2_regs);
+#endif
+
+	printf("vmm_base %lx, l2_size %lx\n", vmm_base, L2_SIZE);
 
 	/* Add memory to the vmem allocator (checking there is space) */
 	if (vmm_base > (L2_SIZE + PAGE_SIZE)) {
@@ -414,6 +425,7 @@ vmmops_modinit(int ipinum)
 		vmem_add(el2_mem_alloc, next_hyp_va,
 		    HYP_VM_MAX_ADDRESS - next_hyp_va, M_WAITOK);
 
+#if 0
 	daif = intr_disable();
 	cnthctl_el2 = vmm_call_hyp(HYP_READ_REGISTER, HYP_REG_CNTHCTL);
 	intr_restore(daif);
@@ -471,7 +483,6 @@ el2_hypctx_size(void)
 static vm_offset_t
 el2_map_enter(vm_offset_t data, vm_size_t size, vm_prot_t prot)
 {
-#if 0
 	vmem_addr_t addr;
 	int err __diagused;
 	bool rv __diagused;
@@ -482,32 +493,34 @@ el2_map_enter(vm_offset_t data, vm_size_t size, vm_prot_t prot)
 	MPASS(rv);
 
 	return (addr);
-#endif
-	return (0);
 }
 
 void *
 vmmops_init(struct vm *vm, pmap_t pmap)
 {
-#if 0
 	struct hyp *hyp;
 	vm_size_t size;
 
+printf("%s\n", __func__);
 	size = el2_hyp_size(vm);
+printf("%s size %ld\n", __func__, size);
 	hyp = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
+printf("%s hyp %p\n", __func__, hyp);
 
 	hyp->vm = vm;
 	hyp->vgic_attached = false;
 
+#if 0
 	vtimer_vminit(hyp);
 	vgic_vminit(hyp);
+#endif
 
 	hyp->el2_addr = el2_map_enter((vm_offset_t)hyp, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
 
+printf("%s done\n", __func__);
+
 	return (hyp);
-#endif
-	return (NULL);
 }
 
 void *
@@ -543,19 +556,23 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 }
 
 static int
-arm_vmm_pinit(pmap_t pmap)
+riscv_vmm_pinit(pmap_t pmap)
 {
 
 #if 0
 	pmap_pinit_stage(pmap, PM_STAGE2, vmm_pmap_levels);
 #endif
+
+	pmap_pinit(pmap);
+
 	return (1);
 }
 
 struct vmspace *
 vmmops_vmspace_alloc(vm_offset_t min, vm_offset_t max)
 {
-	return (vmspace_alloc(min, max, arm_vmm_pinit));
+
+	return (vmspace_alloc(min, max, riscv_vmm_pinit));
 }
 
 void

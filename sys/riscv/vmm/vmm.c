@@ -337,6 +337,7 @@ vmm_init(void)
 {
 #if 0
 	int error;
+#endif
 
 	vm_maxcpu = mp_ncpus;
 	TUNABLE_INT_FETCH("hw.vmm.maxcpu", &vm_maxcpu);
@@ -348,13 +349,13 @@ vmm_init(void)
 	if (vm_maxcpu == 0)
 		vm_maxcpu = 1;
 
+#if 0
 	error = vmm_regs_init(&vmm_arch_regs, &vmm_arch_regs_masks);
 	if (error != 0)
 		return (error);
+#endif
 
 	return (vmmops_modinit(0));
-#endif
-	return (0);
 }
 
 static int

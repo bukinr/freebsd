@@ -49,16 +49,13 @@
 #include "mmu.h"
 #include "riscv.h"
 
-#if 0
 static struct mtx vmmpmap_mtx;
 static pt_entry_t *l0;
 static vm_paddr_t l0_paddr;
-#endif
 
 bool
 vmmpmap_init(void)
 {
-#if 0
 	vm_page_t m;
 
 	m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO);
@@ -69,7 +66,6 @@ vmmpmap_init(void)
 	l0 = (pd_entry_t *)PHYS_TO_DMAP(l0_paddr);
 
 	mtx_init(&vmmpmap_mtx, "vmm pmap", NULL, MTX_DEF);
-#endif
 
 	return (true);
 }
@@ -172,15 +168,16 @@ vmmpmap_to_ttbr0(void)
 static pt_entry_t *
 vmmpmap_l1_table(vm_offset_t va)
 {
-#if 0
 	pt_entry_t new_l0e, l0e, *l1;
 	vm_page_t m;
 	int rv;
+	vm_paddr_t paddr;
+	pn_t pn;
 
 	m = NULL;
 again:
 	l0e = atomic_load_64(&l0[pmap_l0_index(va)]);
-	if ((l0e & ATTR_DESCR_VALID) == 0) {
+	if ((l0e & PTE_V) == 0) {
 		/* Allocate a page for the level 1 table */
 		if (m == NULL) {
 			m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO);
@@ -188,7 +185,9 @@ again:
 				return (NULL);
 		}
 
-		new_l0e = VM_PAGE_TO_PHYS(m) | L0_TABLE;
+		paddr = VM_PAGE_TO_PHYS(m);
+		pn = (paddr / PAGE_SIZE);
+		new_l0e = (pn << PTE_PPN0_S) | PTE_V;
 
 		mtx_lock(&vmmpmap_mtx);
 		rv = atomic_cmpset_64(&l0[pmap_l0_index(va)], l0e, new_l0e);
@@ -205,19 +204,18 @@ again:
 		vm_page_free_zero(m);
 	}
 
-	l1 = (pd_entry_t *)PHYS_TO_DMAP(l0e & ~ATTR_MASK);
+	l1 = (pt_entry_t *)PHYS_TO_DMAP(PTE_TO_PHYS(l0e));
 	return (l1);
-#endif
-	return (0);
 }
 
 static pt_entry_t *
 vmmpmap_l2_table(vm_offset_t va)
 {
-#if 0
 	pt_entry_t new_l1e, l1e, *l1, *l2;
 	vm_page_t m;
 	int rv;
+	vm_paddr_t paddr;
+	pn_t pn;
 
 	l1 = vmmpmap_l1_table(va);
 	if (l1 == NULL)
@@ -226,7 +224,7 @@ vmmpmap_l2_table(vm_offset_t va)
 	m = NULL;
 again:
 	l1e = atomic_load_64(&l1[pmap_l1_index(va)]);
-	if ((l1e & ATTR_DESCR_VALID) == 0) {
+	if ((l1e & PTE_V) == 0) {
 		/* Allocate a page for the level 2 table */
 		if (m == NULL) {
 			m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO);
@@ -234,7 +232,9 @@ again:
 				return (NULL);
 		}
 
-		new_l1e = VM_PAGE_TO_PHYS(m) | L1_TABLE;
+		paddr = VM_PAGE_TO_PHYS(m);
+		pn = (paddr / PAGE_SIZE);
+		new_l1e = (pn << PTE_PPN0_S) | PTE_V;
 
 		mtx_lock(&vmmpmap_mtx);
 		rv = atomic_cmpset_64(&l1[pmap_l1_index(va)], l1e, new_l1e);
@@ -251,19 +251,18 @@ again:
 		vm_page_free_zero(m);
 	}
 
-	l2 = (pd_entry_t *)PHYS_TO_DMAP(l1e & ~ATTR_MASK);
+	l2 = (pt_entry_t *)PHYS_TO_DMAP(PTE_TO_PHYS(l1e));
 	return (l2);
-#endif
-	return (0);
 }
 
 static pd_entry_t *
 vmmpmap_l3_table(vm_offset_t va)
 {
-#if 0
 	pt_entry_t new_l2e, l2e, *l2, *l3;
 	vm_page_t m;
 	int rv;
+	vm_paddr_t paddr;
+	pn_t pn;
 
 	l2 = vmmpmap_l2_table(va);
 	if (l2 == NULL)
@@ -272,7 +271,7 @@ vmmpmap_l3_table(vm_offset_t va)
 	m = NULL;
 again:
 	l2e = atomic_load_64(&l2[pmap_l2_index(va)]);
-	if ((l2e & ATTR_DESCR_VALID) == 0) {
+	if ((l2e & PTE_V) == 0) {
 		/* Allocate a page for the level 3 table */
 		if (m == NULL) {
 			m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO);
@@ -280,7 +279,9 @@ again:
 				return (NULL);
 		}
 
-		new_l2e = VM_PAGE_TO_PHYS(m) | L2_TABLE;
+		paddr = VM_PAGE_TO_PHYS(m);
+		pn = (paddr / PAGE_SIZE);
+		new_l2e = (pn << PTE_PPN0_S) | PTE_V;
 
 		mtx_lock(&vmmpmap_mtx);
 		rv = atomic_cmpset_64(&l2[pmap_l2_index(va)], l2e, new_l2e);
@@ -297,10 +298,8 @@ again:
 		vm_page_free_zero(m);
 	}
 
-	l3 = (pt_entry_t *)PHYS_TO_DMAP(l2e & ~ATTR_MASK);
+	l3 = (pt_entry_t *)PHYS_TO_DMAP(PTE_TO_PHYS(l2e));
 	return (l3);
-#endif
-	return (0);
 }
 
 /*
@@ -309,16 +308,21 @@ again:
 bool
 vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 {
-#if 0
 	pd_entry_t l3e, *l3;
+	pd_entry_t new_l3;
+	pn_t pn;
+
+	printf("%s: %lx -> %lx size %ld prot %x\n", __func__,
+	    va, pa, size, prot);
 
 	KASSERT((pa & L3_OFFSET) == 0,
-	   ("%s: Invalid physical address", __func__));
+	    ("%s: Invalid physical address", __func__));
 	KASSERT((va & L3_OFFSET) == 0,
-	   ("%s: Invalid virtual address", __func__));
+	    ("%s: Invalid virtual address", __func__));
 	KASSERT((size & PAGE_MASK) == 0,
 	    ("%s: Mapping is not page-sized", __func__));
 
+#if 0
 	l3e = ATTR_DEFAULT | L3_PAGE;
 	/* This bit is res1 at EL2 */
 	l3e |= ATTR_S1_AP(ATTR_S1_AP_USER);
@@ -332,6 +336,14 @@ vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 	if ((prot & VM_PROT_WRITE) == 0) {
 		l3e |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	}
+#endif
+
+	new_l3 = PTE_V | PTE_R | PTE_A;
+	if (prot & VM_PROT_EXECUTE)
+		new_l3 |= PTE_X;
+	if (prot & VM_PROT_WRITE)
+		new_l3 |= PTE_W;
+	new_l3 |= PTE_U;
 
 	while (size > 0) {
 		l3 = vmmpmap_l3_table(va);
@@ -348,7 +360,9 @@ vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 		KASSERT(atomic_load_64(&l3[pmap_l3_index(va)]) == 0,
 		    ("%s: VA already mapped", __func__));
 
-		atomic_store_64(&l3[pmap_l3_index(va)], l3e | pa);
+		pn = (pa / PAGE_SIZE);
+		l3e = new_l3 | (pn << PTE_PPN0_S);
+		atomic_store_64(&l3[pmap_l3_index(va)], l3e);
 #ifdef INVARIANTS
 		mtx_unlock(&vmmpmap_mtx);
 #endif
@@ -357,7 +371,6 @@ vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
-#endif
 
 	return (true);
 }
