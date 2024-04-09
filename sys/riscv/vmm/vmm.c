@@ -1723,8 +1723,10 @@ vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 {
 	vcpu_lock(vcpu);
 	while (1) {
+#if 0
 		if (vgic_has_pending_irq(vcpu->cookie))
 			break;
+#endif
 
 		if (vcpu_should_yield(vcpu))
 			break;
@@ -1785,13 +1787,14 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 int
 vm_run(struct vcpu *vcpu)
 {
-#if 0
 	struct vm *vm = vcpu->vm;
 	struct vm_eventinfo evinfo;
 	int error, vcpuid;
 	struct vm_exit *vme;
 	bool retu;
 	pmap_t pmap;
+
+	printf("%s\n", __func__);
 
 	vcpuid = vcpu->vcpuid;
 
@@ -1867,6 +1870,4 @@ restart:
 		goto restart;
 
 	return (error);
-#endif
-	return (0);
 }
