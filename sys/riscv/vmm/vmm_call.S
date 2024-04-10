@@ -30,6 +30,5 @@
 	.text
 
 ENTRY(vmm_call_hyp)
-	ecall
-	ret
+	sret
 END(vmm_call_hyp)
