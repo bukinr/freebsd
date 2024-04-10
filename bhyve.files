@@ -253,3 +253,14 @@ var/run
 usr/lib/libvmmapi.so.6
 usr/lib/libvmmapi.so
 usr/sbin/bhyvectl
+usr/sbin/bhyve
+lib/libcam.so.7
+lib/libcrypto.so.30
+usr/lib/libcam.so
+usr/lib/lib9p.so.1
+usr/lib/lib9p.so
+usr/lib/libcrypto.so
+lib/libcap_pwd.so.1
+usr/lib/libcap_pwd.so
+lib/libcap_grp.so.1
+usr/lib/libcap_grp.so
