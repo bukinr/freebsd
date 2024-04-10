@@ -1398,7 +1398,6 @@ static int
 vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
     bool from_idle)
 {
-#if 0
 	int error;
 
 	vcpu_assert_locked(vcpu);
@@ -1457,7 +1456,7 @@ vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
 
 	if (newstate == VCPU_IDLE)
 		wakeup(&vcpu->state);
-#endif
+
 	return (0);
 }
 
