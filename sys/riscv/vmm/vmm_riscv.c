@@ -111,19 +111,17 @@ static void vmm_pmap_invalidate_all(uint64_t);
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
 
-#if 0
 static inline void
-arm64_set_active_vcpu(struct hypctx *hypctx)
+riscv_set_active_vcpu(struct hypctx *hypctx)
 {
 	DPCPU_SET(vcpu, hypctx);
 }
 
 struct hypctx *
-arm64_get_active_vcpu(void)
+riscv_get_active_vcpu(void)
 {
 	return (DPCPU_GET(vcpu));
 }
-#endif
 
 static void
 arm_setup_vectors(void *arg)
@@ -135,7 +133,7 @@ arm_setup_vectors(void *arg)
 	register_t daif;
 
 	el2_regs = arg;
-	arm64_set_active_vcpu(NULL);
+	riscv_set_active_vcpu(NULL);
 
 	daif = intr_disable();
 
@@ -201,7 +199,7 @@ arm_teardown_vectors(void *arg)
 	vmm_call_hyp(HYP_CLEANUP, vtophys(hyp_stub_vectors));
 	intr_restore(daif);
 
-	arm64_set_active_vcpu(NULL);
+	riscv_set_active_vcpu(NULL);
 #endif
 }
 
@@ -1092,7 +1090,6 @@ fault:
 int
 vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
-#if 0
 	uint64_t excp_type;
 	int handled;
 	register_t daif;
@@ -1100,20 +1097,25 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	struct hypctx *hypctx;
 	struct vcpu *vcpu;
 	struct vm_exit *vme;
+#if 0
 	int mode;
+#endif
 
 	hypctx = (struct hypctx *)vcpui;
 	hyp = hypctx->hyp;
 	vcpu = hypctx->vcpu;
 	vme = vm_exitinfo(vcpu);
 
-	hypctx->tf.tf_elr = (uint64_t)pc;
+	printf("%s: pc %lx\n", __func__, pc);
+
+	hypctx->tf.tf_sepc = (uint64_t)pc;
 
 	for (;;) {
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
-			hypctx->elr_el1 = hypctx->tf.tf_elr;
+			hypctx->elr_el1 = hypctx->tf.tf_sepc;
 
+#if 0
 			mode = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
 
 			if (mode == PSR_M_EL1t) {
@@ -1145,6 +1147,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 				hypctx->tf.tf_spsr &= ~PSR_SSBS;
 			else
 				hypctx->tf.tf_spsr |= PSR_SSBS;
+#endif
 		}
 
 		daif = intr_disable();
@@ -1162,21 +1165,29 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 			break;
 		}
 
+#if 0
 		/* Activate the stage2 pmap so the vmid is valid */
 		pmap_activate_vm(pmap);
+#endif
+		pmap_activate_boot(pmap);
+#if 0
 		hyp->vttbr_el2 = pmap_to_ttbr0(pmap);
+#endif
 
 		/*
 		 * TODO: What happens if a timer interrupt is asserted exactly
 		 * here, but for the previous VM?
 		 */
-		arm64_set_active_vcpu(hypctx);
+		riscv_set_active_vcpu(hypctx);
+#if 0
 		vgic_flush_hwstate(hypctx);
+#endif
 
 		/* Call into EL2 to switch to the guest */
 		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
 
+#if 0
 		vgic_sync_hwstate(hypctx);
 		vtimer_sync_hwstate(hypctx);
 
@@ -1186,16 +1197,21 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		 * the vm again
 		 */
 		PCPU_SET(curvmpmap, NULL);
+#else
+		/* TODO */
+#endif
 		intr_restore(daif);
 
 		vmm_stat_incr(vcpu, VMEXIT_COUNT, 1);
 		if (excp_type == EXCP_TYPE_MAINT_IRQ)
 			continue;
 
-		vme->pc = hypctx->tf.tf_elr;
+		vme->pc = hypctx->tf.tf_sepc;
 		vme->inst_length = INSN_SIZE;
 		vme->u.hyp.exception_nr = excp_type;
+#if 0
 		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
+#endif
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
 
@@ -1204,12 +1220,12 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		if (handled == UNHANDLED)
 			/* Exit loop to emulate instruction. */
 			break;
-		else
+		else {
 			/* Resume guest execution from the next instruction. */
-			hypctx->tf.tf_elr += vme->inst_length;
+			hypctx->tf.tf_sepc += vme->inst_length;
+		}
 	}
 
-#endif
 	return (0);
 }
 
@@ -1224,7 +1240,7 @@ arm_pcpu_vmcleanup(void *arg)
 	maxcpus = vm_get_maxcpus(hyp->vm);
 	for (i = 0; i < maxcpus; i++) {
 		if (arm64_get_active_vcpu() == hyp->ctx[i]) {
-			arm64_set_active_vcpu(NULL);
+			riscv_set_active_vcpu(NULL);
 			break;
 		}
 	}
