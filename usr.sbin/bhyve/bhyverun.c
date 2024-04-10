@@ -575,6 +575,9 @@ do_open(const char *vmname)
 		romboot = true;
 #endif
 
+	/* TODO. */
+	romboot = true;
+
 	error = vm_create(vmname);
 	if (error) {
 		if (errno == EEXIST) {
