@@ -1,10 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (C) 2017 Alexandru Elisei <alexandru.elisei@gmail.com>
- *
- * This software was developed by Alexandru Elisei under sponsorship
- * from the FreeBSD Foundation.
+ * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,14 +25,11 @@
  * SUCH DAMAGE.
  */
 
-
 #include <machine/asm.h>
 
 	.text
 
 ENTRY(vmm_call_hyp)
-#if 0
-	hvc	#0
+	ecall
 	ret
-#endif
 END(vmm_call_hyp)
