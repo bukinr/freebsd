@@ -524,7 +524,6 @@ printf("%s done\n", __func__);
 void *
 vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 {
-#if 0
 	struct hyp *hyp = vmi;
 	struct hypctx *hypctx;
 	vm_size_t size;
@@ -542,15 +541,15 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	reset_vm_el01_regs(hypctx);
 	reset_vm_el2_regs(hypctx);
 
+#if 0
 	vtimer_cpuinit(hypctx);
 	vgic_cpuinit(hypctx);
+#endif
 
 	hypctx->el2_addr = el2_map_enter((vm_offset_t)hypctx, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
 
 	return (hypctx);
-#endif
-	return (NULL);
 }
 
 static int

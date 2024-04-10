@@ -295,7 +295,6 @@ vcpu_cleanup(struct vcpu *vcpu, bool destroy)
 static struct vcpu *
 vcpu_alloc(struct vm *vm, int vcpu_id)
 {
-#if 0
 	struct vcpu *vcpu;
 
 	KASSERT(vcpu_id >= 0 && vcpu_id < vm->maxcpus,
@@ -307,23 +306,22 @@ vcpu_alloc(struct vm *vm, int vcpu_id)
 	vcpu->hostcpu = NOCPU;
 	vcpu->vcpuid = vcpu_id;
 	vcpu->vm = vm;
+#if 0
 	vcpu->guestfpu = fpu_save_area_alloc();
+#endif
 	vcpu->stats = vmm_stat_alloc();
 	return (vcpu);
-#endif
-
-	return (NULL);
 }
 
 static void
 vcpu_init(struct vcpu *vcpu)
 {
-#if 0
 	vcpu->cookie = vmmops_vcpu_init(vcpu->vm->cookie, vcpu, vcpu->vcpuid);
 	MPASS(vcpu->cookie != NULL);
+#if 0
 	fpu_save_area_reset(vcpu->guestfpu);
-	vmm_stat_init(vcpu->stats);
 #endif
+	vmm_stat_init(vcpu->stats);
 }
 
 struct vm_exit *
