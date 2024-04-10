@@ -1109,6 +1109,23 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	hypctx->tf.tf_sepc = (uint64_t)pc;
 
+	uint64_t hstatus;
+	uint64_t sstatus;
+
+	sstatus = csr_read(sstatus);
+	printf("sstatus %lx\n", sstatus);
+	sstatus |= SSTATUS_SPP;
+	csr_write(sstatus, sstatus);
+
+	hstatus = csr_read(hstatus);
+	printf("hstatus %lx\n", hstatus);
+	hstatus |= (1 << 7); //SPV
+	hstatus |= (1 << 8); //SPVP
+	hstatus |= (1 << 21); //VTW
+	csr_write(hstatus, hstatus);
+	hstatus = csr_read(hstatus);
+	printf("hstatus %lx\n", hstatus);
+
 	for (;;) {
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
