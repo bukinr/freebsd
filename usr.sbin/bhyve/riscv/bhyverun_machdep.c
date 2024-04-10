@@ -225,6 +225,7 @@ load_bootrom(struct vmctx *ctx, const char *path, uint64_t *elrp)
 	*elrp = loadaddr;
 }
 
+#if 0
 static void
 mmio_uart_intr_assert(void *arg)
 {
@@ -344,6 +345,7 @@ init_mmio_rtc(struct vmctx *ctx)
 	error = register_mem(&mr);
 	assert(error == 0);
 }
+#endif
 
 static vm_paddr_t
 fdt_gpa(struct vmctx *ctx)
@@ -357,7 +359,9 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	const char *bootrom;
 	uint64_t elr;
 	int error;
+#if 0
 	int pcie_intrs[4] = {PCIE_INTA, PCIE_INTB, PCIE_INTC, PCIE_INTD};
+#endif
 
 	bootrom = get_config_value("bootrom");
 	if (bootrom == NULL) {
@@ -384,7 +388,6 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 		warn("vm_attach_vgic()");
 		return (error);
 	}
-#endif
 
 	if (init_mmio_uart(ctx))
 		fdt_add_uart(UART_MMIO_BASE, UART_MMIO_SIZE, UART_INTR);
@@ -393,6 +396,7 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	fdt_add_timer();
 	pci_irq_init(pcie_intrs);
 	fdt_add_pcie(pcie_intrs);
+#endif
 
 	return (0);
 }
