@@ -161,7 +161,7 @@ int	vm_suspend(struct vmctx *ctx, enum vm_suspend_how how);
 int	vm_reinit(struct vmctx *ctx);
 int	vm_raise_msi(struct vmctx *ctx, uint64_t addr, uint64_t msg,
     int bus, int slot, int func);
-#ifdef __aarch64__
+#if defined(__aarch64__) || defined(__riscv)
 int	vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
     uint64_t redist_start, size_t redist_size);
 int	vm_assert_irq(struct vmctx *ctx, uint32_t irq);

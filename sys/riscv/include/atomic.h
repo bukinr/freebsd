@@ -293,6 +293,31 @@ atomic_store_rel_32(volatile uint32_t *p, uint32_t val)
 #define	atomic_subtract_rel_int	atomic_subtract_rel_32
 #define	atomic_store_rel_int	atomic_store_rel_32
 
+#if 0
+static __inline uint16_t
+atomic_load_acq_16(volatile uint16_t *p)
+{
+	uint16_t ret;
+
+	ret = *p;
+
+	fence();
+
+	return (ret);
+}
+
+#define	atomic_add_acq_short		atomic_add_acq_16
+#define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
+#define	atomic_clear_acq_short		atomic_clear_acq_16
+#define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
+#endif
+#define	atomic_load_acq_short		atomic_load_acq_16
+#if 0
+#define	atomic_set_acq_short		atomic_set_acq_16
+#define	atomic_subtract_acq_short	atomic_subtract_acq_16
+#define	atomic_testandset_acq_short	atomic_testandset_acq_16
+#endif
+
 static __inline void
 atomic_add_64(volatile uint64_t *p, uint64_t val)
 {

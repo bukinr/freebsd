@@ -56,7 +56,6 @@ const cap_ioctl_t vm_ioctl_cmds[] = {
 };
 size_t vm_ioctl_ncmds = nitems(vm_ioctl_cmds);
 
-#if 0
 int
 vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
     uint64_t redist_start, size_t redist_size)
@@ -126,4 +125,3 @@ vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far)
 
 	return (vcpu_ioctl(vcpu, VM_INJECT_EXCEPTION, &vmexc));
 }
-#endif

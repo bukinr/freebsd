@@ -1,8 +1,9 @@
-SRCS+=
+SRCS+=	\
+	fdt.c		\
+	rtc_pl031.c	\
+	uart_pl011.c
 
-.PATH:  ${BHYVE_SYSDIR}/sys/riscv/vmm
+.PATH:  ${BHYVE_SYSDIR}/sys/arm64/vmm
 SRCS+=	vmm_instruction_emul.c
 
-# CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
-
-# SUBDIR+=	kbdlayout
+BHYVE_FDT_SUPPORT=
