@@ -1,16 +1,15 @@
-
 PACKAGE=lib${LIB}
 LIB=	vmmapi
 SHLIB_MAJOR=	6
 SRCS=	vmmapi.c
 INCS=	vmmapi.h
 
-.if ${MACHINE_CPUARCH} == "amd64"
-SRCS+=	vmmapi_freebsd.c
-.endif
+CFLAGS+= -I${.CURDIR}
+
+.PATH:	${.CURDIR}/${MACHINE_CPUARCH}
+
+.include "${MACHINE_CPUARCH}/Makefile.inc"
 
 LIBADD=	util
-
-CFLAGS+= -I${.CURDIR}
 
 .include <bsd.lib.mk>
