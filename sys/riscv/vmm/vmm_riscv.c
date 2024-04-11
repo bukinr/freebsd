@@ -1130,6 +1130,10 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	csr_write(sepc, hyp->el2_addr);
 
+	csr_write(vsatp, 0);
+	csr_write(hgatp, pmap->pm_satp);
+	printf("hgatp %lx\n", csr_read(hgatp));
+
 	for (;;) {
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
