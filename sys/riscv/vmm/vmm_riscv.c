@@ -516,7 +516,7 @@ printf("%s hyp %p\n", __func__, hyp);
 	hyp->el2_addr = el2_map_enter((vm_offset_t)hyp, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
 
-printf("%s done\n", __func__);
+printf("%s el2_addr %lx\n", __func__, hyp->el2_addr);
 
 	return (hyp);
 }
@@ -548,6 +548,8 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	hypctx->el2_addr = el2_map_enter((vm_offset_t)hypctx, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
+
+printf("%s hypctx->el2_addr %lx\n", __func__, hypctx->el2_addr);
 
 	return (hypctx);
 }
@@ -1125,6 +1127,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	csr_write(hstatus, hstatus);
 	hstatus = csr_read(hstatus);
 	printf("hstatus %lx\n", hstatus);
+
+	csr_write(sepc, hyp->el2_addr);
 
 	for (;;) {
 		if (hypctx->has_exception) {
