@@ -1109,7 +1109,10 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	printf("%s: pc %lx\n", __func__, pc);
 
+#if 0
 	hypctx->tf.tf_sepc = (uint64_t)pc;
+#endif
+	hypctx->guest_regs.hyp_sepc = (uint64_t)pc;
 
 	uint64_t hstatus;
 	uint64_t sstatus;
