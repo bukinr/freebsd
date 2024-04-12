@@ -1129,17 +1129,24 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	printf("hstatus %lx\n", hstatus);
 
 	csr_write(sepc, hyp->el2_addr);
+	csr_write(sepc, pc);
+
+	uint64_t hgatp;
 
 	csr_write(vsatp, 0);
-	csr_write(hgatp, pmap->pm_satp);
+	hgatp = (vmmpmap_to_ttbr0() >> PAGE_SHIFT) | SATP_MODE_SV48;
+	printf("hgatp %lx\n", hgatp);
+	csr_write(hgatp, hgatp);
 	printf("hgatp %lx\n", csr_read(hgatp));
+
+	csr_write(hgatp, pmap->pm_satp);
 
 	for (;;) {
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
+#if 0
 			hypctx->elr_el1 = hypctx->tf.tf_sepc;
 
-#if 0
 			mode = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
 
 			if (mode == PSR_M_EL1t) {
@@ -1235,9 +1242,9 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		vme->u.hyp.exception_nr = excp_type;
 #if 0
 		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
-#endif
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
+#endif
 
 		handled = arm64_handle_world_switch(hypctx, excp_type, vme,
 		    pmap);

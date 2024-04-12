@@ -42,6 +42,9 @@ struct vgic_v3_cpu;
 struct hypctx {
 	struct trapframe tf;
 
+	uint64_t	stvec;
+
+#if 0
 	/*
 	 * EL1 control registers.
 	 */
@@ -94,18 +97,22 @@ struct hypctx {
 	uint64_t	mdcr_el2;	/* Monitor Debug Configuration Register */
 	uint64_t	vpidr_el2;	/* Virtualization Processor ID Register */
 	uint64_t	vmpidr_el2;	/* Virtualization Multiprocessor ID Register */
+#endif
+
 	uint64_t	el2_addr;	/* The address of this in el2 space */
 	struct hyp	*hyp;
 	struct vcpu	*vcpu;
+
 	struct {
 		uint64_t	far_el2;	/* Fault Address Register */
 		uint64_t	hpfar_el2;	/* Hypervisor IPA Fault Address Register */
 	} exit_info;
 
+#if 0
 	struct vtimer_cpu 	vtimer_cpu;
-
 	struct vgic_v3_regs	vgic_v3_regs;
 	struct vgic_v3_cpu	*vgic_cpu;
+#endif
 	bool			has_exception;
 };
 

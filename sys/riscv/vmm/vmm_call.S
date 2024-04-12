@@ -26,9 +26,28 @@
  */
 
 #include <machine/asm.h>
+#include "assym.inc"
+
+#include <machine/trap.h>
+#include <machine/riscvreg.h>
 
 	.text
 
 ENTRY(vmm_call_hyp)
+	addi    sp, sp, -(TF_SIZE)
+
+	la	t4, .Lswitch_return
+	csrrw	t4, stvec, t4
+
+	sd	t4, (TF_T + 4 * 8)(sp)
+
 	sret
+
+	.align 2
+.Lswitch_return:
+
+	ld	t4, (TF_T + 4 * 8)(sp)
+	csrw	stvec, t4
+	ret
+
 END(vmm_call_hyp)

@@ -1745,7 +1745,6 @@ vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 static int
 vm_handle_paging(struct vcpu *vcpu, bool *retu)
 {
-#if 0
 	struct vm *vm = vcpu->vm;
 	struct vm_exit *vme;
 	struct vm_map *map;
@@ -1755,6 +1754,8 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 
 	vme = &vcpu->exitinfo;
 
+	printf("%s\n", __func__);
+
 	pmap = vmspace_pmap(vcpu->vm->vmspace);
 	addr = vme->u.paging.gpa;
 	esr = vme->u.paging.esr;
@@ -1763,6 +1764,7 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	if (pmap_fault(pmap, esr, addr) == KERN_SUCCESS)
 		return (0);
 
+#if 0
 	switch (ESR_ELx_EXCEPTION(esr)) {
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
@@ -1771,12 +1773,14 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	default:
 		panic("%s: Invalid exception (esr = %lx)", __func__, esr);
 	}
+#else
+	ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
+#endif
 
 	map = &vm->vmspace->vm_map;
 	rv = vm_fault(map, vme->u.paging.gpa, ftype, VM_FAULT_NORMAL, NULL);
 	if (rv != KERN_SUCCESS)
 		return (EFAULT);
-#endif
 
 	return (0);
 }

@@ -110,7 +110,8 @@ cpu_fetch_syscall_args(struct thread *td)
 	sa->code = td->td_frame->tf_t[0];
 	sa->original_code = sa->code;
 
-	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
+	if (__predict_false(sa->code == SYS_syscall ||
+	    sa->code == SYS___syscall)) {
 		sa->code = *ap++;
 	} else {
 		*dst_ap++ = *ap++;
@@ -369,6 +370,10 @@ do_trap_supervisor(struct trapframe *frame)
 		panic("Illegal instruction 0x%0*lx at %#lx",
 		    (frame->tf_stval & 0x3) != 0x3 ? 4 : 8,
 		    frame->tf_stval, frame->tf_sepc);
+		break;
+	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
+		dump_regs(frame);
+		panic("guest page fault");
 		break;
 	default:
 		dump_regs(frame);
