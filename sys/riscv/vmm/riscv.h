@@ -39,10 +39,27 @@
 struct vgic_v3;
 struct vgic_v3_cpu;
 
-struct hypctx {
-	struct trapframe tf;
+struct hypregs {
+	uint64_t hyp_ra;
+	uint64_t hyp_sp;
+	uint64_t hyp_gp;
+	uint64_t hyp_tp;
+	uint64_t hyp_t[7];
+	uint64_t hyp_s[12];
+	uint64_t hyp_a[8];
+	uint64_t hyp_sepc;
+	uint64_t hyp_sstatus;
+	uint64_t hyp_hstatus;
+};
 
-	uint64_t	stvec;
+struct hypctx {
+	struct hypregs host_regs;
+	struct hypregs guest_regs;
+	uint64_t host_sscratch;
+	uint64_t host_stvec;
+	uint64_t host_scounteren;
+	uint64_t guest_scounteren;
+	struct trapframe tf; /* unused */
 
 #if 0
 	/*
@@ -158,9 +175,10 @@ DEFINE_VMMOPS_IFUNC(int, restore_tsc, (void *vcpui, uint64_t now))
 #endif
 #endif
 
-uint64_t	vmm_call_hyp(uint64_t, ...);
+uint64_t	vmm_call_hyp(struct hypctx *);
 
 #if 0
+uint64_t	vmm_call_hyp(uint64_t, ...);
 #define	eprintf(fmt, ...)	printf("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #else
 #define	eprintf(fmt, ...)	do {} while(0)
