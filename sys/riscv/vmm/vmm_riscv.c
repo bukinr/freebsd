@@ -35,10 +35,12 @@
 #include <sys/mman.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/rman.h>
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/vmem.h>
+#include <sys/bus.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -57,6 +59,7 @@
 #include <machine/atomic.h>
 #include <machine/hypervisor.h>
 #include <machine/pmap.h>
+#include <machine/intr.h>
 
 #include "mmu.h"
 #include "riscv.h"
@@ -1092,7 +1095,7 @@ int
 vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
 	uint64_t excp_type;
-	int handled;
+	//int handled;
 	register_t daif;
 	struct hyp *hyp;
 	struct hypctx *hypctx;
@@ -1120,29 +1123,52 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	sstatus = csr_read(sstatus);
 	printf("sstatus %lx\n", sstatus);
 	sstatus |= SSTATUS_SPP;
-	csr_write(sstatus, sstatus);
+	hypctx->guest_regs.hyp_sstatus = sstatus;
+	//csr_write(sstatus, sstatus);
 
 	hstatus = csr_read(hstatus);
 	printf("hstatus %lx\n", hstatus);
 	hstatus |= (1 << 7); //SPV
 	hstatus |= (1 << 8); //SPVP
 	hstatus |= (1 << 21); //VTW
-	csr_write(hstatus, hstatus);
-	hstatus = csr_read(hstatus);
-	printf("hstatus %lx\n", hstatus);
+	hypctx->guest_regs.hyp_hstatus = hstatus;
+	//csr_write(hstatus, hstatus);
+	//hstatus = csr_read(hstatus);
+	//printf("hstatus %lx\n", hstatus);
+
+	uint64_t hedeleg;
+	uint64_t hideleg;
+
+	hedeleg  = (1UL << SCAUSE_INST_MISALIGNED);
+	hedeleg |= (1UL << SCAUSE_BREAKPOINT);
+	hedeleg |= (1UL << SCAUSE_ECALL_USER);
+	hedeleg |= (1UL << SCAUSE_INST_PAGE_FAULT);
+	hedeleg |= (1UL << SCAUSE_LOAD_PAGE_FAULT);
+	hedeleg |= (1UL << SCAUSE_STORE_PAGE_FAULT);
+	csr_write(hedeleg, hedeleg);
+
+	hideleg  = IRQ_SOFTWARE_HYPERVISOR;
+	hideleg |= IRQ_TIMER_HYPERVISOR;
+	hideleg |= IRQ_EXTERNAL_HYPERVISOR;
+	csr_write(hideleg, hideleg);
 
 	csr_write(sepc, hyp->el2_addr);
 	csr_write(sepc, pc);
 
+#if 0
 	uint64_t hgatp;
+#endif
 
 	csr_write(vsatp, 0);
+#if 0
 	hgatp = (vmmpmap_to_ttbr0() >> PAGE_SHIFT) | SATP_MODE_SV48;
 	printf("hgatp %lx\n", hgatp);
 	csr_write(hgatp, hgatp);
 	printf("hgatp %lx\n", csr_read(hgatp));
-
+#endif
+	printf("pm_satp %lx\n", pmap->pm_satp);
 	csr_write(hgatp, pmap->pm_satp);
+	printf("hgatp %lx\n", csr_read(hgatp));
 
 	for (;;) {
 		if (hypctx->has_exception) {
@@ -1202,9 +1228,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #if 0
 		/* Activate the stage2 pmap so the vmid is valid */
 		pmap_activate_vm(pmap);
-#endif
 		pmap_activate_boot(pmap);
-#if 0
 		hyp->vttbr_el2 = pmap_to_ttbr0(pmap);
 #endif
 
@@ -1217,9 +1241,41 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		vgic_flush_hwstate(hypctx);
 #endif
 
+#if 0
+		sstatus = csr_read(sstatus);
+		printf("sstatus %lx\n", sstatus);
+		sstatus |= SSTATUS_SPP;
+		csr_write(sstatus, sstatus);
+
+		hstatus = csr_read(hstatus);
+		printf("hstatus %lx\n", hstatus);
+		hstatus |= (1 << 7); //SPV
+		hstatus |= (1 << 8); //SPVP
+		hstatus |= (1 << 21); //VTW
+		csr_write(hstatus, hstatus);
+		hstatus = csr_read(hstatus);
+		printf("hstatus %lx\n", hstatus);
+#endif
+
 		/* Call into EL2 to switch to the guest */
 		excp_type = vmm_call_hyp(hypctx);
 
+		uint64_t scause;
+		uint64_t stval;
+		uint64_t htval;
+		uint64_t htinst;
+
+		scause = csr_read(scause);
+		stval = csr_read(stval);
+		htval = csr_read(htval);
+		htinst = csr_read(htinst);
+
+		printf("exit scause %lx stval %lx htval %lx htinst %lx\n",
+		    scause, stval, htval, htinst);
+
+		critical_exit();
+		vm_handle_paging2(vcpu, pmap, scause, stval, NULL);
+		critical_enter();
 #if 0
 		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
@@ -1249,7 +1305,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
-#endif
 
 		handled = arm64_handle_world_switch(hypctx, excp_type, vme,
 		    pmap);
@@ -1260,6 +1315,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 			/* Resume guest execution from the next instruction. */
 			hypctx->tf.tf_sepc += vme->inst_length;
 		}
+#endif
 	}
 
 	return (0);
@@ -1398,7 +1454,6 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 int
 vmmops_exception(void *vcpui, uint64_t esr, uint64_t far)
 {
-#if 0
 	struct hypctx *hypctx = vcpui;
 	int running, hostcpu;
 
@@ -1407,10 +1462,11 @@ vmmops_exception(void *vcpui, uint64_t esr, uint64_t far)
 		panic("%s: %s%d is running", __func__, vm_name(hypctx->hyp->vm),
 		    vcpu_vcpuid(hypctx->vcpu));
 
+#if 0
 	hypctx->far_el1 = far;
 	hypctx->esr_el1 = esr;
-	hypctx->has_exception = true;
 #endif
+	hypctx->has_exception = true;
 
 	return (0);
 }

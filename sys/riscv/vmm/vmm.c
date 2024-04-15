@@ -1872,3 +1872,37 @@ restart:
 
 	return (error);
 }
+
+int
+vm_handle_paging2(struct vcpu *vcpu, pmap_t pmap, uint64_t scause,
+    uint64_t addr, bool *retu)
+{
+	struct vm_map *map;
+	struct vm *vm;
+	int ftype;
+	int rv;
+
+	vm = vcpu->vm;
+
+	switch (scause) {
+	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
+		printf("trying to fault\n");
+		ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
+#if 0
+		ftype = VM_PROT_EXECUTE | VM_PROT_READ;
+		if (pmap_fault(pmap, addr, ftype) == KERN_SUCCESS)
+			break;
+		printf("pmap fault success\n");
+#endif
+		map = &vm->vmspace->vm_map;
+		rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
+		if (rv != KERN_SUCCESS)
+			return (EFAULT);
+		printf("vm fault success\n");
+		break;
+	default:
+		panic("unknown exit status");
+	};
+
+	return (0);
+}
