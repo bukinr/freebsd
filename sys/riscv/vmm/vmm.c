@@ -240,9 +240,9 @@ u_int vm_maxcpu;
 SYSCTL_UINT(_hw_vmm, OID_AUTO, maxcpu, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
     &vm_maxcpu, 0, "Maximum number of vCPUs");
 
-#if 0
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
+#if 0
 static void vcpu_notify_event_locked(struct vcpu *vcpu);
 #endif
 
@@ -544,22 +544,31 @@ vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
 static void
 vm_cleanup(struct vm *vm, bool destroy)
 {
-#if 0
 	struct mem_map *mm;
+#if 0
 	pmap_t pmap __diagused;
+#endif
 	int i;
 
 	if (destroy) {
+#if 0
 		pmap = vmspace_pmap(vm->vmspace);
+#endif
 		sched_pin();
+#if 0
 		PCPU_SET(curvmpmap, NULL);
+#endif
 		sched_unpin();
 		CPU_FOREACH(i) {
+#if 0
 			MPASS(cpuid_to_pcpu[i]->pc_curvmpmap != pmap);
+#endif
 		}
 	}
 
+#if 0
 	vgic_detach_from_vm(vm->cookie);
+#endif
 
 	for (i = 0; i < vm->maxcpus; i++) {
 		if (vm->vcpu[i] != NULL)
@@ -597,7 +606,6 @@ vm_cleanup(struct vm *vm, bool destroy)
 		sx_destroy(&vm->vcpus_init_lock);
 		sx_destroy(&vm->mem_segs_lock);
 	}
-#endif
 }
 
 void
@@ -817,7 +825,6 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 int
 vm_munmap_memseg(struct vm *vm, vm_paddr_t gpa, size_t len)
 {
-#if 0
 	struct mem_map *m;
 	int i;
 
@@ -830,9 +837,6 @@ vm_munmap_memseg(struct vm *vm, vm_paddr_t gpa, size_t len)
 	}
 
 	return (EINVAL);
-#endif
-
-	return (0);
 }
 
 int
@@ -869,7 +873,6 @@ vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
 	}
 }
 
-#if 0
 static void
 vm_free_memmap(struct vm *vm, int ident)
 {
@@ -895,7 +898,6 @@ sysmem_mapping(struct vm *vm, struct mem_map *mm)
 	else
 		return (false);
 }
-#endif
 
 vm_paddr_t
 vmm_sysmem_maxaddr(struct vm *vm)
@@ -1748,15 +1750,23 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	struct vm *vm = vcpu->vm;
 	struct vm_exit *vme;
 	struct vm_map *map;
-	uint64_t addr, esr;
+	uint64_t addr;
+#if 0
+	uint64_t esr;
 	pmap_t pmap;
+#endif
 	int ftype, rv;
 
 	vme = &vcpu->exitinfo;
 
 	printf("%s\n", __func__);
 
+#if 0
 	pmap = vmspace_pmap(vcpu->vm->vmspace);
+#endif
+	addr = vme->stval;
+
+#if 0
 	addr = vme->u.paging.gpa;
 	esr = vme->u.paging.esr;
 
@@ -1764,7 +1774,6 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	if (pmap_fault(pmap, esr, addr) == KERN_SUCCESS)
 		return (0);
 
-#if 0
 	switch (ESR_ELx_EXCEPTION(esr)) {
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
@@ -1774,11 +1783,11 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 		panic("%s: Invalid exception (esr = %lx)", __func__, esr);
 	}
 #else
-	ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
+	ftype = VM_PROT_EXECUTE | VM_PROT_READ;
 #endif
 
 	map = &vm->vmspace->vm_map;
-	rv = vm_fault(map, vme->u.paging.gpa, ftype, VM_FAULT_NORMAL, NULL);
+	rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
 	if (rv != KERN_SUCCESS)
 		return (EFAULT);
 

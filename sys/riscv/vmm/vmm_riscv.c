@@ -805,9 +805,9 @@ static int
 arm64_handle_world_switch(struct hypctx *hypctx, int excp_type,
     struct vm_exit *vme, pmap_t pmap)
 {
-#if 0
 	int handled;
 
+#if 0
 	switch (excp_type) {
 	case EXCP_TYPE_EL1_SYNC:
 		/* The exit code will be set by handle_el1_sync_excp(). */
@@ -839,10 +839,21 @@ arm64_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		handled = UNHANDLED;
 		break;
 	}
+#endif
+
+	switch (vme->scause) {
+	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
+		vme->exitcode = VM_EXITCODE_PAGING;
+		handled = UNHANDLED;
+		break;
+	default:
+		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
+		vme->exitcode = VM_EXITCODE_BOGUS;
+		handled = UNHANDLED;
+		break;
+	}
 
 	return (handled);
-#endif
-	return (0);
 }
 
 static void
@@ -1095,7 +1106,7 @@ int
 vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
 	uint64_t excp_type;
-	//int handled;
+	int handled;
 	register_t daif;
 	struct hyp *hyp;
 	struct hypctx *hypctx;
@@ -1239,9 +1250,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		riscv_set_active_vcpu(hypctx);
 #if 0
 		vgic_flush_hwstate(hypctx);
-#endif
 
-#if 0
 		sstatus = csr_read(sstatus);
 		printf("sstatus %lx\n", sstatus);
 		sstatus |= SSTATUS_SPP;
@@ -1259,23 +1268,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		/* Call into EL2 to switch to the guest */
 		excp_type = vmm_call_hyp(hypctx);
-
-		uint64_t scause;
-		uint64_t stval;
-		uint64_t htval;
-		uint64_t htinst;
-
-		scause = csr_read(scause);
-		stval = csr_read(stval);
-		htval = csr_read(htval);
-		htinst = csr_read(htinst);
-
-		printf("exit scause %lx stval %lx htval %lx htinst %lx\n",
-		    scause, stval, htval, htinst);
-
-		critical_exit();
-		vm_handle_paging2(vcpu, pmap, scause, stval, NULL);
-		critical_enter();
 #if 0
 		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
@@ -1298,13 +1290,27 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		if (excp_type == EXCP_TYPE_MAINT_IRQ)
 			continue;
 
-		vme->pc = hypctx->tf.tf_sepc;
-		vme->inst_length = INSN_SIZE;
-		vme->u.hyp.exception_nr = excp_type;
+		vme->scause = csr_read(scause);
+		vme->stval = csr_read(stval);
+		vme->htval = csr_read(htval);
+		vme->htinst = csr_read(htinst);
+
+		printf("exit scause %lx stval %lx htval %lx htinst %lx\n",
+		    vme->scause, vme->stval, vme->htval, vme->htinst);
+
 #if 0
+		critical_exit();
+		vm_handle_paging2(vcpu, pmap, scause, stval, NULL);
+		critical_enter();
+
+		vme->u.hyp.exception_nr = excp_type;
 		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
+#endif
+
+		vme->pc = vme->stval;
+		vme->inst_length = INSN_SIZE;
 
 		handled = arm64_handle_world_switch(hypctx, excp_type, vme,
 		    pmap);
@@ -1313,9 +1319,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 			break;
 		else {
 			/* Resume guest execution from the next instruction. */
-			hypctx->tf.tf_sepc += vme->inst_length;
+			hypctx->guest_regs.hyp_sepc = vme->inst_length;
 		}
-#endif
 	}
 
 	return (0);

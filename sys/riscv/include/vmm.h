@@ -316,6 +316,12 @@ enum vm_exitcode {
 };
 
 struct vm_exit {
+
+	uint64_t scause;
+	uint64_t stval;
+	uint64_t htval;
+	uint64_t htinst;
+
 	enum vm_exitcode	exitcode;
 	int			inst_length;
 	uint64_t		pc;
