@@ -847,7 +847,8 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		handled = UNHANDLED;
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-		printf("%s: illegal instruction.\n", __func__);
+		printf("%s: Illegal instruction 0x%lx.\n",
+		    __func__, vme->stval);
 	default:
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;
