@@ -802,7 +802,7 @@ handle_el1_sync_excp(struct hypctx *hypctx, struct vm_exit *vme_ret,
 }
 
 static int
-arm64_handle_world_switch(struct hypctx *hypctx, int excp_type,
+riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
     struct vm_exit *vme, pmap_t pmap)
 {
 	int handled;
@@ -846,6 +846,8 @@ arm64_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		vme->exitcode = VM_EXITCODE_PAGING;
 		handled = UNHANDLED;
 		break;
+	case SCAUSE_ILLEGAL_INSTRUCTION:
+		printf("%s: illegal instruction.\n", __func__);
 	default:
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;
@@ -1312,7 +1314,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		vme->pc = vme->stval;
 		vme->inst_length = INSN_SIZE;
 
-		handled = arm64_handle_world_switch(hypctx, excp_type, vme,
+		handled = riscv_handle_world_switch(hypctx, excp_type, vme,
 		    pmap);
 		if (handled == UNHANDLED)
 			/* Exit loop to emulate instruction. */
