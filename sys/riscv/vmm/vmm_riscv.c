@@ -843,12 +843,15 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 
 	switch (vme->scause) {
 	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
+	case SCAUSE_LOAD_GUEST_PAGE_FAULT:
+	case SCAUSE_STORE_GUEST_PAGE_FAULT:
 		vme->exitcode = VM_EXITCODE_PAGING;
 		handled = UNHANDLED;
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
 		printf("%s: Illegal instruction 0x%lx.\n",
 		    __func__, vme->stval);
+	case SCAUSE_VIRTUAL_INSTRUCTION:
 	default:
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;

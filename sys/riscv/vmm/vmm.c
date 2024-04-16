@@ -1782,9 +1782,14 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	default:
 		panic("%s: Invalid exception (esr = %lx)", __func__, esr);
 	}
-#else
-	ftype = VM_PROT_EXECUTE | VM_PROT_READ;
 #endif
+
+	if (vme->scause == SCAUSE_STORE_PAGE_FAULT)
+		ftype = VM_PROT_WRITE;
+	else if (vme->scause == SCAUSE_INST_PAGE_FAULT)
+		ftype = VM_PROT_EXECUTE;
+	else
+		ftype = VM_PROT_READ;
 
 	map = &vm->vmspace->vm_map;
 	rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
