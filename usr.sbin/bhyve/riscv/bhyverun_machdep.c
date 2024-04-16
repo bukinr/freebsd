@@ -408,7 +408,11 @@ bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
 
 	fdt_finalize();
 
-	error = vm_set_register(bsp, VM_REG_GUEST_X0, fdt_gpa(ctx));
+	/* TODO: set hart ID correctly. */
+	error = vm_set_register(bsp, VM_REG_GUEST_X0, 0);
+	assert(error == 0);
+
+	error = vm_set_register(bsp, VM_REG_GUEST_X1, fdt_gpa(ctx));
 	assert(error == 0);
 
 	return (0);
