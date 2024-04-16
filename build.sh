@@ -10,3 +10,4 @@ sh embed.sh || exit 2
 ADDR=`sh call_hyp.sh | awk '{print $1}'`
 echo until pc 0 ${ADDR}
 echo bhyve -o bootrom=/bin/ls test
+echo bhyve -o bootrom=/kernel.bin test
