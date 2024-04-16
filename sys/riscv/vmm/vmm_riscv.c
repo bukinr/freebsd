@@ -1317,7 +1317,7 @@ printf("%s: leaving Guest VM\n", __func__);
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
 #endif
 
-		vme->pc = vme->stval;
+		vme->pc = hypctx->guest_regs.hyp_sepc;
 		vme->inst_length = INSN_SIZE;
 
 		handled = riscv_handle_world_switch(hypctx, excp_type, vme,
@@ -1327,7 +1327,7 @@ printf("%s: leaving Guest VM\n", __func__);
 			break;
 		else {
 			/* Resume guest execution from the next instruction. */
-			hypctx->guest_regs.hyp_sepc = vme->inst_length;
+			hypctx->guest_regs.hyp_sepc += vme->inst_length;
 		}
 	}
 
