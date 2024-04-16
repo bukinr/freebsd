@@ -1388,8 +1388,8 @@ vmmops_cleanup(void *vmi)
 static uint64_t *
 hypctx_regptr(struct hypctx *hypctx, int reg)
 {
-#if 0
 	switch (reg) {
+#if 0
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
 		return (&hypctx->tf.tf_x[reg]);
 	case VM_REG_GUEST_LR:
@@ -1410,24 +1410,31 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 		return (&hypctx->tcr_el1);
 	case VM_REG_GUEST_TCR2_EL1:
 		return (&hypctx->tcr2_el1);
+#else
+	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+		return (&hypctx->guest_regs.hyp_a[reg]);
+	case VM_REG_GUEST_PC:
+		return (&hypctx->guest_regs.hyp_sepc);
+#endif
 	default:
 		break;
 	}
-#endif
+
 	return (NULL);
 }
 
 int
 vmmops_getreg(void *vcpui, int reg, uint64_t *retval)
 {
-#if 0
 	uint64_t *regp;
 	int running, hostcpu;
-	struct hypctx *hypctx = vcpui;
+	struct hypctx *hypctx;
+
+	hypctx = vcpui;
 
 	running = vcpu_is_running(hypctx->vcpu, &hostcpu);
 	if (running && hostcpu != curcpu)
-		panic("arm_getreg: %s%d is running", vm_name(hypctx->hyp->vm),
+		panic("%s: %s%d is running", __func__, vm_name(hypctx->hyp->vm),
 		    vcpu_vcpuid(hypctx->vcpu));
 
 	regp = hypctx_regptr(hypctx, reg);
@@ -1435,21 +1442,24 @@ vmmops_getreg(void *vcpui, int reg, uint64_t *retval)
 		return (EINVAL);
 
 	*retval = *regp;
-#endif
+
 	return (0);
 }
 
 int
 vmmops_setreg(void *vcpui, int reg, uint64_t val)
 {
-#if 0
 	uint64_t *regp;
-	struct hypctx *hypctx = vcpui;
+	struct hypctx *hypctx;
 	int running, hostcpu;
+
+	hypctx = vcpui;
+
+printf("%s: set reg\n", __func__);
 
 	running = vcpu_is_running(hypctx->vcpu, &hostcpu);
 	if (running && hostcpu != curcpu)
-		panic("arm_setreg: %s%d is running", vm_name(hypctx->hyp->vm),
+		panic("%s: %s%d is running", __func__, vm_name(hypctx->hyp->vm),
 		    vcpu_vcpuid(hypctx->vcpu));
 
 	regp = hypctx_regptr(hypctx, reg);
@@ -1457,7 +1467,9 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 		return (EINVAL);
 
 	*regp = val;
-#endif
+
+printf("%s: set reg ok\n", __func__);
+
 	return (0);
 }
 
