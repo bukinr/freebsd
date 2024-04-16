@@ -1270,7 +1270,9 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 		/* Call into EL2 to switch to the guest */
+printf("%s: entering Guest VM\n", __func__);
 		excp_type = vmm_call_hyp(hypctx);
+printf("%s: leaving Guest VM\n", __func__);
 #if 0
 		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
