@@ -1764,7 +1764,7 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 #if 0
 	pmap = vmspace_pmap(vcpu->vm->vmspace);
 #endif
-	addr = vme->stval;
+	addr = vme->htval << 2;
 
 #if 0
 	addr = vme->u.paging.gpa;
@@ -1784,12 +1784,19 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	}
 #endif
 
-	if (vme->scause == SCAUSE_STORE_PAGE_FAULT)
+	switch (vme->scause) {
+	case SCAUSE_STORE_GUEST_PAGE_FAULT:
 		ftype = VM_PROT_WRITE;
-	else if (vme->scause == SCAUSE_INST_PAGE_FAULT)
+		break;
+	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
 		ftype = VM_PROT_EXECUTE;
-	else
+		break;
+	case SCAUSE_LOAD_GUEST_PAGE_FAULT:
 		ftype = VM_PROT_READ;
+		break;
+	default:
+		panic("unknown page trap: %lu", vme->scause);
+	}
 
 	map = &vm->vmspace->vm_map;
 	rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
