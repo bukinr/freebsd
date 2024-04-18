@@ -851,6 +851,8 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 	case SCAUSE_ILLEGAL_INSTRUCTION:
 		printf("%s: Illegal instruction stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->stval, vme->htval);
+	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
+		panic("ecall rcvd");
 	case SCAUSE_VIRTUAL_INSTRUCTION:
 	default:
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
@@ -1114,7 +1116,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	uint64_t excp_type;
 	int handled;
 	register_t daif;
-	struct hyp *hyp;
+	//struct hyp *hyp;
 	struct hypctx *hypctx;
 	struct vcpu *vcpu;
 	struct vm_exit *vme;
@@ -1123,7 +1125,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 	hypctx = (struct hypctx *)vcpui;
-	hyp = hypctx->hyp;
+	//hyp = hypctx->hyp;
 	vcpu = hypctx->vcpu;
 	vme = vm_exitinfo(vcpu);
 
@@ -1141,10 +1143,12 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	printf("sstatus %lx\n", sstatus);
 	sstatus |= SSTATUS_SPP;
 	hypctx->guest_regs.hyp_sstatus = sstatus;
+	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP;
 	//csr_write(sstatus, sstatus);
 
 	hstatus = csr_read(hstatus);
 	printf("hstatus %lx\n", hstatus);
+	hstatus = 0;
 	hstatus |= (1 << 7); //SPV
 	hstatus |= (1 << 8); //SPVP
 	hstatus |= (1 << 21); //VTW
@@ -1169,15 +1173,11 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hideleg |= IRQ_EXTERNAL_HYPERVISOR;
 	csr_write(hideleg, hideleg);
 
-	csr_write(sepc, hyp->el2_addr);
 	csr_write(sepc, pc);
 
 #if 0
 	uint64_t hgatp;
-#endif
 
-	csr_write(vsatp, 0);
-#if 0
 	hgatp = (vmmpmap_to_ttbr0() >> PAGE_SHIFT) | SATP_MODE_SV48;
 	printf("hgatp %lx\n", hgatp);
 	csr_write(hgatp, hgatp);
@@ -1273,9 +1273,15 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 		/* Call into EL2 to switch to the guest */
-printf("%s: entering Guest VM\n", __func__);
+		printf("%s: entering Guest VM, vsatp %lx, sstatus %lx, "
+		 "hstatus %lx\n", __func__,
+		    csr_read(vsatp),
+		    hypctx->guest_regs.hyp_sstatus,
+		    hypctx->guest_regs.hyp_hstatus);
+
 		excp_type = vmm_call_hyp(hypctx);
 printf("%s: leaving Guest VM\n", __func__);
+
 #if 0
 		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
@@ -1295,8 +1301,10 @@ printf("%s: leaving Guest VM\n", __func__);
 		intr_restore(daif);
 
 		vmm_stat_incr(vcpu, VMEXIT_COUNT, 1);
+#if 0
 		if (excp_type == EXCP_TYPE_MAINT_IRQ)
 			continue;
+#endif
 
 		vme->scause = csr_read(scause);
 		vme->stval = csr_read(stval);
@@ -1305,12 +1313,9 @@ printf("%s: leaving Guest VM\n", __func__);
 
 		printf("exit scause %lx stval %lx htval %lx htinst %lx\n",
 		    vme->scause, vme->stval, vme->htval, vme->htinst);
+		printf("exit vsatp 0x%lx\n", csr_read(vsatp));
 
 #if 0
-		critical_exit();
-		vm_handle_paging2(vcpu, pmap, scause, stval, NULL);
-		critical_enter();
-
 		vme->u.hyp.exception_nr = excp_type;
 		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;

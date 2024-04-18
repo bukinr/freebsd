@@ -49,7 +49,7 @@
 #include "debug.h"
 #include "mem.h"
 
-#define	BOOTROM_SIZE	(16 * 1024 * 1024)	/* 16 MB */
+#define	BOOTROM_SIZE	(128 * 1024 * 1024)	/* 128 MB */
 
 /*
  * ROM region is 16 MB at the top of 4GB ("low") memory.
@@ -234,6 +234,7 @@ bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
 	}
 
 	rom_size = sbuf.st_size;
+	rom_size += 4 * 1024 * 1024; /* BSS */
 
 	varfile = get_config_value_node(nvl, "bootvars");
 	var_size = 0;
@@ -271,7 +272,7 @@ bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
 	}
 
 	/* Map the bootrom into the guest address space */
-	if (bootrom_alloc(ctx, rom_size, PROT_READ | PROT_EXEC,
+	if (bootrom_alloc(ctx, rom_size, PROT_READ | PROT_EXEC | PROT_WRITE,
 	    BOOTROM_ALLOC_TOP, &ptr, NULL) != 0) {
 		goto done;
 	}

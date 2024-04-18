@@ -186,6 +186,5 @@ uint64_t	vmm_call_hyp(uint64_t, ...);
 
 struct hypctx *riscv_get_active_vcpu(void);
 void raise_data_insn_abort(struct hypctx *, uint64_t, bool, int);
-int vm_handle_paging2(struct vcpu *vcpu, pmap_t pmap, uint64_t scause, uint64_t addr, bool *retu);
 
 #endif /* !_VMM_ARM64_H_ */

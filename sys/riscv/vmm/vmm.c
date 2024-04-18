@@ -1747,42 +1747,20 @@ vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 static int
 vm_handle_paging(struct vcpu *vcpu, bool *retu)
 {
-	struct vm *vm = vcpu->vm;
+	struct vm *vm;
 	struct vm_exit *vme;
 	struct vm_map *map;
 	uint64_t addr;
-#if 0
-	uint64_t esr;
 	pmap_t pmap;
-#endif
 	int ftype, rv;
 
+	vm = vcpu->vm;
 	vme = &vcpu->exitinfo;
 
 	printf("%s\n", __func__);
 
-#if 0
 	pmap = vmspace_pmap(vcpu->vm->vmspace);
-#endif
 	addr = vme->htval << 2;
-
-#if 0
-	addr = vme->u.paging.gpa;
-	esr = vme->u.paging.esr;
-
-	/* The page exists, but the page table needs to be updated. */
-	if (pmap_fault(pmap, esr, addr) == KERN_SUCCESS)
-		return (0);
-
-	switch (ESR_ELx_EXCEPTION(esr)) {
-	case EXCP_INSN_ABORT_L:
-	case EXCP_DATA_ABORT_L:
-		ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
-		break;
-	default:
-		panic("%s: Invalid exception (esr = %lx)", __func__, esr);
-	}
-#endif
 
 	switch (vme->scause) {
 	case SCAUSE_STORE_GUEST_PAGE_FAULT:
@@ -1797,6 +1775,10 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	default:
 		panic("unknown page trap: %lu", vme->scause);
 	}
+
+	/* The page exists, but the page table needs to be updated. */
+	if (pmap_fault(pmap, addr, ftype) != KERN_SUCCESS)
+		return (0);
 
 	map = &vm->vmspace->vm_map;
 	rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
@@ -1892,38 +1874,4 @@ restart:
 		goto restart;
 
 	return (error);
-}
-
-int
-vm_handle_paging2(struct vcpu *vcpu, pmap_t pmap, uint64_t scause,
-    uint64_t addr, bool *retu)
-{
-	struct vm_map *map;
-	struct vm *vm;
-	int ftype;
-	int rv;
-
-	vm = vcpu->vm;
-
-	switch (scause) {
-	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
-		printf("trying to fault\n");
-		ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
-#if 0
-		ftype = VM_PROT_EXECUTE | VM_PROT_READ;
-		if (pmap_fault(pmap, addr, ftype) == KERN_SUCCESS)
-			break;
-		printf("pmap fault success\n");
-#endif
-		map = &vm->vmspace->vm_map;
-		rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
-		if (rv != KERN_SUCCESS)
-			return (EFAULT);
-		printf("vm fault success\n");
-		break;
-	default:
-		panic("unknown exit status");
-	};
-
-	return (0);
 }

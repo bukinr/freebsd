@@ -104,7 +104,7 @@ ENTRY(vmm_call_hyp)
 	ld	s9, (HYP_G_S + 9 * 8)(a0)
 	ld	s10, (HYP_G_S + 10 * 8)(a0)
 	ld	s11, (HYP_G_S + 11 * 8)(a0)
-	/* a0 below. */
+	/* skip a0 for now. */
 	ld	a1, (HYP_G_A + 1 * 8)(a0)
 	ld	a2, (HYP_G_A + 2 * 8)(a0)
 	ld	a3, (HYP_G_A + 3 * 8)(a0)
@@ -112,13 +112,21 @@ ENTRY(vmm_call_hyp)
 	ld	a5, (HYP_G_A + 5 * 8)(a0)
 	ld	a6, (HYP_G_A + 6 * 8)(a0)
 	ld	a7, (HYP_G_A + 7 * 8)(a0)
-
+	/* now load a0. */
 	ld	a0, (HYP_G_A + 0 * 8)(a0)
+
+	sfence.vma
+	hfence.vvma
+	hfence.gvma
 
 	sret
 
 	.align 2
 .Lswitch_return:
+
+	sfence.vma
+	hfence.vvma
+	hfence.gvma
 
 	csrrw	a0, sscratch, a0
 	sd	ra, (HYP_G_RA)(a0)
