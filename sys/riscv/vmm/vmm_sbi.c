@@ -49,12 +49,59 @@
 #include <machine/vmparam.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
+#include <machine/sbi.h>
 
 #include "riscv.h"
+
+static int
+vmm_sbi_handle_base(struct hypctx *hypctx)
+{
+	int sbi_function_id;
+	uint32_t val;
+
+	sbi_function_id = hypctx->guest_regs.hyp_a[6];
+
+	switch (sbi_function_id) {
+	case SBI_BASE_GET_SPEC_VERSION:
+		val = 2 << SBI_SPEC_VERS_MAJOR_OFFSET;
+		val |= 0 << SBI_SPEC_VERS_MINOR_OFFSET;
+		hypctx->guest_regs.hyp_a[0] = 0;
+		hypctx->guest_regs.hyp_a[0] = val;
+		break;
+	default:
+		panic("unknown sbi function id %d", sbi_function_id);
+	}
+
+	return (0);
+}
 
 int
 vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 {
+	struct hypctx *hypctx;
+	int sbi_extension_id;
+
+	hypctx = riscv_get_active_vcpu();
+
+	printf("%s: args %lx %lx %lx %lx %lx %lx %lx %lx\n", __func__,
+	    hypctx->guest_regs.hyp_a[0],
+	    hypctx->guest_regs.hyp_a[1],
+	    hypctx->guest_regs.hyp_a[2],
+	    hypctx->guest_regs.hyp_a[3],
+	    hypctx->guest_regs.hyp_a[4],
+	    hypctx->guest_regs.hyp_a[5],
+	    hypctx->guest_regs.hyp_a[6],
+	    hypctx->guest_regs.hyp_a[7]);
+
+	sbi_extension_id = hypctx->guest_regs.hyp_a[7];
+
+	switch (sbi_extension_id) {
+	case SBI_EXT_ID_BASE:
+		vmm_sbi_handle_base(hypctx);
+		break;
+	default:
+		panic("unknown sbi extension id %d", sbi_extension_id);
+	}
 
 	return (0);
 }
