@@ -187,4 +187,6 @@ uint64_t	vmm_call_hyp(uint64_t, ...);
 struct hypctx *riscv_get_active_vcpu(void);
 void raise_data_insn_abort(struct hypctx *, uint64_t, bool, int);
 
+int vmm_sbi_ecall(struct vcpu *, bool *);
+
 #endif /* !_VMM_ARM64_H_ */

@@ -852,7 +852,9 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		printf("%s: Illegal instruction stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->stval, vme->htval);
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
-		panic("ecall rcvd");
+		vme->exitcode = VM_EXITCODE_ECALL;
+		handled = UNHANDLED;
+		break;
 	case SCAUSE_VIRTUAL_INSTRUCTION:
 	default:
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);

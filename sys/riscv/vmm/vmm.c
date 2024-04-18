@@ -1829,6 +1829,7 @@ restart:
 	if (error == 0) {
 		retu = false;
 		switch (vme->exitcode) {
+#if 0
 		case VM_EXITCODE_INST_EMUL:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_inst_emul(vcpu, &retu);
@@ -1856,12 +1857,15 @@ restart:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_wfi(vcpu, vme, &retu);
 			break;
-
+#endif
+		case VM_EXITCODE_ECALL:
+			vcpu->nextpc = vme->pc;
+			error = vmm_sbi_ecall(vcpu, &retu);
+			break;
 		case VM_EXITCODE_PAGING:
 			vcpu->nextpc = vme->pc;
 			error = vm_handle_paging(vcpu, &retu);
 			break;
-
 		default:
 			/* Handle in userland */
 			vcpu->nextpc = vme->pc;
