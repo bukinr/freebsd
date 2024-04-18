@@ -1258,20 +1258,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		riscv_set_active_vcpu(hypctx);
 #if 0
 		vgic_flush_hwstate(hypctx);
-
-		sstatus = csr_read(sstatus);
-		printf("sstatus %lx\n", sstatus);
-		sstatus |= SSTATUS_SPP;
-		csr_write(sstatus, sstatus);
-
-		hstatus = csr_read(hstatus);
-		printf("hstatus %lx\n", hstatus);
-		hstatus |= (1 << 7); //SPV
-		hstatus |= (1 << 8); //SPVP
-		hstatus |= (1 << 21); //VTW
-		csr_write(hstatus, hstatus);
-		hstatus = csr_read(hstatus);
-		printf("hstatus %lx\n", hstatus);
 #endif
 
 		/* Call into EL2 to switch to the guest */
@@ -1344,34 +1330,34 @@ printf("%s: leaving Guest VM\n", __func__);
 static void
 arm_pcpu_vmcleanup(void *arg)
 {
-#if 0
 	struct hyp *hyp;
 	int i, maxcpus;
 
 	hyp = arg;
 	maxcpus = vm_get_maxcpus(hyp->vm);
 	for (i = 0; i < maxcpus; i++) {
-		if (arm64_get_active_vcpu() == hyp->ctx[i]) {
+		if (riscv_get_active_vcpu() == hyp->ctx[i]) {
 			riscv_set_active_vcpu(NULL);
 			break;
 		}
 	}
-#endif
 }
 
 void
 vmmops_vcpu_cleanup(void *vcpui)
 {
-#if 0
-	struct hypctx *hypctx = vcpui;
+	struct hypctx *hypctx;
 
+	hypctx = vcpui;
+
+#if 0
 	vtimer_cpucleanup(hypctx);
 	vgic_cpucleanup(hypctx);
 
 	vmmpmap_remove(hypctx->el2_addr, el2_hypctx_size(), true);
+#endif
 
 	free(hypctx, M_HYP);
-#endif
 }
 
 void
