@@ -1859,7 +1859,7 @@ restart:
 			break;
 #endif
 		case VM_EXITCODE_ECALL:
-			vcpu->nextpc = vme->pc;
+			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vmm_sbi_ecall(vcpu, &retu);
 			break;
 		case VM_EXITCODE_PAGING:
