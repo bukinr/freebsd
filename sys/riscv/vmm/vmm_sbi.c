@@ -58,9 +58,29 @@
 #define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
 
 static int
+vmm_sbi_probe_extension(struct hypctx *hypctx, int ext_id)
+{
+
+	switch (ext_id) {
+	case SBI_EXT_ID_TIME:
+	case SBI_EXT_ID_IPI:
+	case SBI_EXT_ID_RFNC:
+	case SBI_EXT_ID_SRST:
+	case SBI_CONSOLE_PUTCHAR:
+	case SBI_CONSOLE_GETCHAR:
+		break;
+	default:
+		panic("%s: unknown ext_id %d", __func__, ext_id);
+	}
+
+	return (1);
+}
+
+static int
 vmm_sbi_handle_base(struct hypctx *hypctx)
 {
 	int sbi_function_id;
+	int ext_id;
 	uint32_t val;
 
 	sbi_function_id = hypctx->guest_regs.hyp_a[6];
@@ -77,7 +97,8 @@ vmm_sbi_handle_base(struct hypctx *hypctx)
 		val = BHYVE_VERSION;
 		break;
 	case SBI_BASE_PROBE_EXTENSION:
-		panic("probe ext");
+		ext_id = hypctx->guest_regs.hyp_a[0];
+		val = vmm_sbi_probe_extension(hypctx, ext_id);
 		break;
 	case SBI_BASE_GET_MVENDORID:
 		val = mvendorid;
@@ -94,6 +115,28 @@ vmm_sbi_handle_base(struct hypctx *hypctx)
 
 	hypctx->guest_regs.hyp_a[0] = 0;
 	hypctx->guest_regs.hyp_a[1] = val;
+
+	return (0);
+}
+
+static int
+vmm_sbi_handle_srst(struct hypctx *hypctx)
+{
+	int func_id;
+	int type;
+
+	func_id = hypctx->guest_regs.hyp_a[6];
+	type = hypctx->guest_regs.hyp_a[0];
+
+	switch (func_id) {
+	case SBI_SRST_SYSTEM_RESET:
+		switch (type) {
+		case SBI_SRST_TYPE_SHUTDOWN:
+		case SBI_SRST_TYPE_COLD_REBOOT:
+		case SBI_SRST_TYPE_WARM_REBOOT:
+			panic("sbi reset issued");
+		}
+	}
 
 	return (0);
 }
@@ -122,8 +165,11 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 	case SBI_EXT_ID_BASE:
 		vmm_sbi_handle_base(hypctx);
 		break;
+	case SBI_EXT_ID_SRST:
+		vmm_sbi_handle_srst(hypctx);
+		break;
 	default:
-		panic("unknown sbi extension id %d", sbi_extension_id);
+		panic("unknown sbi extension id 0x%x", sbi_extension_id);
 	}
 
 	return (0);
