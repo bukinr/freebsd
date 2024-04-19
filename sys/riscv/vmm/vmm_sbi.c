@@ -49,9 +49,13 @@
 #include <machine/vmparam.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
+#include <machine/md_var.h>
 #include <machine/sbi.h>
 
 #include "riscv.h"
+
+#define	BHYVE_IMPL_ID	4
+#define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
 
 static int
 vmm_sbi_handle_base(struct hypctx *hypctx)
@@ -65,12 +69,31 @@ vmm_sbi_handle_base(struct hypctx *hypctx)
 	case SBI_BASE_GET_SPEC_VERSION:
 		val = 2 << SBI_SPEC_VERS_MAJOR_OFFSET;
 		val |= 0 << SBI_SPEC_VERS_MINOR_OFFSET;
-		hypctx->guest_regs.hyp_a[0] = 0;
-		hypctx->guest_regs.hyp_a[0] = val;
+		break;
+	case SBI_BASE_GET_IMPL_ID:
+		val = BHYVE_IMPL_ID;
+		break;
+	case SBI_BASE_GET_IMPL_VERSION:
+		val = BHYVE_VERSION;
+		break;
+	case SBI_BASE_PROBE_EXTENSION:
+		panic("probe ext");
+		break;
+	case SBI_BASE_GET_MVENDORID:
+		val = mvendorid;
+		break;
+	case SBI_BASE_GET_MARCHID:
+		val = marchid;
+		break;
+	case SBI_BASE_GET_MIMPID:
+		val = mimpid;
 		break;
 	default:
 		panic("unknown sbi function id %d", sbi_function_id);
 	}
+
+	hypctx->guest_regs.hyp_a[0] = 0;
+	hypctx->guest_regs.hyp_a[1] = val;
 
 	return (0);
 }
