@@ -54,7 +54,7 @@
 
 static cpuset_t running_cpumask;
 
-static int
+static int __unused
 vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_run *vmrun)
 {
@@ -167,7 +167,7 @@ smccc_affinity_info(uint64_t target_affinity __unused, uint32_t lowest_affinity_
 	return (PSCI_AFFINITY_INFO_OFF);
 }
 
-static int
+static int __unused
 vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 {
 	struct vcpu *newvcpu;
@@ -240,7 +240,7 @@ vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 	return (VMEXIT_CONTINUE);
 }
 
-static int
+static int __unused
 vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
     struct vm_run *vmrun)
 {
@@ -254,9 +254,13 @@ vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 
 const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_BOGUS]  = vmexit_bogus,
+#if 0
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
+#endif
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
+#if 0
 	[VM_EXITCODE_SMCCC] = vmexit_smccc,
 	[VM_EXITCODE_HYP] = vmexit_hyp,
+#endif
 };

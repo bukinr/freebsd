@@ -141,6 +141,9 @@ vmm_sbi_handle_srst(struct hypctx *hypctx)
 	return (0);
 }
 
+static uint8_t message[1024];
+static int ptr = 0;
+
 int
 vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 {
@@ -163,7 +166,13 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 
 	switch (sbi_extension_id) {
 	case SBI_CONSOLE_PUTCHAR:
-		panic("putchar");
+		message[ptr] = hypctx->guest_regs.hyp_a[0];
+		if (message[ptr] == '\n') {
+			printf("MESSAGE: %s", message);
+			ptr = 0;
+		} else
+			ptr += 1;
+		break;
 	case SBI_CONSOLE_GETCHAR:
 		panic("getchar");
 	case SBI_EXT_ID_BASE:

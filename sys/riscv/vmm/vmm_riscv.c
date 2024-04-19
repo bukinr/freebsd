@@ -1131,8 +1131,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	vcpu = hypctx->vcpu;
 	vme = vm_exitinfo(vcpu);
 
-	printf("%s: pc %lx\n", __func__, pc);
-
 #if 0
 	hypctx->tf.tf_sepc = (uint64_t)pc;
 #endif
@@ -1194,6 +1192,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 	for (;;) {
+		printf("%s: pc %lx\n", __func__, pc);
+
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
 #if 0
@@ -1265,16 +1265,18 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 		/* Call into EL2 to switch to the guest */
+#if 0
 		printf("%s: entering Guest VM, vsatp %lx, ss %lx, "
 		 "hs %lx\n", __func__,
 		    csr_read(vsatp),
 		    hypctx->guest_regs.hyp_sstatus,
 		    hypctx->guest_regs.hyp_hstatus);
+#endif
 
 		excp_type = vmm_call_hyp(hypctx);
-printf("%s: leaving Guest VM\n", __func__);
 
 #if 0
+printf("%s: leaving Guest VM\n", __func__);
 		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
 
