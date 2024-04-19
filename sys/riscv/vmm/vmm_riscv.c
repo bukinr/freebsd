@@ -1142,14 +1142,18 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	uint64_t sstatus;
 
 	sstatus = csr_read(sstatus);
+#if 0
 	printf("sstatus %lx\n", sstatus);
+#endif
 	sstatus |= SSTATUS_SPP;
 	hypctx->guest_regs.hyp_sstatus = sstatus;
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP;
 	//csr_write(sstatus, sstatus);
 
 	hstatus = csr_read(hstatus);
+#if 0
 	printf("hstatus %lx\n", hstatus);
+#endif
 	hstatus = 0;
 	hstatus |= (1 << 7); //SPV
 	hstatus |= (1 << 8); //SPVP
@@ -1182,10 +1186,12 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	printf("hgatp %lx\n", hgatp);
 	csr_write(hgatp, hgatp);
 	printf("hgatp %lx\n", csr_read(hgatp));
-#endif
 	printf("pm_satp %lx\n", pmap->pm_satp);
+#endif
 	csr_write(hgatp, pmap->pm_satp);
+#if 0
 	printf("hgatp %lx\n", csr_read(hgatp));
+#endif
 
 	for (;;) {
 		if (hypctx->has_exception) {
@@ -1259,8 +1265,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 		/* Call into EL2 to switch to the guest */
-		printf("%s: entering Guest VM, vsatp %lx, sstatus %lx, "
-		 "hstatus %lx\n", __func__,
+		printf("%s: entering Guest VM, vsatp %lx, ss %lx, "
+		 "hs %lx\n", __func__,
 		    csr_read(vsatp),
 		    hypctx->guest_regs.hyp_sstatus,
 		    hypctx->guest_regs.hyp_hstatus);
@@ -1299,9 +1305,9 @@ printf("%s: leaving Guest VM\n", __func__);
 
 		printf("exit scause %lx stval %lx htval %lx htinst %lx\n",
 		    vme->scause, vme->stval, vme->htval, vme->htinst);
-		printf("exit vsatp 0x%lx\n", csr_read(vsatp));
 
 #if 0
+		printf("exit vsatp 0x%lx\n", csr_read(vsatp));
 		vme->u.hyp.exception_nr = excp_type;
 		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
