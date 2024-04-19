@@ -162,6 +162,10 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 	sbi_extension_id = hypctx->guest_regs.hyp_a[7];
 
 	switch (sbi_extension_id) {
+	case SBI_CONSOLE_PUTCHAR:
+		panic("putchar");
+	case SBI_CONSOLE_GETCHAR:
+		panic("getchar");
 	case SBI_EXT_ID_BASE:
 		vmm_sbi_handle_base(hypctx);
 		break;
