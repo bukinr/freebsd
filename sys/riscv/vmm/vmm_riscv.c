@@ -1175,8 +1175,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hideleg |= IRQ_EXTERNAL_HYPERVISOR;
 	csr_write(hideleg, hideleg);
 
-	csr_write(sepc, pc);
-
 #if 0
 	uint64_t hgatp;
 
