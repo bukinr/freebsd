@@ -101,6 +101,7 @@ typedef	uint64_t	pn_t;			/* page number */
     ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * PAGE_SIZE)
 #define	L2PTE_TO_PHYS(l2) \
     ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << L2_SHIFT)
+#define PTE_TO_VM_PAGE(pte) PHYS_TO_VM_PAGE(PTE_TO_PHYS(pte))
 
 #endif /* !_MACHINE_PTE_H_ */
 
