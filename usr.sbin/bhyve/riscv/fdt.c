@@ -91,9 +91,21 @@ add_cpu(void *fdt, int cpuid)
 
 	fdt_begin_node(fdt, node_name);
 	fdt_property_string(fdt, "device_type", "cpu");
-	fdt_property_string(fdt, "compatible", "arm,armv8");
+	fdt_property_string(fdt, "compatible", "riscv");
 	fdt_property_u64(fdt, "reg", cpuid);
-	fdt_property_string(fdt, "enable-method", "psci");
+	fdt_property_string(fdt, "riscv,isa", "rv64imafdch_zicntr_zihpm");
+	fdt_property_string(fdt, "mmu-type", "riscv,sv39");
+	fdt_property_string(fdt, "riscv,pmpregions", "16");
+	fdt_property_string(fdt, "riscv,pmpgranularity", "4");
+	fdt_property_string(fdt, "clock-frequency", "1000000000");
+
+	fdt_begin_node(fdt, "interrupt-controller");
+	fdt_property_u32(fdt, "#address-cells", 2);
+	fdt_property_u32(fdt, "#size-cells", 1);
+	fdt_property(fdt, "interrupt-controller", NULL, 0);
+	fdt_property_string(fdt, "compatible", "riscv,cpu-intc");
+	fdt_end_node(fdt);
+
 	fdt_end_node(fdt);
 }
 
@@ -104,7 +116,7 @@ add_cpus(void *fdt, int ncpu)
 
 	fdt_begin_node(fdt, "cpus");
 	/* XXX: Needed given the root #address-cells? */
-	fdt_property_u32(fdt, "#address-cells", 2);
+	fdt_property_u32(fdt, "#address-cells", 1);
 	fdt_property_u32(fdt, "#size-cells", 0);
 
 	for (cpuid = 0; cpuid < ncpu; cpuid++) {
@@ -151,6 +163,7 @@ fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t fdtaddr, vm_size_t fdtsize)
 
 	add_cpus(fdt, ncpu);
 
+#if 0
 	fdt_begin_node(fdt, "psci");
 	fdt_property_string(fdt, "compatible", "arm,psci-1.0");
 	fdt_property_string(fdt, "method", "hvc");
@@ -163,6 +176,7 @@ fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t fdtaddr, vm_size_t fdtsize)
 	fdt_property_u32(fdt, "clock-frequency", 24000000);
 	apb_pclk_phandle = assign_phandle(fdt);
 	fdt_end_node(fdt);
+#endif
 
 	/* Finalized by fdt_finalized(). */
 	fdtroot = fdt;
