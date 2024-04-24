@@ -54,7 +54,6 @@
 
 #include "riscv.h"
 
-#define	BHYVE_IMPL_ID	4
 #define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
 
 static int
@@ -91,7 +90,7 @@ vmm_sbi_handle_base(struct hypctx *hypctx)
 		val |= 0 << SBI_SPEC_VERS_MINOR_OFFSET;
 		break;
 	case SBI_BASE_GET_IMPL_ID:
-		val = BHYVE_IMPL_ID;
+		val = SBI_IMPL_ID_BHYVE;
 		break;
 	case SBI_BASE_GET_IMPL_VERSION:
 		val = BHYVE_VERSION;
@@ -141,6 +140,30 @@ vmm_sbi_handle_srst(struct hypctx *hypctx)
 	return (0);
 }
 
+static int
+vmm_sbi_handle_time(struct hypctx *hypctx)
+{
+	uint64_t val;
+	int func_id;
+
+	func_id = hypctx->guest_regs.hyp_a[6];
+	val = hypctx->guest_regs.hyp_a[0];
+
+	switch (func_id) {
+	case SBI_TIME_SET_TIMER:
+		if (1 == 0)
+			printf("%s: set timer %lx\n", __func__, val);
+		break;
+	default:
+		break;
+	}
+
+	/* Return code. */
+	hypctx->guest_regs.hyp_a[0] = 0;
+
+	return (0);
+}
+
 static uint8_t message[1024];
 static int ptr = 0;
 
@@ -173,17 +196,27 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 		if (c == '\n') {
 			message[ptr] = '\0';
 			ptr = 0;
-			printf("MESSAGE: %s\n", message);
-		} else
+			printf("GUEST: %s\n", message);
+		} else {
 			message[ptr++] = c;
+			if (c == '>' && strncmp(message, "mountroot", 9) == 0) {
+				message[ptr] = '\0';
+				ptr = 0;
+				printf("GUEST: %s\n", message);
+			}
+		}
 		break;
 	case SBI_CONSOLE_GETCHAR:
-		panic("getchar");
+		hypctx->guest_regs.hyp_a[0] = 0;
+		break;
 	case SBI_EXT_ID_BASE:
 		vmm_sbi_handle_base(hypctx);
 		break;
 	case SBI_EXT_ID_SRST:
 		vmm_sbi_handle_srst(hypctx);
+		break;
+	case SBI_EXT_ID_TIME:
+		vmm_sbi_handle_time(hypctx);
 		break;
 	default:
 		panic("unknown sbi extension id 0x%x", sbi_extension_id);
