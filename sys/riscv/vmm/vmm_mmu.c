@@ -64,7 +64,7 @@ vmmpmap_init(void)
 
 	l0_paddr = VM_PAGE_TO_PHYS(m);
 	l0 = (pd_entry_t *)PHYS_TO_DMAP(l0_paddr);
-printf("%s: l0 addr %p paddr %lx\n", __func__, l0, l0_paddr);
+//printf("%s: l0 addr %p paddr %lx\n", __func__, l0, l0_paddr);
 
 	mtx_init(&vmmpmap_mtx, "vmm pmap", NULL, MTX_DEF);
 
@@ -188,7 +188,7 @@ again:
 		new_l0e = (pn << PTE_PPN0_S) | PTE_V;
 
 		mtx_lock(&vmmpmap_mtx);
-printf("%s: pte %lx l0_index %ld addr %lx\n", __func__, new_l0e, pmap_l0_index(va), DMAP_TO_PHYS((uint64_t)&l0[pmap_l0_index(va)]));
+//printf("%s: pte %lx l0_index %ld addr %lx\n", __func__, new_l0e, pmap_l0_index(va), DMAP_TO_PHYS((uint64_t)&l0[pmap_l0_index(va)]));
 		rv = atomic_cmpset_64(&l0[pmap_l0_index(va)], l0e, new_l0e);
 		mtx_unlock(&vmmpmap_mtx);
 		/* We may have raced another thread, try again */
@@ -236,7 +236,7 @@ again:
 		new_l1e = (pn << PTE_PPN0_S) | PTE_V;
 
 		mtx_lock(&vmmpmap_mtx);
-printf("%s: pte %lx l1_index %ld addr %lx\n", __func__, new_l1e, pmap_l1_index(va), DMAP_TO_PHYS((uint64_t)&l1[pmap_l1_index(va)]));
+//printf("%s: pte %lx l1_index %ld addr %lx\n", __func__, new_l1e, pmap_l1_index(va), DMAP_TO_PHYS((uint64_t)&l1[pmap_l1_index(va)]));
 		rv = atomic_cmpset_64(&l1[pmap_l1_index(va)], l1e, new_l1e);
 		mtx_unlock(&vmmpmap_mtx);
 		/* We may have raced another thread, try again */
@@ -312,8 +312,8 @@ vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 	pd_entry_t new_l3;
 	pn_t pn;
 
-	printf("%s: %lx -> %lx size %ld prot %x\n", __func__,
-	    va, pa, size, prot);
+	//printf("%s: %lx -> %lx size %ld prot %x\n", __func__,
+	//    va, pa, size, prot);
 
 	KASSERT((pa & L3_OFFSET) == 0,
 	    ("%s: Invalid physical address", __func__));
