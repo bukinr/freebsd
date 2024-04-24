@@ -1155,7 +1155,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hstatus = 0;
 	hstatus |= (1 << 7); //SPV
 	hstatus |= (1 << 8); //SPVP
-	hstatus |= (1 << 21); //VTW
+	/* Allow WFI for now. */
+	//hstatus |= (1 << 21); //VTW
 	hypctx->guest_regs.hyp_hstatus = hstatus;
 	//csr_write(hstatus, hstatus);
 	//hstatus = csr_read(hstatus);
@@ -1177,8 +1178,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hideleg |= IRQ_EXTERNAL_HYPERVISOR;
 	csr_write(hideleg, hideleg);
 
-	/* TODO: should we trap rdcycle? */
-	csr_write(hcounteren, 0x1);
+	/* TODO: should we trap rdcycle / rdtime ? */
+	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
 
 #if 0
 	uint64_t hgatp;
@@ -1195,7 +1196,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 	for (;;) {
-		printf("%s: pc %lx\n", __func__, pc);
+		//printf("%s: pc %lx\n", __func__, pc);
 
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
@@ -1308,8 +1309,10 @@ printf("%s: leaving Guest VM\n", __func__);
 		vme->htval = csr_read(htval);
 		vme->htinst = csr_read(htinst);
 
-		printf("exit scause %lx stval %lx htval %lx htinst %lx\n",
+#if 0
+		printf("exit scause 0x%lx stval %lx htval %lx htinst %lx\n",
 		    vme->scause, vme->stval, vme->htval, vme->htinst);
+#endif
 
 #if 0
 		printf("exit vsatp 0x%lx\n", csr_read(vsatp));
