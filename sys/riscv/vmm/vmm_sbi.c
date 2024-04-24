@@ -149,9 +149,11 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 {
 	struct hypctx *hypctx;
 	int sbi_extension_id;
+	int c;
 
 	hypctx = riscv_get_active_vcpu();
 
+#if 0
 	printf("%s: args %lx %lx %lx %lx %lx %lx %lx %lx\n", __func__,
 	    hypctx->guest_regs.hyp_a[0],
 	    hypctx->guest_regs.hyp_a[1],
@@ -161,17 +163,19 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 	    hypctx->guest_regs.hyp_a[5],
 	    hypctx->guest_regs.hyp_a[6],
 	    hypctx->guest_regs.hyp_a[7]);
+#endif
 
 	sbi_extension_id = hypctx->guest_regs.hyp_a[7];
 
 	switch (sbi_extension_id) {
 	case SBI_CONSOLE_PUTCHAR:
-		message[ptr] = hypctx->guest_regs.hyp_a[0];
-		if (message[ptr] == '\n') {
-			printf("MESSAGE: %s", message);
+		c = hypctx->guest_regs.hyp_a[0];
+		if (c == '\n') {
+			message[ptr] = '\0';
 			ptr = 0;
+			printf("MESSAGE: %s\n", message);
 		} else
-			ptr += 1;
+			message[ptr++] = c;
 		break;
 	case SBI_CONSOLE_GETCHAR:
 		panic("getchar");
