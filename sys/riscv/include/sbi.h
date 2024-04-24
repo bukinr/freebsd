@@ -49,6 +49,7 @@
 #define	SBI_IMPL_ID_KVM			3
 #define	SBI_IMPL_ID_RUSTSBI		4
 #define	SBI_IMPL_ID_DIOSIX		5
+#define	SBI_IMPL_ID_BHYVE		6
 
 /* SBI Error Codes */
 #define	SBI_SUCCESS			0
