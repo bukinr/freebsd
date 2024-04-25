@@ -12,3 +12,4 @@ echo until pc 0 ${ADDR}
 echo bhyve -o bootrom=/bin/ls test
 echo bhyve -o bootrom=/kernel.bin test
 echo bhyve -m 1024 -o bootrom=/kernel.bin test
+echo bhyve -m 1024 -o bootrom=/kernel.bin -o console=stdio test
