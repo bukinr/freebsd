@@ -764,6 +764,8 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 	vm_ooffset_t last;
 	int i, error;
 
+printf("%s: gpa %lx first %lx len %lx\n", __func__, gpa, first, len);
+
 	if (prot == 0 || (prot & ~(VM_PROT_ALL)) != 0)
 		return (EINVAL);
 
@@ -1465,23 +1467,19 @@ vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
 static void
 vcpu_require_state(struct vcpu *vcpu, enum vcpu_state newstate)
 {
-#if 0
 	int error;
 
 	if ((error = vcpu_set_state(vcpu, newstate, false)) != 0)
 		panic("Error %d setting state to %d\n", error, newstate);
-#endif
 }
 
 static void
 vcpu_require_state_locked(struct vcpu *vcpu, enum vcpu_state newstate)
 {
-#if 0
 	int error;
 
 	if ((error = vcpu_set_state_locked(vcpu, newstate, false)) != 0)
 		panic("Error %d setting state to %d", error, newstate);
-#endif
 }
 
 int
@@ -1556,7 +1554,6 @@ static void *
 _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
     void **cookie)
 {
-#if 0
 	int i, count, pageoff;
 	struct mem_map *mm;
 	vm_page_t m;
@@ -1583,8 +1580,6 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 		*cookie = NULL;
 		return (NULL);
 	}
-#endif
-	return (NULL);
 }
 
 void *
@@ -1757,10 +1752,10 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	vm = vcpu->vm;
 	vme = &vcpu->exitinfo;
 
-	printf("%s\n", __func__);
-
 	pmap = vmspace_pmap(vcpu->vm->vmspace);
-	addr = vme->htval << 2;
+	addr = (vme->htval << 2) & ~(PAGE_SIZE - 1);
+
+	//printf("%s: %lx\n", __func__, addr);
 
 	switch (vme->scause) {
 	case SCAUSE_STORE_GUEST_PAGE_FAULT:
@@ -1777,13 +1772,18 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	}
 
 	/* The page exists, but the page table needs to be updated. */
-	if (pmap_fault(pmap, addr, ftype) != KERN_SUCCESS)
+	if (pmap_fault(pmap, addr, ftype) != KERN_SUCCESS) {
+		//printf("%s: pmap_fault failed\n", __func__);
 		return (0);
+	}
 
 	map = &vm->vmspace->vm_map;
 	rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
-	if (rv != KERN_SUCCESS)
+	if (rv != KERN_SUCCESS) {
+		printf("%s: vm_fault failed, addr %lx, ftype %d, err %d\n",
+		    __func__, addr, ftype, rv);
 		return (EFAULT);
+	}
 
 	return (0);
 }
@@ -1798,7 +1798,7 @@ vm_run(struct vcpu *vcpu)
 	bool retu;
 	pmap_t pmap;
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	vcpuid = vcpu->vcpuid;
 
@@ -1829,12 +1829,12 @@ restart:
 	if (error == 0) {
 		retu = false;
 		switch (vme->exitcode) {
-#if 0
 		case VM_EXITCODE_INST_EMUL:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_inst_emul(vcpu, &retu);
 			break;
 
+#if 0
 		case VM_EXITCODE_REG_EMUL:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_reg_emul(vcpu, &retu);

@@ -210,6 +210,8 @@ uart_pl011_write(struct uart_pl011_softc *sc, int offset, uint32_t value)
 {
 	bool loopback;
 
+//printf("%s: %x %x\n", __func__, offset, value);
+
 	pthread_mutex_lock(&sc->mtx);
 	switch (offset) {
 	case UARTDR:
@@ -274,6 +276,8 @@ uart_pl011_read(struct uart_pl011_softc *sc, int offset)
 {
 	uint32_t reg;
 	int fifo_sz;
+
+//printf("%s: %x\n", __func__, offset);
 
 	reg = 0;
 	pthread_mutex_lock(&sc->mtx);

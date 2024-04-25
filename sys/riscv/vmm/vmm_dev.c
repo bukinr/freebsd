@@ -378,7 +378,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	enum { NONE, SINGLE, ALL } vcpus_locked;
 	bool memsegs_locked;
 
-	printf("%s: cmd %ld\n", __func__, cmd);
+	//printf("%s: cmd %ld\n", __func__, cmd);
 
 	error = vmm_priv_check(curthread->td_ucred);
 	if (error)
@@ -399,7 +399,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	 */
 	switch (cmd) {
 	case VM_RUN:
-		printf("%s: cmd %ld RUN\n", __func__, cmd);
+		//printf("%s: cmd %ld RUN\n", __func__, cmd);
 	case VM_GET_REGISTER:
 	case VM_SET_REGISTER:
 	case VM_GET_REGISTER_SET:
@@ -976,6 +976,8 @@ devmem_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t len,
 	size_t seglen;
 	int error;
 	bool sysmem;
+
+printf("%s: offset %lx len %lx\n", __func__, *offset, len);
 
 	dsc = cdev->si_drv1;
 	if (dsc == NULL) {

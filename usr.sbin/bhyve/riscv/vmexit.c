@@ -254,13 +254,11 @@ vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 
 const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_BOGUS]  = vmexit_bogus,
-#if 0
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
-#endif
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
 #if 0
 	[VM_EXITCODE_SMCCC] = vmexit_smccc,
-	[VM_EXITCODE_HYP] = vmexit_hyp,
 #endif
+	[VM_EXITCODE_HYP] = vmexit_hyp,
 };

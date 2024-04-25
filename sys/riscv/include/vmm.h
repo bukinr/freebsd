@@ -255,12 +255,14 @@ void vcpu_notify_event(struct vcpu *vcpu);
 
 enum vm_reg_name vm_segment_name(int seg_encoding);
 
+#if 0
 struct vm_copyinfo {
 	uint64_t	gpa;
 	size_t		len;
 	void		*hva;
 	void		*cookie;
 };
+#endif
 
 #endif	/* _KERNEL */
 
@@ -307,13 +309,13 @@ enum vm_exitcode {
 	VM_EXITCODE_PAGING,
 	VM_EXITCODE_SUSPENDED,
 	VM_EXITCODE_DEBUG,
+	VM_EXITCODE_INST_EMUL,
+	VM_EXITCODE_HYP,
 #if 0
 	VM_EXITCODE_BOGUS,
-	VM_EXITCODE_INST_EMUL,
 	VM_EXITCODE_REG_EMUL,
 	VM_EXITCODE_HVC,
 	VM_EXITCODE_SUSPENDED,
-	VM_EXITCODE_HYP,
 	VM_EXITCODE_WFI,
 	VM_EXITCODE_PAGING,
 	VM_EXITCODE_SMCCC,
@@ -325,6 +327,7 @@ enum vm_exitcode {
 struct vm_exit {
 
 	uint64_t scause;
+	uint64_t sepc;
 	uint64_t stval;
 	uint64_t htval;
 	uint64_t htinst;

@@ -224,14 +224,20 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 }
 
 void
-fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
+fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr __unused)
 {
+#if 0
 	void *fdt, *interrupts, *prop;
+#else
+	void *fdt;
+#endif
 	char node_name[32];
 
+#if 0
 	assert(gic_phandle != 0);
 	assert(apb_pclk_phandle != 0);
 	assert(intr >= GIC_FIRST_SPI);
+#endif
 
 	fdt = fdtroot;
 
@@ -241,6 +247,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 	fdt_property(fdt, "compatible", UART_COMPAT, sizeof(UART_COMPAT));
 #undef UART_COMPAT
 	set_single_reg(fdt, uart_base, uart_size);
+#if 0
 	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
 	fdt_property_placeholder(fdt, "interrupts", 3 * sizeof(uint32_t),
 	    &interrupts);
@@ -254,6 +261,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 	fdt_property(fdt, "clock-names", UART_CLK_NAMES,
 	    sizeof(UART_CLK_NAMES));
 #undef UART_CLK_NAMES
+#endif
 
 	fdt_end_node(fdt);
 

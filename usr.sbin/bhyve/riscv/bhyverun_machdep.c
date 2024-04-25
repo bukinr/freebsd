@@ -225,7 +225,6 @@ load_bootrom(struct vmctx *ctx, const char *path, uint64_t *elrp)
 	*elrp = loadaddr;
 }
 
-#if 0
 static void
 mmio_uart_intr_assert(void *arg)
 {
@@ -292,6 +291,7 @@ init_mmio_uart(struct vmctx *ctx)
 	return (true);
 }
 
+#if 0
 static void
 mmio_rtc_intr_assert(void *arg)
 {
@@ -388,9 +388,12 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 		warn("vm_attach_vgic()");
 		return (error);
 	}
+#endif
 
 	if (init_mmio_uart(ctx))
 		fdt_add_uart(UART_MMIO_BASE, UART_MMIO_SIZE, UART_INTR);
+
+#if 0
 	init_mmio_rtc(ctx);
 	fdt_add_rtc(RTC_MMIO_BASE, RTC_MMIO_SIZE, RTC_INTR);
 	fdt_add_timer();
@@ -409,10 +412,10 @@ bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
 	fdt_finalize();
 
 	/* TODO: set hart ID correctly. */
-	error = vm_set_register(bsp, VM_REG_GUEST_X0, 0);
+	error = vm_set_register(bsp, VM_REG_GUEST_X10, 0);
 	assert(error == 0);
 
-	error = vm_set_register(bsp, VM_REG_GUEST_X1, fdt_gpa(ctx));
+	error = vm_set_register(bsp, VM_REG_GUEST_X11, fdt_gpa(ctx));
 	assert(error == 0);
 
 	return (0);

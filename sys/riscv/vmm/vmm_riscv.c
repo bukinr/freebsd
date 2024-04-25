@@ -60,6 +60,7 @@
 #include <machine/hypervisor.h>
 #include <machine/pmap.h>
 #include <machine/intr.h>
+#include <machine/encoding.h>
 
 #include "mmu.h"
 #include "riscv.h"
@@ -113,6 +114,16 @@ static void vmm_pmap_invalidate_all(uint64_t);
 #endif
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
+
+static int
+m_op(uint32_t insn, int match, int mask)
+{
+
+	if (((insn ^ match) & mask) == 0)
+		return (1);
+
+	return (0);
+}
 
 static inline void
 riscv_set_active_vcpu(struct hypctx *hypctx)
@@ -657,6 +668,102 @@ arm64_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 	paging->flags = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
 	if ((hypctx->sctlr_el1 & SCTLR_M) != 0)
 		paging->flags |= VM_GP_MMU_ENABLED;
+#else
+	struct vie *vie;
+
+	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2);
+
+	uint64_t guest_addr;
+	uint64_t old_hstatus;
+	//uint64_t old_stvec;
+
+	guest_addr = vme_ret->sepc;
+
+	old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
+	//old_stvec = csr_swap(stvec, hypctx->guest_regs.hyp_stvec);
+
+	vie = &vme_ret->u.inst_emul.vie;
+	vie->dir = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
+	    VM_DIR_WRITE : VM_DIR_READ;
+
+	uint64_t insn;
+	uint64_t val1;
+	int reg_num;
+	int rs2, rd;
+
+	__asm __volatile(".option push\n"
+			 ".option norvc\n"
+			"hlvx.hu %[insn], (%[addr])\n"
+			".option pop\n"
+	    : [insn] "=&r" (insn), [addr] "+&r" (guest_addr)
+	    :: "memory");
+
+	if ((insn & 0x3) == 0x3) {
+		guest_addr += 2;
+		__asm __volatile(".option push\n"
+				 ".option norvc\n"
+				"hlvx.hu %[val1], (%[addr])\n"
+				".option pop\n"
+		    : [val1] "=&r" (val1), [addr] "+&r" (guest_addr)
+		    :: "memory");
+		insn |= (val1 << 16);
+
+		//rs1 = (insn & RS1_MASK) >> RS1_SHIFT;
+		rs2 = (insn & RS2_MASK) >> RS2_SHIFT;
+		rd = (insn & RD_MASK) >> RD_SHIFT;
+
+		if (vie->dir == VM_DIR_WRITE) {
+			if (m_op(insn, MATCH_SB, MASK_SB))
+				vie->access_size = 1;
+			else if (m_op(insn, MATCH_SW, MASK_SW))
+				vie->access_size = 2;
+			else if (m_op(insn, MATCH_SH, MASK_SH))
+				vie->access_size = 4;
+			else if (m_op(insn, MATCH_SD, MASK_SD))
+				vie->access_size = 8;
+			reg_num = rs2;
+		} else  {
+			if (m_op(insn, MATCH_LB, MASK_LB))
+				vie->access_size = 1;
+			else if (m_op(insn, MATCH_LW, MASK_LW))
+				vie->access_size = 2;
+			else if (m_op(insn, MATCH_LH, MASK_LH))
+				vie->access_size = 4;
+			else if (m_op(insn, MATCH_LD, MASK_LD))
+				vie->access_size = 8;
+			reg_num = rd;
+		}
+		vme_ret->inst_length = 4;
+	} else {
+		rs2 = (insn >> 7) & 0x7;
+		rs2 += 0x8;
+		rd = (insn >> 2) & 0x7;
+		rd += 0x8;
+
+		if (vie->dir == VM_DIR_WRITE) {
+			if (m_op(insn, MATCH_C_SW, MASK_C_SW))
+				vie->access_size = 2;
+			else if (m_op(insn, MATCH_C_SD, MASK_C_SD))
+				vie->access_size = 8;
+			reg_num = rd;
+		} else  {
+			if (m_op(insn, MATCH_C_LW, MASK_C_LW))
+				vie->access_size = 2;
+			else if (m_op(insn, MATCH_C_LD, MASK_C_LD))
+				vie->access_size = 8;
+			reg_num = rd;
+		}
+		vme_ret->inst_length = 2;
+	}
+
+#if 0
+	printf("guest_addr %lx insn %lx, reg %d\n", guest_addr, insn, reg_num);
+#endif
+
+	csr_write(hstatus, old_hstatus);
+	//csr_write(stvec, old_stvec);
+	vie->sign_extend = 0;
+	vie->reg = reg_num;
 #endif
 }
 
@@ -805,6 +912,7 @@ static int
 riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
     struct vm_exit *vme, pmap_t pmap)
 {
+	uint64_t gpa;
 	int handled;
 
 #if 0
@@ -841,16 +949,54 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 	}
 #endif
 
+	handled = UNHANDLED;
+
 	switch (vme->scause) {
 	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
 	case SCAUSE_LOAD_GUEST_PAGE_FAULT:
 	case SCAUSE_STORE_GUEST_PAGE_FAULT:
-		vme->exitcode = VM_EXITCODE_PAGING;
-		handled = UNHANDLED;
+
+		gpa = (vme->htval << 2);
+#if 0
+		/* Check the IPA is valid */
+		if (gpa >= (1ul << vmm_max_ipa_bits)) {
+			raise_data_insn_abort(hypctx,
+			    hypctx->exit_info.far_el2,
+			    esr_ec == EXCP_DATA_ABORT_L,
+			    ISS_DATA_DFSC_ASF_L0);
+			vme_ret->inst_length = 0;
+			return (HANDLED);
+		}
+#endif
+
+		if (vm_mem_allocated(hypctx->vcpu, gpa)) {
+			vme->exitcode = VM_EXITCODE_PAGING;
+			vme->inst_length = 0;
+#if 0
+			vme->u.paging.esr = hypctx->tf.tf_esr;
+#endif
+			vme->u.paging.gpa = gpa;
+#if 0
+		} else if (esr_ec == EXCP_INSN_ABORT_L) {
+			/*
+			 * Raise an external abort. Device memory is
+			 * not executable
+			 */
+			raise_data_insn_abort(hypctx,
+			    hypctx->exit_info.far_el2, false,
+			    ISS_DATA_DFSC_EXT);
+			vme->inst_length = 0;
+			return (HANDLED);
+#endif
+		} else {
+			arm64_gen_inst_emul_data(hypctx, 0 /*esr_iss*/, vme);
+			vme->exitcode = VM_EXITCODE_INST_EMUL;
+		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
 		printf("%s: Illegal instruction stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->stval, vme->htval);
+		panic("handle me");
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
 		vme->exitcode = VM_EXITCODE_ECALL;
 		handled = UNHANDLED;
@@ -891,6 +1037,10 @@ int
 vmmops_gla2gpa(void *vcpui, struct vm_guest_paging *paging, uint64_t gla,
     int prot, uint64_t *gpa, int *is_fault)
 {
+
+	printf("%s: %lx\n", __func__, gla);
+	panic("implement me");
+
 #if 0
 	struct hypctx *hypctx;
 	void *cookie;
@@ -1158,7 +1308,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	/* Allow WFI for now. */
 	//hstatus |= (1 << 21); //VTW
 	hypctx->guest_regs.hyp_hstatus = hstatus;
-	//csr_write(hstatus, hstatus);
 	//hstatus = csr_read(hstatus);
 	//printf("hstatus %lx\n", hstatus);
 
@@ -1276,14 +1425,14 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		    hypctx->guest_regs.hyp_sstatus,
 		    hypctx->guest_regs.hyp_hstatus);
 #endif
-
 		excp_type = vmm_call_hyp(hypctx);
-
 #if 0
 printf("%s: leaving Guest VM\n", __func__);
+#endif
+
+#if 0
 		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
-
 		vgic_sync_hwstate(hypctx);
 		vtimer_sync_hwstate(hypctx);
 
@@ -1305,13 +1454,16 @@ printf("%s: leaving Guest VM\n", __func__);
 #endif
 
 		vme->scause = csr_read(scause);
+		vme->sepc = csr_read(sepc);
 		vme->stval = csr_read(stval);
 		vme->htval = csr_read(htval);
 		vme->htinst = csr_read(htinst);
 
 #if 0
-		printf("exit scause 0x%lx stval %lx htval %lx htinst %lx\n",
-		    vme->scause, vme->stval, vme->htval, vme->htinst);
+		printf("exit scause 0x%lx stval %lx sepc %lx htval %lx "
+		    "htinst %lx\n",
+		    vme->scause, vme->stval, vme->sepc, vme->htval,
+		    vme->htinst);
 #endif
 
 #if 0
@@ -1419,8 +1571,56 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 	case VM_REG_GUEST_TCR2_EL1:
 		return (&hypctx->tcr2_el1);
 #else
-	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
-		return (&hypctx->guest_regs.hyp_a[reg]);
+
+#if 0
+        "zero", "ra",   "sp",   "gp",   "tp",   "t0",   "t1",   "t2",
+        "s0",   "s1",   "a0",   "a1",   "a2",   "a3",   "a4",   "a5",
+        "a6",   "a7",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
+        "s8",   "s9",   "s10",  "s11",  "t3",   "t4",   "t5",   "t6"
+#endif
+
+	case VM_REG_GUEST_X5:
+		return (&hypctx->guest_regs.hyp_t[0]);
+	case VM_REG_GUEST_X6:
+		return (&hypctx->guest_regs.hyp_t[1]);
+	case VM_REG_GUEST_X7:
+		return (&hypctx->guest_regs.hyp_t[2]);
+	case VM_REG_GUEST_X8:
+		return (&hypctx->guest_regs.hyp_s[0]);
+	case VM_REG_GUEST_X9:
+		return (&hypctx->guest_regs.hyp_s[1]);
+	case VM_REG_GUEST_X10 ... VM_REG_GUEST_X17:
+		return (&hypctx->guest_regs.hyp_a[reg - 10]);
+	case VM_REG_GUEST_X18:
+		return (&hypctx->guest_regs.hyp_s[2]);
+	case VM_REG_GUEST_X19:
+		return (&hypctx->guest_regs.hyp_s[3]);
+	case VM_REG_GUEST_X20:
+		return (&hypctx->guest_regs.hyp_s[4]);
+	case VM_REG_GUEST_X21:
+		return (&hypctx->guest_regs.hyp_s[5]);
+	case VM_REG_GUEST_X22:
+		return (&hypctx->guest_regs.hyp_s[6]);
+	case VM_REG_GUEST_X23:
+		return (&hypctx->guest_regs.hyp_s[7]);
+	case VM_REG_GUEST_X24:
+		return (&hypctx->guest_regs.hyp_s[8]);
+	case VM_REG_GUEST_X25:
+		return (&hypctx->guest_regs.hyp_s[9]);
+	case VM_REG_GUEST_X26:
+		return (&hypctx->guest_regs.hyp_s[10]);
+	case VM_REG_GUEST_X27:
+		return (&hypctx->guest_regs.hyp_s[11]);
+	case VM_REG_GUEST_X28:
+		return (&hypctx->guest_regs.hyp_t[3]);
+	case VM_REG_GUEST_X29:
+		return (&hypctx->guest_regs.hyp_t[4]);
+#if 0
+	case VM_REG_GUEST_X30:
+		return (&hypctx->guest_regs.hyp_t[5]);
+	case VM_REG_GUEST_X31:
+		return (&hypctx->guest_regs.hyp_t[6]);
+#endif
 	case VM_REG_GUEST_PC:
 		return (&hypctx->guest_regs.hyp_sepc);
 #endif
@@ -1463,7 +1663,7 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 
 	hypctx = vcpui;
 
-printf("%s: set reg\n", __func__);
+//printf("%s: set reg %d val %ld\n", __func__, reg, val);
 
 	running = vcpu_is_running(hypctx->vcpu, &hostcpu);
 	if (running && hostcpu != curcpu)
@@ -1476,7 +1676,7 @@ printf("%s: set reg\n", __func__);
 
 	*regp = val;
 
-printf("%s: set reg ok\n", __func__);
+//printf("%s: set reg ok\n", __func__);
 
 	return (0);
 }
