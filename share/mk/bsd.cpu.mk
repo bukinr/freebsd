@@ -351,7 +351,7 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"
-CFLAGS += -march=rv64imafdc -mabi=lp64d
+CFLAGS += -march=rv64imafdch -mabi=lp64d
 .endif
 
 # NB: COPTFLAGS is handled in /usr/src/sys/conf/kern.pre.mk
