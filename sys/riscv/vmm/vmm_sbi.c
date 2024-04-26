@@ -151,8 +151,8 @@ vmm_sbi_handle_time(struct hypctx *hypctx)
 
 	switch (func_id) {
 	case SBI_TIME_SET_TIMER:
-		if (1 == 0)
-			printf("%s: set timer %lx\n", __func__, val);
+		printf("%s: set timer %lx\n", __func__, val);
+		csr_write(vstimecmp, val);
 		break;
 	default:
 		break;

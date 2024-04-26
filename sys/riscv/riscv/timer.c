@@ -93,6 +93,8 @@ set_timecmp(uint64_t timecmp)
 		csr_write(stimecmp, timecmp);
 	else
 		sbi_set_timer(timecmp);
+
+	//csr_set(sie, SIE_STIE);
 }
 
 static u_int
@@ -143,7 +145,10 @@ riscv_timer_intr(void *arg)
 
 	sc = (struct riscv_timer_softc *)arg;
 
-	csr_clear(sip, SIP_STIP);
+	if (has_sstc)
+		csr_write(stimecmp, -1);
+	else
+		csr_clear(sip, SIP_STIP);
 
 	if (sc->et.et_active)
 		sc->et.et_event_cb(&sc->et, sc->et.et_arg);
@@ -173,6 +178,8 @@ riscv_timer_get_timebase(device_t dev, uint32_t *freq)
 	}
 
 	OF_getencprop(node, "timebase-frequency", freq, len);
+
+	//*freq /= 100;
 
 	return (0);
 }

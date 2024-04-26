@@ -115,6 +115,9 @@ static void vmm_pmap_invalidate_all(uint64_t);
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
 
+#define	HVIP_VSSIP	(1 << 2)
+#define	HVIP_VSTIP	(1 << 6)
+
 static int
 m_op(uint32_t insn, int match, int mask)
 {
@@ -634,7 +637,7 @@ arm64_print_hyp_regs(struct vm_exit *vme)
 }
 
 static void
-arm64_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
+riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
     struct vm_exit *vme_ret)
 {
 #if 0
@@ -989,7 +992,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 			return (HANDLED);
 #endif
 		} else {
-			arm64_gen_inst_emul_data(hypctx, 0 /*esr_iss*/, vme);
+			riscv_gen_inst_emul_data(hypctx, 0 /*esr_iss*/, vme);
 			vme->exitcode = VM_EXITCODE_INST_EMUL;
 		}
 		break;
@@ -1288,6 +1291,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	uint64_t hstatus;
 	uint64_t sstatus;
+	uint64_t henvcfg;
 
 	sstatus = csr_read(sstatus);
 #if 0
@@ -1322,13 +1326,21 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hedeleg |= (1UL << SCAUSE_STORE_PAGE_FAULT);
 	csr_write(hedeleg, hedeleg);
 
-	hideleg  = IRQ_SOFTWARE_HYPERVISOR;
-	hideleg |= IRQ_TIMER_HYPERVISOR;
-	hideleg |= IRQ_EXTERNAL_HYPERVISOR;
+	hideleg  = (1 << IRQ_SOFTWARE_HYPERVISOR);
+	hideleg |= (1 << IRQ_TIMER_HYPERVISOR);
+	hideleg |= (1 << IRQ_EXTERNAL_HYPERVISOR);
 	csr_write(hideleg, hideleg);
+
+/* xENVCFG flags */
+#define ENVCFG_STCE                     (1ULL << 63)
+#define ENVCFG_PBMTE                    (1ULL << 62)
+
+	henvcfg = ENVCFG_STCE | ENVCFG_PBMTE;
+	csr_write(henvcfg, henvcfg);
 
 	/* TODO: should we trap rdcycle / rdtime ? */
 	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
+	//csr_write(hie, (1 << 6)); //VSTIE
 
 #if 0
 	uint64_t hgatp;
@@ -1458,6 +1470,14 @@ printf("%s: leaving Guest VM\n", __func__);
 		vme->stval = csr_read(stval);
 		vme->htval = csr_read(htval);
 		vme->htinst = csr_read(htinst);
+
+#if 0
+		uint64_t vsie, hvip;
+		vsie = csr_read(vsie);
+		hvip = csr_read(hvip);
+		if (vsie & (1 << 5))
+			printf("vsie hvip %lx %lx\n", vsie, hvip);
+#endif
 
 #if 0
 		printf("exit scause 0x%lx stval %lx sepc %lx htval %lx "
