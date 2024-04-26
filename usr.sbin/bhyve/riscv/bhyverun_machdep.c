@@ -52,7 +52,7 @@
 #include "uart_emul.h"
 
 /* Start of mem + 1M */
-#define	FDT_BASE	0x1000000
+#define	FDT_BASE	0x2000000
 #define	FDT_SIZE	(64 * 1024)
 
 /* Start of lowmem + 64K */
