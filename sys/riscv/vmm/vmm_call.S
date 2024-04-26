@@ -115,18 +115,18 @@ ENTRY(vmm_call_hyp)
 	/* now load a0. */
 	ld	a0, (HYP_G_A + 0 * 8)(a0)
 
-	sfence.vma
-	hfence.vvma
-	hfence.gvma
+	//sfence.vma
+	//hfence.vvma
+	//hfence.gvma
 
 	sret
 
 	.align 2
 .Lswitch_return:
 
-	sfence.vma
-	hfence.vvma
-	hfence.gvma
+	//sfence.vma
+	//hfence.vvma
+	//hfence.gvma
 
 	csrrw	a0, sscratch, a0
 	sd	ra, (HYP_G_RA)(a0)
@@ -175,7 +175,7 @@ ENTRY(vmm_call_hyp)
 	csrrw	t5, sstatus, t5
 
 	sd	t0, (HYP_G_SEPC)(a0)
-	sd	t2, (HYP_G_A)(a0)
+	sd	t2, (HYP_G_A + 0 * 8)(a0)
 	sd	t3, (HYP_G_SCOUNTEREN)(a0)
 	sd	t4, (HYP_G_HSTATUS)(a0)
 	sd	t5, (HYP_G_SSTATUS)(a0)

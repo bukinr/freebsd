@@ -61,6 +61,7 @@
 #include <machine/pmap.h>
 #include <machine/intr.h>
 #include <machine/encoding.h>
+#include <machine/db_machdep.h>
 
 #include "mmu.h"
 #include "riscv.h"
@@ -533,7 +534,7 @@ printf("%s hyp %p\n", __func__, hyp);
 	hyp->el2_addr = el2_map_enter((vm_offset_t)hyp, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
 
-printf("%s el2_addr %lx\n", __func__, hyp->el2_addr);
+//printf("%s el2_addr %lx\n", __func__, hyp->el2_addr);
 
 	return (hyp);
 }
@@ -566,7 +567,48 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->el2_addr = el2_map_enter((vm_offset_t)hypctx, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
 
-printf("%s hypctx->el2_addr %lx\n", __func__, hypctx->el2_addr);
+//printf("%s hypctx->el2_addr %lx\n", __func__, hypctx->el2_addr);
+
+	uint64_t henvcfg;
+	uint64_t hedeleg;
+	uint64_t hideleg;
+
+	hedeleg  = (1UL << SCAUSE_INST_MISALIGNED);
+	hedeleg |= (1UL << SCAUSE_BREAKPOINT);
+	hedeleg |= (1UL << SCAUSE_ECALL_USER);
+	hedeleg |= (1UL << SCAUSE_INST_PAGE_FAULT);
+	hedeleg |= (1UL << SCAUSE_LOAD_PAGE_FAULT);
+	hedeleg |= (1UL << SCAUSE_STORE_PAGE_FAULT);
+	csr_write(hedeleg, hedeleg);
+
+	hideleg  = (1 << IRQ_SOFTWARE_HYPERVISOR);
+	hideleg |= (1 << IRQ_TIMER_HYPERVISOR);
+	hideleg |= (1 << IRQ_EXTERNAL_HYPERVISOR);
+	csr_write(hideleg, hideleg);
+
+/* xENVCFG flags */
+#define ENVCFG_STCE                     (1ULL << 63)
+#define ENVCFG_PBMTE                    (1ULL << 62)
+
+	henvcfg = ENVCFG_STCE | ENVCFG_PBMTE;
+	csr_write(henvcfg, henvcfg);
+
+	/* TODO: should we trap rdcycle / rdtime ? */
+	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
+	hypctx->guest_scounteren = 0x1 | 0x2; /* rdtime */
+	//csr_write(hie, (1 << 6)); //VSTIE
+
+#if 1
+	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
+	hypctx->guest_regs.hyp_sstatus |= SSTATUS_FS_INITIAL;
+
+	uint64_t hstatus;
+	hstatus = 0;
+	hstatus |= (1 << 7); //SPV
+	/* Allow WFI for now. */
+	//hstatus |= (1 << 21); //VTW
+	hypctx->guest_regs.hyp_hstatus = hstatus;
+#endif
 
 	return (hypctx);
 }
@@ -952,6 +994,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 	}
 #endif
 
+	uint64_t insn;
 	handled = UNHANDLED;
 
 	switch (vme->scause) {
@@ -997,9 +1040,25 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-		printf("%s: Illegal instruction stval 0x%lx htval 0x%lx\n",
-		    __func__, vme->stval, vme->htval);
-		panic("handle me");
+#if 0
+		printf("%s: Illegal instruction at %lx stval 0x%lx htval 0x%lx\n",
+		    __func__, vme->sepc, vme->stval, vme->htval);
+#endif
+
+		//old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
+		__asm __volatile(".option push\n"
+				 ".option norvc\n"
+				"hlvx.hu %[insn], (%[addr])\n"
+				".option pop\n"
+		    : [insn] "=&r" (insn), [addr] "+&r" (vme->sepc)
+		    :: "memory");
+
+		//printf("insn %lx\n", insn);
+		//print_instr(insn);
+		csr_write(vsstatus, SSTATUS_FS_INITIAL);
+		//panic("handle me");
+		handled = HANDLED;
+		break;
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
 		vme->exitcode = VM_EXITCODE_ECALL;
 		handled = UNHANDLED;
@@ -1288,59 +1347,12 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hypctx->tf.tf_sepc = (uint64_t)pc;
 #endif
 	hypctx->guest_regs.hyp_sepc = (uint64_t)pc;
+	if (hypctx->guest_regs.hyp_sstatus & SSTATUS_SPP)
+		hypctx->guest_regs.hyp_hstatus |= (1 << 8); //SPVP;
+	else
+		hypctx->guest_regs.hyp_hstatus &= ~(1 << 8); //SPVP;
 
-	uint64_t hstatus;
-	uint64_t sstatus;
-	uint64_t henvcfg;
-
-	sstatus = csr_read(sstatus);
-#if 0
-	printf("sstatus %lx\n", sstatus);
-#endif
-	sstatus |= SSTATUS_SPP;
-	hypctx->guest_regs.hyp_sstatus = sstatus;
-	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP;
-	//csr_write(sstatus, sstatus);
-
-	hstatus = csr_read(hstatus);
-#if 0
-	printf("hstatus %lx\n", hstatus);
-#endif
-	hstatus = 0;
-	hstatus |= (1 << 7); //SPV
-	hstatus |= (1 << 8); //SPVP
-	/* Allow WFI for now. */
-	//hstatus |= (1 << 21); //VTW
-	hypctx->guest_regs.hyp_hstatus = hstatus;
-	//hstatus = csr_read(hstatus);
-	//printf("hstatus %lx\n", hstatus);
-
-	uint64_t hedeleg;
-	uint64_t hideleg;
-
-	hedeleg  = (1UL << SCAUSE_INST_MISALIGNED);
-	hedeleg |= (1UL << SCAUSE_BREAKPOINT);
-	hedeleg |= (1UL << SCAUSE_ECALL_USER);
-	hedeleg |= (1UL << SCAUSE_INST_PAGE_FAULT);
-	hedeleg |= (1UL << SCAUSE_LOAD_PAGE_FAULT);
-	hedeleg |= (1UL << SCAUSE_STORE_PAGE_FAULT);
-	csr_write(hedeleg, hedeleg);
-
-	hideleg  = (1 << IRQ_SOFTWARE_HYPERVISOR);
-	hideleg |= (1 << IRQ_TIMER_HYPERVISOR);
-	hideleg |= (1 << IRQ_EXTERNAL_HYPERVISOR);
-	csr_write(hideleg, hideleg);
-
-/* xENVCFG flags */
-#define ENVCFG_STCE                     (1ULL << 63)
-#define ENVCFG_PBMTE                    (1ULL << 62)
-
-	henvcfg = ENVCFG_STCE | ENVCFG_PBMTE;
-	csr_write(henvcfg, henvcfg);
-
-	/* TODO: should we trap rdcycle / rdtime ? */
-	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
-	//csr_write(hie, (1 << 6)); //VSTIE
+	hypctx->guest_regs.hyp_hstatus |= (1 << 7); //SPV
 
 #if 0
 	uint64_t hgatp;
@@ -1431,7 +1443,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		/* Call into EL2 to switch to the guest */
 #if 0
-		printf("%s: entering Guest VM, vsatp %lx, ss %lx, "
+		printf("%s: Entering Guest VM, vsatp %lx, ss %lx, "
 		 "hs %lx\n", __func__,
 		    csr_read(vsatp),
 		    hypctx->guest_regs.hyp_sstatus,
@@ -1480,6 +1492,7 @@ printf("%s: leaving Guest VM\n", __func__);
 #endif
 
 #if 0
+	if (vme->scause == SCAUSE_ILLEGAL_INSTRUCTION)
 		printf("exit scause 0x%lx stval %lx sepc %lx htval %lx "
 		    "htinst %lx\n",
 		    vme->scause, vme->stval, vme->sepc, vme->htval,

@@ -119,7 +119,7 @@ vmm_sbi_handle_base(struct hypctx *hypctx)
 }
 
 static int
-vmm_sbi_handle_srst(struct hypctx *hypctx)
+vmm_sbi_handle_srst(struct hypctx *hypctx, bool *retu)
 {
 	int func_id;
 	int type;
@@ -127,13 +127,16 @@ vmm_sbi_handle_srst(struct hypctx *hypctx)
 	func_id = hypctx->guest_regs.hyp_a[6];
 	type = hypctx->guest_regs.hyp_a[0];
 
+	//printf("srst %d %d\n", func_id, type);
+
 	switch (func_id) {
 	case SBI_SRST_SYSTEM_RESET:
 		switch (type) {
 		case SBI_SRST_TYPE_SHUTDOWN:
 		case SBI_SRST_TYPE_COLD_REBOOT:
 		case SBI_SRST_TYPE_WARM_REBOOT:
-			panic("sbi reset issued");
+			//printf("sbi reset issued");
+			*retu = true;
 		}
 	}
 
@@ -213,7 +216,7 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 		vmm_sbi_handle_base(hypctx);
 		break;
 	case SBI_EXT_ID_SRST:
-		vmm_sbi_handle_srst(hypctx);
+		vmm_sbi_handle_srst(hypctx, retu);
 		break;
 	case SBI_EXT_ID_TIME:
 		vmm_sbi_handle_time(hypctx);

@@ -52,7 +52,7 @@
 #include "mem.h"
 #include "vmexit.h"
 
-static cpuset_t running_cpumask;
+//static cpuset_t running_cpumask;
 
 static int __unused
 vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
@@ -125,10 +125,10 @@ vmexit_bogus(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 	return (VMEXIT_CONTINUE);
 }
 
+#if 0
 static uint64_t
 smccc_affinity_info(uint64_t target_affinity __unused, uint32_t lowest_affinity_level __unused)
 {
-#if 0
 	uint64_t cpu_aff, mask = 0;
 
 	switch (lowest_affinity_level) {
@@ -163,13 +163,15 @@ smccc_affinity_info(uint64_t target_affinity __unused, uint32_t lowest_affinity_
 	}
 
 	/* No CPUs in the affinity mask are on, return OFF */
-#endif
 	return (PSCI_AFFINITY_INFO_OFF);
 }
+#endif
 
 static int __unused
-vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
+vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu __unused,
+    struct vm_run *vmrun __unused)
 {
+#if 0
 	struct vcpu *newvcpu;
 	struct vm_exit *vme;
 	uint64_t newcpu, smccc_rv;
@@ -236,6 +238,11 @@ vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 
 	error = vm_set_register(vcpu, VM_REG_GUEST_X0, smccc_rv);
 	assert(error == 0);
+#endif
+
+	enum vm_suspend_how how;
+	how = VM_SUSPEND_POWEROFF;
+	vm_suspend(ctx, how);
 
 	return (VMEXIT_CONTINUE);
 }
@@ -257,8 +264,6 @@ const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
-#if 0
 	[VM_EXITCODE_SMCCC] = vmexit_smccc,
-#endif
 	[VM_EXITCODE_HYP] = vmexit_hyp,
 };
