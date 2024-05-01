@@ -1040,7 +1040,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-#if 0
+#if 1
 		printf("%s: Illegal instruction at %lx stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->sepc, vme->stval, vme->htval);
 #endif

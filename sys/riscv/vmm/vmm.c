@@ -1655,28 +1655,20 @@ vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far)
 int
 vm_attach_vgic(struct vm *vm, struct vm_vgic_descr *descr)
 {
-#if 0
+
 	return (vgic_attach_to_vm(vm->cookie, descr));
-#endif
-	return (0);
 }
 
 int
 vm_assert_irq(struct vm *vm, uint32_t irq)
 {
-#if 0
 	return (vgic_inject_irq(vm->cookie, -1, irq, true));
-#endif
-	return (0);
 }
 
 int
 vm_deassert_irq(struct vm *vm, uint32_t irq)
 {
-#if 0
 	return (vgic_inject_irq(vm->cookie, -1, irq, false));
-#endif
-	return (0);
 }
 
 int

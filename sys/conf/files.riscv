@@ -100,6 +100,7 @@ vmm_hyp_blob.bin				optional vmm		\
 riscv/vmm/vmm_hyp_el2.S				optional vmm		\
 	dependency	vmm_hyp_blob.bin
 riscv/vmm/vmm_mmu.c				optional vmm
+riscv/vmm/vmm_aplic.c				optional vmm
 #riscv/vmm/io/vgic.c				optional vmm
 #riscv/vmm/io/vgic_v3.c				optional vmm
 #riscv/vmm/io/vgic_if.m				optional vmm

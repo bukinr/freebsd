@@ -56,7 +56,8 @@
 #define	GIC_FIRST_SPI		32
 
 static void *fdtroot;
-static uint32_t gic_phandle = 0;
+static uint32_t aplic_phandle = 0;
+static uint32_t intc0_phandle = 0;
 static uint32_t apb_pclk_phandle;
 
 static uint32_t
@@ -100,6 +101,7 @@ add_cpu(void *fdt, int cpuid)
 	fdt_property_string(fdt, "clock-frequency", "1000000000");
 
 	fdt_begin_node(fdt, "interrupt-controller");
+	intc0_phandle = assign_phandle(fdt);
 	fdt_property_u32(fdt, "#address-cells", 2);
 	fdt_property_u32(fdt, "#size-cells", 1);
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
@@ -185,9 +187,20 @@ fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t fdtaddr, vm_size_t fdtsize)
 	return (0);
 }
 
+#if 0
+aplic1: interrupt-controller@d000000 {
+  compatible = "qemu,aplic", "riscv,aplic";
+  interrupts-extended = <&cpu1_intc 9>, <&cpu2_intc 9>;
+  reg = <0xd000000 0x4080>;
+  interrupt-controller;
+  #interrupt-cells = <2>;
+  riscv,num-sources = <63>;
+};
+#endif
+
 void
 fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
-    uint64_t redist_base, uint64_t redist_size)
+    uint64_t redist_base __unused, uint64_t redist_size __unused)
 {
 	char node_name[32];
 	void *fdt, *prop;
@@ -198,29 +211,26 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 	    (unsigned long)dist_base);
 	fdt_begin_node(fdt, node_name);
 
-	gic_phandle = assign_phandle(fdt);
-	fdt_property_string(fdt, "compatible", "arm,gic-v3");
+	aplic_phandle = assign_phandle(fdt);
+	fdt_property_string(fdt, "compatible", "riscv,aplic");
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
-	fdt_property(fdt, "msi-controller", NULL, 0);
+	//fdt_property(fdt, "msi-controller", NULL, 0);
 	/* XXX: Needed given the root #address-cells? */
 	fdt_property_u32(fdt, "#address-cells", 2);
-	fdt_property_u32(fdt, "#interrupt-cells", 3);
-	fdt_property_placeholder(fdt, "reg", 4 * sizeof(uint64_t), &prop);
-	/* GICD */
+	fdt_property_u32(fdt, "#interrupt-cells", 1);
+	fdt_property_placeholder(fdt, "reg", 2 * sizeof(uint64_t), &prop);
 	SET_PROP_U64(prop, 0, dist_base);
 	SET_PROP_U64(prop, 1, dist_size);
-	/* GICR */
-	SET_PROP_U64(prop, 2, redist_base);
-	SET_PROP_U64(prop, 3, redist_size);
 
-	fdt_property_placeholder(fdt, "mbi-ranges", 2 * sizeof(uint32_t),
-	    &prop);
-	SET_PROP_U32(prop, 0, 256);
-	SET_PROP_U32(prop, 1, 64);
+	fdt_property_placeholder(fdt, "interrupts-extended",
+	    2 * sizeof(uint32_t), &prop);
+	SET_PROP_U32(prop, 0, intc0_phandle);
+	SET_PROP_U32(prop, 1, 9);
+	fdt_property_u32(fdt, "riscv,num-sources", 63);
 
 	fdt_end_node(fdt);
 
-	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
+	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
 }
 
 void
@@ -234,7 +244,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr __unused)
 	char node_name[32];
 
 #if 0
-	assert(gic_phandle != 0);
+	assert(aplic_phandle != 0);
 	assert(apb_pclk_phandle != 0);
 	assert(intr >= GIC_FIRST_SPI);
 #endif
@@ -248,7 +258,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr __unused)
 #undef UART_COMPAT
 	set_single_reg(fdt, uart_base, uart_size);
 #if 0
-	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
+	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
 	fdt_property_placeholder(fdt, "interrupts", 3 * sizeof(uint32_t),
 	    &interrupts);
 	SET_PROP_U32(interrupts, 0, GIC_SPI);
@@ -277,7 +287,7 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 	void *fdt, *interrupts, *prop;
 	char node_name[32];
 
-	assert(gic_phandle != 0);
+	assert(aplic_phandle != 0);
 	assert(apb_pclk_phandle != 0);
 	assert(intr >= GIC_FIRST_SPI);
 
@@ -289,7 +299,7 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 	fdt_property(fdt, "compatible", RTC_COMPAT, sizeof(RTC_COMPAT));
 #undef RTC_COMPAT
 	set_single_reg(fdt, rtc_base, rtc_size);
-	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
+	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
 	fdt_property_placeholder(fdt, "interrupts", 3 * sizeof(uint32_t),
 	    &interrupts);
 	SET_PROP_U32(interrupts, 0, GIC_SPI);
@@ -308,13 +318,13 @@ fdt_add_timer(void)
 	void *fdt, *interrupts;
 	uint32_t irqs[] = { 13, 14, 11 };
 
-	assert(gic_phandle != 0);
+	assert(aplic_phandle != 0);
 
 	fdt = fdtroot;
 
 	fdt_begin_node(fdt, "timer");
 	fdt_property_string(fdt, "compatible", "arm,armv8-timer");
-	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
+	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
 	fdt_property_placeholder(fdt, "interrupts", 9 * sizeof(uint32_t),
 	    &interrupts);
 	for (u_int i = 0; i < nitems(irqs); i++) {
@@ -331,7 +341,7 @@ fdt_add_pcie(int intrs[static 4])
 	void *fdt, *prop;
 	int slot, pin, intr, i;
 
-	assert(gic_phandle != 0);
+	assert(aplic_phandle != 0);
 
 	fdt = fdtroot;
 
@@ -368,13 +378,13 @@ fdt_add_pcie(int intrs[static 4])
 
 	fdt_property_placeholder(fdt, "msi-map", 4 * sizeof(uint32_t), &prop);
 	SET_PROP_U32(prop, 0, 0);		/* RID base */
-	SET_PROP_U32(prop, 1, gic_phandle);	/* MSI parent */
+	SET_PROP_U32(prop, 1, aplic_phandle);	/* MSI parent */
 	SET_PROP_U32(prop, 2, 0);		/* MSI base */
 	SET_PROP_U32(prop, 3, 0x10000);		/* RID length */
-	fdt_property_u32(fdt, "msi-parent", gic_phandle);
+	fdt_property_u32(fdt, "msi-parent", aplic_phandle);
 
 	fdt_property_u32(fdt, "#interrupt-cells", 1);
-	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
+	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
 
 	/*
 	 * Describe standard swizzled interrupts routing (pins rotated by one
@@ -397,7 +407,7 @@ fdt_add_pcie(int intrs[static 4])
 		SET_PROP_U32(prop, 10 * i + 1, 0);
 		SET_PROP_U32(prop, 10 * i + 2, 0);
 		SET_PROP_U32(prop, 10 * i + 3, pin + 1);
-		SET_PROP_U32(prop, 10 * i + 4, gic_phandle);
+		SET_PROP_U32(prop, 10 * i + 4, aplic_phandle);
 		SET_PROP_U32(prop, 10 * i + 5, 0);
 		SET_PROP_U32(prop, 10 * i + 6, 0);
 		SET_PROP_U32(prop, 10 * i + 7, GIC_SPI);

@@ -96,6 +96,8 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_TIME, "");
 	rflag = 0;
 	Iflag = jflag = Rflag = 0;
+	ts.tv_sec = 0;
+	ts.tv_nsec = 0;
 	while ((ch = getopt(argc, argv, "f:I::jnRr:uv:z:")) != -1)
 		switch((char)ch) {
 		case 'f':
@@ -332,7 +334,9 @@ setthetime(const char *fmt, const char *p, int jflag, struct timespec *ts)
 	}
 
 	/* convert broken-down time to GMT clock time */
-	if ((ts->tv_sec = mktime(lt)) == -1)
+	lt->tm_yday = -1;
+	ts->tv_sec = mktime(lt);
+	if (lt->tm_yday == -1)
 		errx(1, "nonexistent time");
 	ts->tv_nsec = 0;
 
