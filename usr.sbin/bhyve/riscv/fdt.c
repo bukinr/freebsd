@@ -103,7 +103,8 @@ add_cpu(void *fdt, int cpuid)
 	fdt_begin_node(fdt, "interrupt-controller");
 	intc0_phandle = assign_phandle(fdt);
 	fdt_property_u32(fdt, "#address-cells", 2);
-	fdt_property_u32(fdt, "#size-cells", 1);
+	fdt_property_u32(fdt, "#interrupt-cells", 1);
+ //	fdt_property_u32(fdt, "#size-cells", 1);
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
 	fdt_property_string(fdt, "compatible", "riscv,cpu-intc");
 	fdt_end_node(fdt);
@@ -217,7 +218,7 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 	//fdt_property(fdt, "msi-controller", NULL, 0);
 	/* XXX: Needed given the root #address-cells? */
 	fdt_property_u32(fdt, "#address-cells", 2);
-	fdt_property_u32(fdt, "#interrupt-cells", 1);
+	fdt_property_u32(fdt, "#interrupt-cells", 2);
 	fdt_property_placeholder(fdt, "reg", 2 * sizeof(uint64_t), &prop);
 	SET_PROP_U64(prop, 0, dist_base);
 	SET_PROP_U64(prop, 1, dist_size);
