@@ -43,7 +43,8 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
     int size, void *arg)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: fault_ipa %lx size %d\n", __func__,
+	    fault_ipa, size);
 
 	return (0);
 }
@@ -53,7 +54,8 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
     int size, void *arg)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__,
+	    fault_ipa, wval, size);
 
 	return (0);
 }
@@ -63,7 +65,8 @@ redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
     int size, void *arg)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: fault_ipa %lx size %d\n", __func__,
+	    fault_ipa, size);
 
 	return (0);
 }
@@ -73,7 +76,8 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
     int size, void *arg)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__,
+	    fault_ipa, wval, size);
 
 	return (0);
 }
