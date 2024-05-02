@@ -240,7 +240,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 #if 0
 	void *fdt, *interrupts, *prop;
 #else
-	void *fdt;
+	void *fdt, *interrupts;
 #endif
 	char node_name[32];
 
