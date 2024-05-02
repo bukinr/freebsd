@@ -64,10 +64,7 @@ static const char *progname;
 
 static int get_stats, getcap, setcap, capval;
 static int force_reset, force_poweroff;
-#if 0
 static const char *capname;
-#endif
-
 static int create, destroy, get_memmap, get_memseg;
 static int get_active_cpus, get_debug_cpus, get_suspended_cpus;
 static uint64_t memsize;
@@ -78,10 +75,10 @@ static int vm_suspend_opt;
 #endif
 
 static int get_all;
+
 enum {
 	VMNAME = OPT_START,	/* avoid collision with return values from getopt */
 	VCPU,
-#if 0
 	SET_MEM,
 	SET_CAP,
 	CAPNAME,
@@ -120,12 +117,10 @@ setup_options(void)
 	const struct option common_opts[] = {
 		{ "vm",		REQ_ARG,	0,	VMNAME },
 		{ "cpu",	REQ_ARG,	0,	VCPU },
-#if 0
 		{ "set-mem",	REQ_ARG,	0,	SET_MEM },
 		{ "capname",	REQ_ARG,	0,	CAPNAME },
 		{ "setcap",	REQ_ARG,	0,	SET_CAP },
 		{ "getcap",	NO_ARG,		&getcap,	1 },
-#endif
 		{ "get-stats",	NO_ARG,		&get_stats,	1 },
 		{ "get-memmap",	NO_ARG,		&get_memmap,	1 },
 		{ "get-memseg", NO_ARG,		&get_memseg,	1 },
@@ -144,6 +139,8 @@ setup_options(void)
 		{ "suspend", 		REQ_ARG, 0,	SET_SUSPEND_FILE},
 #endif
 	};
+
+	return (bhyvectl_opts(common_opts, nitems(common_opts)));
 }
 
 void
@@ -151,14 +148,12 @@ usage(const struct option *opts)
 {
 	static const char *set_desc[] = {
 	    [VCPU] = "vcpu_number",
-#if 0
 	    [SET_MEM] = "memory in units of MB",
 	    [SET_CAP] = "0|1",
 	    [CAPNAME] = "capname",
 #ifdef BHYVE_SNAPSHOT
 	    [SET_CHECKPOINT_FILE] = "filename",
 	    [SET_SUSPEND_FILE] = "filename",
-#endif
 #endif
 	};
 	(void)fprintf(stderr, "Usage: %s --vm=<vmname>\n", progname);
@@ -254,7 +249,6 @@ show_memseg(struct vmctx *ctx)
 	}
 }
 
-#if 0
 #ifdef BHYVE_SNAPSHOT
 static int
 send_message(const char *vmname, nvlist_t *nvl)
@@ -327,7 +321,6 @@ snapshot_request(const char *vmname, char *file, bool suspend)
 	return (send_message(vmname, nvl));
 }
 #endif
-#endif
 
 int
 main(int argc, char *argv[])
@@ -364,7 +357,6 @@ main(int argc, char *argv[])
 		case VCPU:
 			vcpuid = atoi(optarg);
 			break;
-#if 0
 		case SET_MEM:
 			memsize = atoi(optarg) * MB;
 			memsize = roundup(memsize, 2 * MB);
@@ -385,7 +377,6 @@ main(int argc, char *argv[])
 			checkpoint_file = optarg;
 			vm_suspend_opt = (ch == SET_SUSPEND_FILE);
 			break;
-#endif
 #endif
 		default:
 			usage(opts);
@@ -422,7 +413,6 @@ main(int argc, char *argv[])
 	if (!error && (get_memmap || get_all))
 		error = show_memmap(ctx);
 
-#if 0
 	if (!error)
 		bhyvectl_md_main(ctx, vcpu, vcpuid, get_all);
 
@@ -460,7 +450,6 @@ main(int argc, char *argv[])
 			}
 		}
 	}
-#endif
 
 	if (!error && (get_active_cpus || get_all)) {
 		error = vm_active_cpus(ctx, &cpus);
@@ -496,7 +485,6 @@ main(int argc, char *argv[])
 		}
 	}
 
-#if 0
 	if (!error && (get_cpu_topology || get_all)) {
 		uint16_t sockets, cores, threads, maxcpus;
 
@@ -504,7 +492,6 @@ main(int argc, char *argv[])
 		printf("cpu_topology:\tsockets=%hu, cores=%hu, threads=%hu, "
 		    "maxcpus=%hu\n", sockets, cores, threads, maxcpus);
 	}
-#endif
 
 	if (!error && run) {
 		struct vm_exit vmexit;
@@ -514,13 +501,10 @@ main(int argc, char *argv[])
 		vmrun.cpuset = &cpuset;
 		vmrun.cpusetsize = sizeof(cpuset);
 		error = vm_run(vcpu, &vmrun);
-#if 0
 		if (error == 0)
 			bhyvectl_dump_vm_run_exitcode(&vmexit, vcpuid);
 		else
 			printf("vm_run error %d\n", error);
-#endif
-		printf("vm_run error %d\n", error);
 	}
 
 	if (!error && force_reset)
