@@ -235,7 +235,7 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 }
 
 void
-fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr __unused)
+fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 {
 #if 0
 	void *fdt, *interrupts, *prop;
@@ -258,13 +258,13 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr __unused)
 	fdt_property(fdt, "compatible", UART_COMPAT, sizeof(UART_COMPAT));
 #undef UART_COMPAT
 	set_single_reg(fdt, uart_base, uart_size);
-#if 0
 	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
-	fdt_property_placeholder(fdt, "interrupts", 3 * sizeof(uint32_t),
+	fdt_property_placeholder(fdt, "interrupts", 2 * sizeof(uint32_t),
 	    &interrupts);
-	SET_PROP_U32(interrupts, 0, GIC_SPI);
-	SET_PROP_U32(interrupts, 1, intr - GIC_FIRST_SPI);
-	SET_PROP_U32(interrupts, 2, IRQ_TYPE_LEVEL_HIGH);
+	SET_PROP_U32(interrupts, 0, intr);
+	SET_PROP_U32(interrupts, 1, IRQ_TYPE_LEVEL_HIGH);
+
+#if 0
 	fdt_property_placeholder(fdt, "clocks", 2 * sizeof(uint32_t), &prop);
 	SET_PROP_U32(prop, 0, apb_pclk_phandle);
 	SET_PROP_U32(prop, 1, apb_pclk_phandle);
