@@ -35,6 +35,7 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/rman.h>
+#include <sys/smp.h>
 
 #include <riscv/vmm/hyp.h>
 #include <riscv/vmm/riscv.h>
@@ -54,6 +55,8 @@ MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 #define	APLIC_CLRIPNUM		0x1ddc
 #define	APLIC_SETIENUM		0x1edc
 #define	APLIC_CLRIENUM		0x1fdc
+#define	APLIC_GENMSI		0x3000
+#define	APLIC_TARGET(x)		(0x3004 + ((x) - 1) * 4)
 #define	APLIC_IDC(x)		(0x4000 + (x) * 32)
 #define	 IDC_IDELIVERY(x)	(APLIC_IDC(x) + 0x0)
 #define	 IDC_IFORCE(x)		(APLIC_IDC(x) + 0x4)
@@ -82,7 +85,26 @@ static int
 aplic_handle_sourcecfg(struct aplic *aplic, int i, bool write, uint64_t *val)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: i %d\n", __func__, i);
+
+	return (0);
+}
+
+static int
+aplic_handle_target(struct aplic *aplic, int i, bool write, uint64_t *val)
+{
+
+	printf("%s: i %d\n", __func__, i);
+
+	return (0);
+}
+
+static int
+aplic_handle_idc(struct aplic *aplic, int cpu, int reg, bool write,
+    uint64_t *val)
+{
+
+	printf("%s: cpu %d reg %d\n", __func__, cpu, reg);
 
 	return (0);
 }
@@ -92,11 +114,27 @@ aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 {
 	struct aplic_irq *irq;
 	int error;
+	int cpu;
+	int r;
 	int i;
 
-	if ((reg >= APLIC_SOURCECFG(0)) && (reg < ((aplic->nirqs - 1) * 4))) {
-		i = (((reg - APLIC_SOURCECFG(0)) >> 2) + 1);
+	if ((reg >= APLIC_SOURCECFG(1)) &&
+	    (reg <= APLIC_SOURCECFG(aplic->nirqs))) {
+		i = ((reg - APLIC_SOURCECFG(1)) >> 2) + 1;
 		error = aplic_handle_sourcecfg(aplic, i, write, val);
+		return (error);
+	}
+
+	if ((reg >= APLIC_TARGET(1)) && (reg <= APLIC_TARGET(aplic->nirqs))) {
+		i = (reg - APLIC_TARGET(1)) >> 2;
+		error = aplic_handle_target(aplic, i, write, val);
+		return (error);
+	}
+
+	if ((reg >= APLIC_IDC(0)) && (reg < APLIC_IDC(mp_ncpus))) {
+		cpu = (reg - APLIC_IDC(0)) >> 5;
+		r = (reg - APLIC_IDC(0)) % 32;
+		error = aplic_handle_idc(aplic, cpu, r, write, val);
 		return (error);
 	}
 
@@ -110,6 +148,8 @@ aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 			irq = &aplic->irqs[i];
 			irq->state |= APLIC_IRQ_STATE_ENABLED;
 		}
+	case APLIC_CLRIENUM:
+		break;
 	default:
 		panic("unknown reg %lx", reg);
 		break;
@@ -262,7 +302,7 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 	aplic->dist_start = descr->v3_regs.dist_start;
 	aplic->dist_end = descr->v3_regs.dist_start + descr->v3_regs.dist_size;
 	aplic->irqs = malloc(sizeof(struct aplic_irq) * aplic->nirqs, M_DEVBUF,
-	    M_ZERO);
+	    M_WAITOK | M_ZERO);
 
 	hyp->aplic_attached = true;
 
