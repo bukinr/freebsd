@@ -45,21 +45,108 @@
 
 MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 
+#define	APLIC_DOMAINCFG		0x0000
+#define	 DOMAINCFG_IE		(1 << 8)	/* Interrupt Enable */
+#define	 DOMAINCFG_DM		(1 << 2)	/* Direct Mode */
+#define	 DOMAINCFG_BE		(1 << 0)	/* Big-Endian */
+#define	APLIC_SOURCECFG(x)	(0x0004 + ((x) - 1) * 4)
+#define	APLIC_SETIPNUM		0x1cdc
+#define	APLIC_CLRIPNUM		0x1ddc
+#define	APLIC_SETIENUM		0x1edc
+#define	APLIC_CLRIENUM		0x1fdc
+#define	APLIC_IDC(x)		(0x4000 + (x) * 32)
+#define	 IDC_IDELIVERY(x)	(APLIC_IDC(x) + 0x0)
+#define	 IDC_IFORCE(x)		(APLIC_IDC(x) + 0x4)
+#define	 IDC_ITHRESHOLD(x)	(APLIC_IDC(x) + 0x8)
+#define	 IDC_TOPI(x)		(APLIC_IDC(x) + 0x18)
+#define	 IDC_CLAIMI(x)		(APLIC_IDC(x) + 0x1C)
+
+struct aplic_irq {
+	uint32_t source_cfg;
+	uint32_t state;
+#define	APLIC_IRQ_STATE_PENDING	(1 << 0)
+#define	APLIC_IRQ_STATE_ENABLED	(1 << 1)
+	uint32_t target;
+};
+
 struct aplic {
 	uint32_t dist_start;
 	uint32_t dist_end;
 	struct mtx mtx;
+	struct aplic_irq *irqs;
+	int nirqs;
+	uint32_t domaincfg;
 };
+
+static int
+aplic_handle_sourcecfg(struct aplic *aplic, int i, bool write, uint64_t *val)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
+{
+	struct aplic_irq *irq;
+	int error;
+	int i;
+
+	if ((reg >= APLIC_SOURCECFG(0)) && (reg < ((aplic->nirqs - 1) * 4))) {
+		i = (((reg - APLIC_SOURCECFG(0)) >> 2) + 1);
+		error = aplic_handle_sourcecfg(aplic, i, write, val);
+		return (error);
+	}
+
+	switch (reg) {
+	case APLIC_DOMAINCFG:
+		aplic->domaincfg = *val & DOMAINCFG_IE;
+		break;
+	case APLIC_SETIENUM:
+		i = *val;
+		if (i > 0 && i < aplic->nirqs) {
+			irq = &aplic->irqs[i];
+			irq->state |= APLIC_IRQ_STATE_ENABLED;
+		}
+	default:
+		panic("unknown reg %lx", reg);
+		break;
+	};
+
+	return (0);
+}
 
 static int
 dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
     int size, void *arg)
 {
+	struct hypctx *hypctx;
+	struct hyp *hyp;
+	struct aplic *aplic;
+	uint64_t reg;
+	uint64_t val;
+	int error;
+
+	hypctx = vcpu_get_cookie(vcpu);
+	hyp = hypctx->hyp;
+	aplic = hyp->aplic;
 
 	printf("%s: fault_ipa %lx size %d\n", __func__,
 	    fault_ipa, size);
 
-	return (0);
+	if (fault_ipa < aplic->dist_start ||
+	    fault_ipa + size > aplic->dist_end)
+		return (EINVAL);
+
+	reg = fault_ipa - aplic->dist_start;
+
+	error = aplic_mmio_access(aplic, reg, false, &val);
+	if (error == 0)
+		*rval = val;
+
+	return (error);
 }
 
 static int
@@ -70,6 +157,8 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	struct hyp *hyp;
 	struct aplic *aplic;
 	uint64_t reg;
+	uint64_t val;
+	int error;
 
 	hypctx = vcpu_get_cookie(vcpu);
 	hyp = hypctx->hyp;
@@ -78,16 +167,19 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__,
 	    fault_ipa, wval, size);
 
-	/* Ensure that we get here correctly. */
 	if (fault_ipa < aplic->dist_start ||
 	    fault_ipa + size > aplic->dist_end)
 		return (EINVAL);
 
 	reg = fault_ipa - aplic->dist_start;
 
-	printf("Reg %lx\n", reg);
+	//printf("Reg %lx\n", reg);
 
-	return (0);
+	val = wval;
+
+	error = aplic_mmio_access(aplic, reg, true, &val);
+
+	return (error);
 }
 
 static int
@@ -147,8 +239,8 @@ aplic_vminit(struct hyp *hyp)
 int
 aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 {
-	struct vm *vm;
 	struct aplic *aplic;
+	struct vm *vm;
 
 	vm = hyp->vm;
 
@@ -166,8 +258,11 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 #endif
 
 	aplic = hyp->aplic;
+	aplic->nirqs = 63;
 	aplic->dist_start = descr->v3_regs.dist_start;
 	aplic->dist_end = descr->v3_regs.dist_start + descr->v3_regs.dist_size;
+	aplic->irqs = malloc(sizeof(struct aplic_irq) * aplic->nirqs, M_DEVBUF,
+	    M_ZERO);
 
 	hyp->aplic_attached = true;
 
