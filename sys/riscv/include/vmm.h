@@ -116,7 +116,7 @@ struct vm_exit;
 struct vm_run;
 struct vm_object;
 struct vm_guest_paging;
-struct vm_vgic_descr;
+struct vm_aplic_descr;
 struct pmap;
 
 struct vm_eventinfo {
@@ -185,7 +185,7 @@ int vm_activate_cpu(struct vcpu *vcpu);
 int vm_suspend_cpu(struct vm *vm, struct vcpu *vcpu);
 int vm_resume_cpu(struct vm *vm, struct vcpu *vcpu);
 int vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far);
-int vm_attach_vgic(struct vm *vm, struct vm_vgic_descr *descr);
+int vm_attach_aplic(struct vm *vm, struct vm_aplic_descr *descr);
 int vm_assert_irq(struct vm *vm, uint32_t irq);
 int vm_deassert_irq(struct vm *vm, uint32_t irq);
 int vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,

@@ -53,8 +53,7 @@
 #include <machine/vmm_dev.h>
 
 #include "vmm_stat.h"
-
-#include "io/vgic.h"
+#include "vmm_aplic.h"
 
 struct devmem_softc {
 	int	segid;
@@ -360,7 +359,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_register_set *vmregset;
 	struct vm_run *vmrun;
 	struct vm_vgic_version *vgv;
-	struct vm_vgic_descr *vgic;
+	struct vm_aplic_descr *vgic;
 	struct vm_cpuset *vm_cpuset;
 	struct vm_irq *vi;
 	struct vm_capability *vmcap;
@@ -664,8 +663,8 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		error = 0;
 		break;
 	case VM_ATTACH_VGIC:
-		vgic = (struct vm_vgic_descr *)data;
-		error = vm_attach_vgic(sc->vm, vgic);
+		vgic = (struct vm_aplic_descr *)data;
+		error = vm_attach_aplic(sc->vm, vgic);
 		break;
 	case VM_RAISE_MSI:
 		vmsi = (struct vm_msi *)data;

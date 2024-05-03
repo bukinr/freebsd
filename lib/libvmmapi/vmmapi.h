@@ -161,9 +161,14 @@ int	vm_suspend(struct vmctx *ctx, enum vm_suspend_how how);
 int	vm_reinit(struct vmctx *ctx);
 int	vm_raise_msi(struct vmctx *ctx, uint64_t addr, uint64_t msg,
     int bus, int slot, int func);
-#if defined(__aarch64__) || defined(__riscv)
+#if defined(__aarch64__)
 int	vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
     uint64_t redist_start, size_t redist_size);
+#elif defined(__riscv)
+int	vm_attach_aplic(struct vmctx *ctx, uint64_t dist_start,
+    size_t dist_size, uint64_t redist_start, size_t redist_size);
+#endif
+#if defined(__aarch64__) || defined(__riscv)
 int	vm_assert_irq(struct vmctx *ctx, uint32_t irq);
 int	vm_deassert_irq(struct vmctx *ctx, uint32_t irq);
 int	vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far);

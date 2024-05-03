@@ -139,7 +139,7 @@ struct vm_vgic_version {
 	u_int flags;
 };
 
-struct vm_vgic_descr {
+struct vm_aplic_descr {
 	struct vm_vgic_version ver;
 	union {
 		struct {
@@ -206,7 +206,7 @@ enum {
 	IOCNUM_SUSPEND_CPU = 92,
 	IOCNUM_RESUME_CPU = 93,
 
-	/* vm_attach_vgic */
+	/* vm_attach_aplic */
 	IOCNUM_GET_VGIC_VERSION = 110,
 	IOCNUM_ATTACH_VGIC = 111,
 };
@@ -268,5 +268,5 @@ enum {
 #define	VM_GET_VGIC_VERSION	\
 	_IOR('v', IOCNUM_GET_VGIC_VERSION, struct vm_vgic_version)
 #define	VM_ATTACH_VGIC	\
-	_IOW('v', IOCNUM_ATTACH_VGIC, struct vm_vgic_descr)
+	_IOW('v', IOCNUM_ATTACH_VGIC, struct vm_aplic_descr)
 #endif

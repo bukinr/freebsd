@@ -28,7 +28,12 @@
 #ifndef _VMM_APLIC_H_
 #define _VMM_APLIC_H_
 
-int vgic_attach_to_vm(struct hyp *hyp, struct vm_vgic_descr *descr);
-int vgic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level);
+struct hyp;
+struct hypctx;
+struct vm_aplic_descr;
+
+int aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr);
+int aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level);
+void aplic_vminit(struct hyp *hyp);
 
 #endif /* !_VMM_APLIC_H_ */

@@ -72,7 +72,7 @@
 #include "riscv.h"
 #include "mmu.h"
 
-#include "io/vgic.h"
+#include "vmm_aplic.h"
 #include "io/vtimer.h"
 
 struct vcpu {
@@ -1151,7 +1151,7 @@ vm_handle_inst_emul(struct vcpu *vcpu, bool *retu)
 
 	vm = vcpu->vm;
 	hyp = vm->cookie;
-	if (!hyp->vgic_attached)
+	if (!hyp->aplic_attached)
 		goto out_user;
 
 	vme = &vcpu->exitinfo;
@@ -1653,22 +1653,22 @@ vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far)
 }
 
 int
-vm_attach_vgic(struct vm *vm, struct vm_vgic_descr *descr)
+vm_attach_aplic(struct vm *vm, struct vm_aplic_descr *descr)
 {
 
-	return (vgic_attach_to_vm(vm->cookie, descr));
+	return (aplic_attach_to_vm(vm->cookie, descr));
 }
 
 int
 vm_assert_irq(struct vm *vm, uint32_t irq)
 {
-	return (vgic_inject_irq(vm->cookie, -1, irq, true));
+	return (aplic_inject_irq(vm->cookie, -1, irq, true));
 }
 
 int
 vm_deassert_irq(struct vm *vm, uint32_t irq)
 {
-	return (vgic_inject_irq(vm->cookie, -1, irq, false));
+	return (aplic_inject_irq(vm->cookie, -1, irq, false));
 }
 
 int

@@ -57,23 +57,23 @@ const cap_ioctl_t vm_ioctl_cmds[] = {
 size_t vm_ioctl_ncmds = nitems(vm_ioctl_cmds);
 
 int
-vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
+vm_attach_aplic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
     uint64_t redist_start, size_t redist_size)
 {
-	struct vm_vgic_descr vgic;
+	struct vm_aplic_descr aplic;
 	int error;
 
-	bzero(&vgic, sizeof(vgic));
-	error = ioctl(ctx->fd, VM_GET_VGIC_VERSION, &vgic.ver);
+	bzero(&aplic, sizeof(aplic));
+	error = ioctl(ctx->fd, VM_GET_VGIC_VERSION, &aplic.ver);
 	if (error != 0)
 		return (error);
-	assert(vgic.ver.version == 3);
-	vgic.v3_regs.dist_start = dist_start;
-	vgic.v3_regs.dist_size = dist_size;
-	vgic.v3_regs.redist_start = redist_start;
-	vgic.v3_regs.redist_size = redist_size;
+	assert(aplic.ver.version == 3);
+	aplic.v3_regs.dist_start = dist_start;
+	aplic.v3_regs.dist_size = dist_size;
+	aplic.v3_regs.redist_start = redist_start;
+	aplic.v3_regs.redist_size = redist_size;
 
-	return (ioctl(ctx->fd, VM_ATTACH_VGIC, &vgic));
+	return (ioctl(ctx->fd, VM_ATTACH_VGIC, &aplic));
 }
 
 int

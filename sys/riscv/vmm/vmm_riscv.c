@@ -67,8 +67,7 @@
 #include "riscv.h"
 #include "hyp.h"
 #include "reset.h"
-#include "io/vgic.h"
-#include "io/vgic_v3.h"
+#include "vmm_aplic.h"
 #include "io/vtimer.h"
 #include "vmm_stat.h"
 
@@ -524,12 +523,12 @@ printf("%s size %ld\n", __func__, size);
 printf("%s hyp %p\n", __func__, hyp);
 
 	hyp->vm = vm;
-	hyp->vgic_attached = false;
+	hyp->aplic_attached = false;
 
 #if 0
 	vtimer_vminit(hyp);
-	vgic_vminit(hyp);
 #endif
+	aplic_vminit(hyp);
 
 	hyp->el2_addr = el2_map_enter((vm_offset_t)hyp, size,
 	    VM_PROT_READ | VM_PROT_WRITE);

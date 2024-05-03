@@ -381,10 +381,10 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 
 	fdt_add_gic(GIC_DIST_BASE, GIC_DIST_SIZE, GIC_REDIST_BASE,
 	    GIC_REDIST_SIZE(guest_ncpus));
-	error = vm_attach_vgic(ctx, GIC_DIST_BASE, GIC_DIST_SIZE,
+	error = vm_attach_aplic(ctx, GIC_DIST_BASE, GIC_DIST_SIZE,
 	    GIC_REDIST_BASE, GIC_REDIST_SIZE(guest_ncpus));
 	if (error != 0) {
-		warn("vm_attach_vgic()");
+		warn("vm_attach_aplic()");
 		return (error);
 	}
 

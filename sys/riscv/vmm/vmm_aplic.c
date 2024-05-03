@@ -25,10 +25,16 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
+#include <sys/errno.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/mutex.h>
+#include <sys/rman.h>
 
 #include <riscv/vmm/hyp.h>
 #include <riscv/vmm/riscv.h>
@@ -37,6 +43,13 @@
 #include <machine/vmm_instruction_emul.h>
 #include <machine/vmm_dev.h>
 
+MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
+
+struct aplic {
+	uint32_t dist_start;
+	uint32_t dist_end;
+	struct mtx mtx;
+};
 
 static int
 dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
@@ -53,9 +66,26 @@ static int
 dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
     int size, void *arg)
 {
+	struct hypctx *hypctx;
+	struct hyp *hyp;
+	struct aplic *aplic;
+	uint64_t reg;
+
+	hypctx = vcpu_get_cookie(vcpu);
+	hyp = hypctx->hyp;
+	aplic = hyp->aplic;
 
 	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__,
 	    fault_ipa, wval, size);
+
+	/* Ensure that we get here correctly. */
+	if (fault_ipa < aplic->dist_start ||
+	    fault_ipa + size > aplic->dist_end)
+		return (EINVAL);
+
+	reg = fault_ipa - aplic->dist_start;
+
+	printf("Reg %lx\n", reg);
 
 	return (0);
 }
@@ -84,7 +114,7 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 
 #if 0
 static int
-vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uint64_t *rval, void *arg)
+aplic_icc_sgi1r_read(struct vcpu *vcpu, uint64_t *rval, void *arg)
 {
 
 	printf("%s\n", __func__);
@@ -93,7 +123,7 @@ vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uint64_t *rval, void *arg)
 }
 
 static int
-vgic_v3_icc_sgi1r_write(struct vcpu *vcpu, uint64_t rval, void *arg)
+aplic_icc_sgi1r_write(struct vcpu *vcpu, uint64_t rval, void *arg)
 {
 
 	printf("%s\n", __func__);
@@ -102,10 +132,23 @@ vgic_v3_icc_sgi1r_write(struct vcpu *vcpu, uint64_t rval, void *arg)
 }
 #endif
 
+void
+aplic_vminit(struct hyp *hyp)
+{
+	struct aplic *aplic;
+
+	hyp->aplic = malloc(sizeof(*hyp->aplic), M_APLIC,
+	    M_WAITOK | M_ZERO);
+	aplic = hyp->aplic;
+
+	mtx_init(&aplic->mtx, "APLIC lock", NULL, MTX_SPIN);
+}
+
 int
-vgic_attach_to_vm(struct hyp *hyp, struct vm_vgic_descr *descr)
+aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 {
 	struct vm *vm;
+	struct aplic *aplic;
 
 	vm = hyp->vm;
 
@@ -118,17 +161,21 @@ vgic_attach_to_vm(struct hyp *hyp, struct vm_vgic_descr *descr)
 
 #if 0
 	vm_register_reg_handler(vm, ISS_MSR_REG(ICC_SGI1R_EL1),
-            ISS_MSR_REG_MASK, vgic_v3_icc_sgi1r_read, vgic_v3_icc_sgi1r_write,
+            ISS_MSR_REG_MASK, aplic_icc_sgi1r_read, aplic_icc_sgi1r_write,
             NULL);
 #endif
 
-	hyp->vgic_attached = true;
+	aplic = hyp->aplic;
+	aplic->dist_start = descr->v3_regs.dist_start;
+	aplic->dist_end = descr->v3_regs.dist_start + descr->v3_regs.dist_size;
+
+	hyp->aplic_attached = true;
 
 	return (0);
 }
 
 int
-vgic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
+aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
 
 	if (irqid != 32) // uart ?

@@ -33,11 +33,10 @@
 #include <machine/pcpu.h>
 
 #include "mmu.h"
-#include "io/vgic_v3.h"
+#include "vmm_aplic.h"
 #include "io/vtimer.h"
 
-struct vgic_v3;
-struct vgic_v3_cpu;
+struct aplic;
 
 struct hypregs {
 	uint64_t hyp_ra;
@@ -139,8 +138,8 @@ struct hyp {
 	uint64_t	vmid_generation;
 	uint64_t	vttbr_el2;
 	uint64_t	el2_addr;	/* The address of this in el2 space */
-	bool		vgic_attached;
-	struct vgic_v3	*vgic;
+	bool		aplic_attached;
+	struct aplic	*aplic;
 	struct hypctx	*ctx[];
 };
 
