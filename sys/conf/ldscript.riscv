@@ -5,7 +5,7 @@ SEARCH_DIR(/usr/lib);
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  . = text_start;
+  . = kernbase;
   /* The load address kernel_lma is set using --defsym= on the command line. */
   .text      : AT(kernel_lma)
   {
