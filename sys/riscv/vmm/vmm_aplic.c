@@ -312,6 +312,14 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 int
 aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
+#if 0
+	struct aplic *aplic;
+	struct aplic_irq *irq;
+
+	aplic = hyp->aplic;
+
+	irq = &aplic->irqs[irqid];
+#endif
 
 	if (irqid != 32) // uart ?
 		printf("%s: %d %d\n", __func__, irqid, level);

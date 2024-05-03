@@ -94,6 +94,7 @@ struct vmm_init_regs {
 
 MALLOC_DEFINE(M_HYP, "ARM VMM HYP", "ARM VMM HYP");
 
+#if 0
 extern char hyp_init_vectors[];
 extern char hyp_vectors[];
 extern char hyp_stub_vectors[];
@@ -106,7 +107,6 @@ static vm_offset_t stack_hyp_va[MAXCPU];
 
 static vmem_t *el2_mem_alloc;
 
-#if 0
 static void arm_setup_vectors(void *arg);
 static void vmm_pmap_clean_stage2_tlbi(void);
 static void vmm_pmap_invalidate_range(uint64_t, vm_offset_t, vm_offset_t, bool);
@@ -246,16 +246,14 @@ vmmops_modinit(int ipinum)
 {
 #if 0
 	struct vmm_init_regs el2_regs;
-#endif
 	vm_offset_t next_hyp_va;
 	vm_paddr_t vmm_base;
-#if 0
 	uint64_t id_aa64mmfr0_el1, pa_range_bits, pa_range_field;
 	uint64_t cnthctl_el2;
 	register_t daif;
-#endif
 	int cpu, i;
 	bool rv __diagused;
+#endif
 
 	if (!virt_enabled()) {
 		printf(
@@ -312,7 +310,6 @@ vmmops_modinit(int ipinum)
 	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
 	pmap_stage2_invalidate_range = vmm_pmap_invalidate_range;
 	pmap_stage2_invalidate_all = vmm_pmap_invalidate_all;
-#endif
 
 	/*
 	 * Create an allocator for the virtual address space used by EL2.
@@ -346,7 +343,6 @@ vmmops_modinit(int ipinum)
 		next_hyp_va += L2_SIZE;
 	}
 
-#if 0
 	el2_regs.tcr_el2 = TCR_EL2_RES1;
 	el2_regs.tcr_el2 |= min(pa_range_bits << TCR_EL2_PS_SHIFT,
 	    TCR_EL2_PS_52BITS);
@@ -406,7 +402,6 @@ vmmops_modinit(int ipinum)
 #endif
 
 	smp_rendezvous(NULL, arm_setup_vectors, NULL, &el2_regs);
-#endif
 
 	printf("vmm_base %lx, l2_size %lx\n", vmm_base, L2_SIZE);
 
@@ -440,7 +435,6 @@ vmmops_modinit(int ipinum)
 		vmem_add(el2_mem_alloc, next_hyp_va,
 		    HYP_VM_MAX_ADDRESS - next_hyp_va, M_WAITOK);
 
-#if 0
 	daif = intr_disable();
 	cnthctl_el2 = vmm_call_hyp(HYP_READ_REGISTER, HYP_REG_CNTHCTL);
 	intr_restore(daif);
@@ -495,6 +489,7 @@ el2_hypctx_size(void)
 	return (round_page(sizeof(struct hypctx)));
 }
 
+#if 0
 static vm_offset_t
 el2_map_enter(vm_offset_t data, vm_size_t size, vm_prot_t prot)
 {
@@ -509,6 +504,7 @@ el2_map_enter(vm_offset_t data, vm_size_t size, vm_prot_t prot)
 
 	return (addr);
 }
+#endif
 
 void *
 vmmops_init(struct vm *vm, pmap_t pmap)
@@ -530,10 +526,12 @@ printf("%s hyp %p\n", __func__, hyp);
 #endif
 	aplic_vminit(hyp);
 
+#if 0
 	hyp->el2_addr = el2_map_enter((vm_offset_t)hyp, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
 
-//printf("%s el2_addr %lx\n", __func__, hyp->el2_addr);
+	printf("%s el2_addr %lx\n", __func__, hyp->el2_addr);
+#endif
 
 	return (hyp);
 }
@@ -561,10 +559,10 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 #if 0
 	vtimer_cpuinit(hypctx);
 	vgic_cpuinit(hypctx);
-#endif
 
 	hypctx->el2_addr = el2_map_enter((vm_offset_t)hypctx, size,
 	    VM_PROT_READ | VM_PROT_WRITE);
+#endif
 
 //printf("%s hypctx->el2_addr %lx\n", __func__, hypctx->el2_addr);
 
