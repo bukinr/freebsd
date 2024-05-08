@@ -47,20 +47,22 @@
 MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 
 #define	APLIC_DOMAINCFG		0x0000
-#define	 DOMAINCFG_IE		(1 << 8)	/* Interrupt Enable. */
-#define	 DOMAINCFG_DM		(1 << 2)	/* Direct Mode. */
-#define	 DOMAINCFG_BE		(1 << 0)	/* Big-Endian. */
+#define	 DOMAINCFG_IE		(1 << 8) /* Interrupt Enable. */
+#define	 DOMAINCFG_DM		(1 << 2) /* Direct Mode. */
+#define	 DOMAINCFG_BE		(1 << 0) /* Big-Endian. */
 #define	APLIC_SOURCECFG(x)	(0x0004 + ((x) - 1) * 4)
 #define	 SOURCECFG_D		(1 << 10) /* Delegate. */
 /* If D == 0. */
 #define	 SOURCECFG_SM_S		(0)
 #define	 SOURCECFG_SM_M		(0x7 << SOURCECFG_SM_S)
-#define	 SOURCECFG_SM_INACTIVE	(0)	/* Not delegated. */
-#define	 SOURCECFG_SM_DETACHED	(1 << 0)
-#define	 SOURCECFG_SM_EDGE1	(1 << 4) /* Rising edge. */
-#define	 SOURCECFG_SM_EDGE0	(1 << 5) /* Falling edge. */
-#define	 SOURCECFG_SM_LEVEL1	(1 << 6) /* High. */
-#define	 SOURCECFG_SM_LEVEL0	(1 << 7) /* Low. */
+#define	 SOURCECFG_SM_INACTIVE	(0) /* Not delegated. */
+#define	 SOURCECFG_SM_DETACHED	(1)
+#define	 SOURCECFG_SM_RESERVED	(2)
+#define	 SOURCECFG_SM_RESERVED1	(3)
+#define	 SOURCECFG_SM_EDGE1	(4) /* Rising edge. */
+#define	 SOURCECFG_SM_EDGE0	(5) /* Falling edge. */
+#define	 SOURCECFG_SM_LEVEL1	(6) /* High. */
+#define	 SOURCECFG_SM_LEVEL0	(7) /* Low. */
 /* If D == 1. */
 #define	 SOURCECFG_CHILD_INDEX_S	(0)
 #define	 SOURCECFG_CHILD_INDEX_M	(0x3ff << SOURCECFG_CHILD_INDEX_S)
@@ -97,8 +99,15 @@ struct aplic {
 static int
 aplic_handle_sourcecfg(struct aplic *aplic, int i, bool write, uint64_t *val)
 {
+	struct aplic_irq *irq;
 
-	printf("%s: i %d\n", __func__, i);
+	//printf("%s: i %d\n", __func__, i);
+
+	irq = &aplic->irqs[i];
+	if (write)
+		irq->state = *val;
+	else
+		*val = irq->state;
 
 	return (0);
 }
@@ -328,12 +337,10 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	struct aplic_irq *irq;
 
 	aplic = hyp->aplic;
-
-	irq = &aplic->irqs[irqid];
-
 	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
 		return (0);
 
+	irq = &aplic->irqs[irqid];
 	if (irq->sourcecfg & SOURCECFG_D)
 		return (0);
 
@@ -345,7 +352,7 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 		}
 		break;
 	default:
-		panic("implement me");
+		break;
 	}
 
 	return (0);
