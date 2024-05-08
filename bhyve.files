@@ -96,7 +96,6 @@ lib/libm.so.5
 lib/libmd.so.6
 lib/libsys.so.7
 lib/libncursesw.so.9
-lib/libnv.so.0
 lib/libpcap.so.8
 lib/libsbuf.so.6
 lib/libstats.so.0
