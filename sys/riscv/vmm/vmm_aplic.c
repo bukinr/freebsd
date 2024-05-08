@@ -328,26 +328,6 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	return (0);
 }
 
-#if 0
-static int
-aplic_icc_sgi1r_read(struct vcpu *vcpu, uint64_t *rval, void *arg)
-{
-
-	printf("%s\n", __func__);
-
-	return (0);  
-}
-
-static int
-aplic_icc_sgi1r_write(struct vcpu *vcpu, uint64_t rval, void *arg)
-{
-
-	printf("%s\n", __func__);
-
-	return (0);  
-}
-#endif
-
 void
 aplic_vminit(struct hyp *hyp)
 {
@@ -374,12 +354,6 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 	    descr->v3_regs.dist_size, dist_read, dist_write);
 	vm_register_inst_handler(vm, descr->v3_regs.redist_start,
 	    descr->v3_regs.redist_size, redist_read, redist_write);
-
-#if 0
-	vm_register_reg_handler(vm, ISS_MSR_REG(ICC_SGI1R_EL1),
-            ISS_MSR_REG_MASK, aplic_icc_sgi1r_read, aplic_icc_sgi1r_write,
-            NULL);
-#endif
 
 	aplic = hyp->aplic;
 	aplic->nirqs = 63;
