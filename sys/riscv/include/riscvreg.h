@@ -149,6 +149,10 @@
 
 #define	MIP_SEIP	(1 << 9)
 
+#define	HVIP_VSSIP	(1 << 2)
+#define	HVIP_VSTIP	(1 << 6)
+#define	HVIP_VSEIP	(1 << 10)
+
 /* Note: sip register has no SIP_STIP bit in Spike simulator */
 #define	SIP_SSIP	(1 << 1)
 #define	SIP_STIP	(1 << 5)

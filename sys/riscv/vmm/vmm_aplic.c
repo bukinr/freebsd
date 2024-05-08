@@ -78,10 +78,10 @@ MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 #define	 IDC_ITHRESHOLD(x)	(APLIC_IDC(x) + 0x8)
 #define	 IDC_TOPI(x)		(APLIC_IDC(x) + 0x18)
 #define	 IDC_CLAIMI(x)		(APLIC_IDC(x) + 0x1C)
-
-#define	HVIP_VSSIP	(1 << 2)
-#define	HVIP_VSTIP	(1 << 6)
-#define	HVIP_VSEIP	(1 << 10)
+#define	   CLAIMI_IRQ_S		(16)
+#define	   CLAIMI_IRQ_M		(0x3ff << CLAIMI_IRQ_S)
+#define	   CLAIMI_PRIO_S	(0)
+#define	   CLAIMI_PRIO_M	(0xff << CLAIMI_PRIO_S)
 
 struct aplic_irq {
 	uint32_t sourcecfg;
@@ -149,13 +149,50 @@ aplic_handle_target(struct aplic *aplic, int i, bool write, uint64_t *val)
 }
 
 static int
+aplic_handle_idc_claimi(struct aplic *aplic, int cpu, bool write, uint64_t *val)
+{
+	struct aplic_irq *irq;
+	int i;
+
+	/* Writes to claimi are ignored. */
+	if (write)
+		return (-1);
+
+	for (i = 0; i < aplic->nirqs; i++) {
+		irq = &aplic->irqs[i];
+		if (irq->state & APLIC_IRQ_STATE_PENDING) {
+			*val = (i << CLAIMI_IRQ_S) | (0 << CLAIMI_PRIO_S);
+			irq->state &= ~APLIC_IRQ_STATE_PENDING;
+			return (0);
+		}
+	}
+
+	panic("claimi without pending");
+
+	return (0);
+}
+
+static int
 aplic_handle_idc(struct aplic *aplic, int cpu, int reg, bool write,
     uint64_t *val)
 {
+	int error;
 
-	printf("%s: cpu %d reg %d\n", __func__, cpu, reg);
+	switch (reg + APLIC_IDC(0)) {
+	case IDC_IDELIVERY(0):
+	case IDC_IFORCE(0):
+	case IDC_ITHRESHOLD(0):
+	case IDC_TOPI(0):
+		error = 0;
+		break;
+	case IDC_CLAIMI(0):
+		error = aplic_handle_idc_claimi(aplic, cpu, write, val);
+		break;
+	default:
+		panic("unknown reg");
+	}
 
-	return (0);
+	return (error);
 }
 
 static int
@@ -219,8 +256,9 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 	hyp = hypctx->hyp;
 	aplic = hyp->aplic;
 
-	printf("%s: fault_ipa %lx size %d\n", __func__,
-	    fault_ipa, size);
+#if 0
+	printf("%s: fault_ipa %lx size %d\n", __func__, fault_ipa, size);
+#endif
 
 	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
 		return (EINVAL);
@@ -249,8 +287,10 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	hyp = hypctx->hyp;
 	aplic = hyp->aplic;
 
-	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__,
-	    fault_ipa, wval, size);
+#if 0
+	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__, fault_ipa,
+	    wval, size);
+#endif
 
 	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
 		return (EINVAL);
@@ -354,11 +394,30 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 }
 
 int
+aplic_check_pending(struct hyp *hyp)
+{
+	struct aplic_irq *irq;
+	struct aplic *aplic;
+	int i;
+
+	aplic = hyp->aplic;
+	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
+		return (0);
+
+	for (i = 0; i < aplic->nirqs; i++) {
+		irq = &aplic->irqs[i];
+		if (irq->state & APLIC_IRQ_STATE_PENDING)
+			return (1);
+	}
+
+	return (0);
+}
+
+int
 aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
-	struct aplic *aplic;
 	struct aplic_irq *irq;
-	struct hypctx *hypctx;
+	struct aplic *aplic;
 
 	aplic = hyp->aplic;
 	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
@@ -368,15 +427,12 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	if (irq->sourcecfg & SOURCECFG_D)
 		return (0);
 
-	hypctx = hyp->ctx[vcpuid];
-
 	switch (irq->sourcecfg & SOURCECFG_SM_M) {
 	case SOURCECFG_SM_EDGE1:
-		if (level) {
+		if (level)
 			irq->state |= APLIC_IRQ_STATE_PENDING;
-			hypctx->guest_csrs.hvip |= HVIP_VSEIP;
-			printf("irq %d injected\n", irqid);
-		}
+		else
+			irq->state &= ~APLIC_IRQ_STATE_PENDING;
 		break;
 	default:
 		break;

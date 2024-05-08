@@ -1321,6 +1321,16 @@ fault:
 static void
 riscv_sync_interrupts(struct hypctx *hypctx)
 {
+	struct hyp *hyp;
+	int pending;
+
+	hyp = hypctx->hyp;
+	pending = aplic_check_pending(hyp);
+
+	if (pending)
+		hypctx->guest_csrs.hvip |= HVIP_VSEIP;
+	else
+		hypctx->guest_csrs.hvip &= ~HVIP_VSEIP;
 
 	csr_write(hvip, hypctx->guest_csrs.hvip);
 }
