@@ -51,84 +51,28 @@ struct hypregs {
 	uint64_t hyp_hstatus;
 };
 
+struct hypcsr {
+	uint64_t hvip;
+};
+
 struct hypctx {
 	struct hypregs host_regs;
 	struct hypregs guest_regs;
+	struct hypcsr guest_csrs;
 	uint64_t host_sscratch;
 	uint64_t host_stvec;
 	uint64_t host_scounteren;
 	uint64_t guest_scounteren;
 	struct trapframe tf; /* unused */
 
-#if 0
-	/*
-	 * EL1 control registers.
-	 */
-	uint64_t	elr_el1;	/* Exception Link Register */
-	uint64_t	sp_el0;		/* Stack pointer */
-	uint64_t	tpidr_el0;	/* EL0 Software ID Register */
-	uint64_t	tpidrro_el0;	/* Read-only Thread ID Register */
-	uint64_t	tpidr_el1;	/* EL1 Software ID Register */
-	uint64_t	vbar_el1;	/* Vector Base Address Register */
-
-	uint64_t	actlr_el1;	/* Auxiliary Control Register */
-	uint64_t	afsr0_el1;	/* Auxiliary Fault Status Register 0 */
-	uint64_t	afsr1_el1;	/* Auxiliary Fault Status Register 1 */
-	uint64_t	amair_el1;	/* Auxiliary Memory Attribute Indirection Register */
-	uint64_t	contextidr_el1;	/* Current Process Identifier */
-	uint64_t	cpacr_el1;	/* Architectural Feature Access Control Register */
-	uint64_t	csselr_el1;	/* Cache Size Selection Register */
-	uint64_t	esr_el1;	/* Exception Syndrome Register */
-	uint64_t	far_el1;	/* Fault Address Register */
-	uint64_t	mair_el1;	/* Memory Attribute Indirection Register */
-	uint64_t	mdccint_el1;	/* Monitor DCC Interrupt Enable Register */
-	uint64_t	mdscr_el1;	/* Monitor Debug System Control Register */
-	uint64_t	par_el1;	/* Physical Address Register */
-	uint64_t	sctlr_el1;	/* System Control Register */
-	uint64_t	tcr_el1;	/* Translation Control Register */
-	uint64_t	tcr2_el1;	/* Translation Control Register 2 */
-	uint64_t	ttbr0_el1;	/* Translation Table Base Register 0 */
-	uint64_t	ttbr1_el1;	/* Translation Table Base Register 1 */
-	uint64_t	spsr_el1;	/* Saved Program Status Register */
-
-	uint64_t	pmcr_el0;	/* Performance Monitors Control Register */
-	uint64_t	pmccntr_el0;
-	uint64_t	pmccfiltr_el0;
-	uint64_t	pmcntenset_el0;
-	uint64_t	pmintenset_el1;
-	uint64_t	pmovsset_el0;
-	uint64_t	pmselr_el0;
-	uint64_t	pmuserenr_el0;
-	uint64_t	pmevcntr_el0[31];
-	uint64_t	pmevtyper_el0[31];
-
-	uint64_t	dbgbcr_el1[16];	/* Debug Breakpoint Control Registers */
-	uint64_t	dbgbvr_el1[16];	/* Debug Breakpoint Value Registers */
-	uint64_t	dbgwcr_el1[16];	/* Debug Watchpoint Control Registers */
-	uint64_t	dbgwvr_el1[16];	/* Debug Watchpoint Value Registers */
-
-	/* EL2 control registers */
-	uint64_t	cptr_el2;	/* Architectural Feature Trap Register */
-	uint64_t	hcr_el2;	/* Hypervisor Configuration Register */
-	uint64_t	mdcr_el2;	/* Monitor Debug Configuration Register */
-	uint64_t	vpidr_el2;	/* Virtualization Processor ID Register */
-	uint64_t	vmpidr_el2;	/* Virtualization Multiprocessor ID Register */
-#endif
-
-	uint64_t	el2_addr;	/* The address of this in el2 space */
 	struct hyp	*hyp;
 	struct vcpu	*vcpu;
 
 	struct {
-		uint64_t	far_el2;	/* Fault Address Register */
-		uint64_t	hpfar_el2;	/* Hypervisor IPA Fault Address Register */
+		uint64_t	far_el2;
+		uint64_t	hpfar_el2;
 	} exit_info;
 
-#if 0
-	struct vtimer_cpu 	vtimer_cpu;
-	struct vgic_v3_regs	vgic_v3_regs;
-	struct vgic_v3_cpu	*vgic_cpu;
-#endif
 	bool			has_exception;
 };
 
@@ -137,7 +81,6 @@ struct hyp {
 	struct vtimer	vtimer;
 	uint64_t	vmid_generation;
 	uint64_t	vttbr_el2;
-	uint64_t	el2_addr;	/* The address of this in el2 space */
 	bool		aplic_attached;
 	struct aplic	*aplic;
 	struct hypctx	*ctx[];
@@ -165,14 +108,6 @@ DEFINE_VMMOPS_IFUNC(int, setcap, (void *vcpui, int num, int val))
 DEFINE_VMMOPS_IFUNC(struct vmspace *, vmspace_alloc, (vm_offset_t min,
     vm_offset_t max))
 DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
-#ifdef notyet
-#ifdef BHYVE_SNAPSHOT
-DEFINE_VMMOPS_IFUNC(int, snapshot, (void *vmi, struct vm_snapshot_meta *meta))
-DEFINE_VMMOPS_IFUNC(int, vcpu_snapshot, (void *vcpui,
-    struct vm_snapshot_meta *meta))
-DEFINE_VMMOPS_IFUNC(int, restore_tsc, (void *vcpui, uint64_t now))
-#endif
-#endif
 
 uint64_t	vmm_call_hyp(struct hypctx *);
 

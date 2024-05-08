@@ -79,6 +79,10 @@ MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 #define	 IDC_TOPI(x)		(APLIC_IDC(x) + 0x18)
 #define	 IDC_CLAIMI(x)		(APLIC_IDC(x) + 0x1C)
 
+#define	HVIP_VSSIP	(1 << 2)
+#define	HVIP_VSTIP	(1 << 6)
+#define	HVIP_VSEIP	(1 << 10)
+
 struct aplic_irq {
 	uint32_t sourcecfg;
 	uint32_t state;
@@ -101,13 +105,36 @@ aplic_handle_sourcecfg(struct aplic *aplic, int i, bool write, uint64_t *val)
 {
 	struct aplic_irq *irq;
 
-	//printf("%s: i %d\n", __func__, i);
-
 	irq = &aplic->irqs[i];
 	if (write)
-		irq->state = *val;
+		irq->sourcecfg = *val;
 	else
-		*val = irq->state;
+		*val = irq->sourcecfg;
+
+	return (0);
+}
+
+static int
+aplic_set_enabled(struct aplic *aplic, bool write, uint64_t *val, bool enabled)
+{
+	struct aplic_irq *irq;
+	int i;
+
+	if (!write) {
+		*val = 0;
+		return (0);
+	}
+
+	i = *val;
+	if (i <= 0 || i > aplic->nirqs)
+		return (-1);
+
+	irq = &aplic->irqs[i];
+
+	if (enabled)
+		irq->state |= APLIC_IRQ_STATE_ENABLED;
+	else
+		irq->state &= ~APLIC_IRQ_STATE_ENABLED;
 
 	return (0);
 }
@@ -134,7 +161,6 @@ aplic_handle_idc(struct aplic *aplic, int cpu, int reg, bool write,
 static int
 aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 {
-	struct aplic_irq *irq;
 	int error;
 	int cpu;
 	int r;
@@ -165,12 +191,10 @@ aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 		aplic->domaincfg = *val & DOMAINCFG_IE;
 		break;
 	case APLIC_SETIENUM:
-		i = *val;
-		if (i > 0 && i < aplic->nirqs) {
-			irq = &aplic->irqs[i];
-			irq->state |= APLIC_IRQ_STATE_ENABLED;
-		}
+		aplic_set_enabled(aplic, write, val, true);
+		break;
 	case APLIC_CLRIENUM:
+		aplic_set_enabled(aplic, write, val, false);
 		break;
 	default:
 		panic("unknown reg %lx", reg);
@@ -198,8 +222,7 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 	printf("%s: fault_ipa %lx size %d\n", __func__,
 	    fault_ipa, size);
 
-	if (fault_ipa < aplic->dist_start ||
-	    fault_ipa + size > aplic->dist_end)
+	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
 		return (EINVAL);
 
 	reg = fault_ipa - aplic->dist_start;
@@ -335,6 +358,7 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
 	struct aplic *aplic;
 	struct aplic_irq *irq;
+	struct hypctx *hypctx;
 
 	aplic = hyp->aplic;
 	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
@@ -344,10 +368,13 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	if (irq->sourcecfg & SOURCECFG_D)
 		return (0);
 
+	hypctx = hyp->ctx[vcpuid];
+
 	switch (irq->sourcecfg & SOURCECFG_SM_M) {
 	case SOURCECFG_SM_EDGE1:
 		if (level) {
 			irq->state |= APLIC_IRQ_STATE_PENDING;
+			hypctx->guest_csrs.hvip |= HVIP_VSEIP;
 			printf("irq %d injected\n", irqid);
 		}
 		break;

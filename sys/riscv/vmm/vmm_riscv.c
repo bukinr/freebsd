@@ -115,9 +115,6 @@ static void vmm_pmap_invalidate_all(uint64_t);
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
 
-#define	HVIP_VSSIP	(1 << 2)
-#define	HVIP_VSTIP	(1 << 6)
-
 static int
 m_op(uint32_t insn, int match, int mask)
 {
@@ -593,7 +590,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	/* TODO: should we trap rdcycle / rdtime ? */
 	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
 	hypctx->guest_scounteren = 0x1 | 0x2; /* rdtime */
-	//csr_write(hie, (1 << 6)); //VSTIE
+	csr_write(hie, (1 << 10) | (1 << 12));
 
 #if 1
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
@@ -1321,6 +1318,13 @@ fault:
 	return (0);
 }
 
+static void
+riscv_sync_interrupts(struct hypctx *hypctx)
+{
+
+	csr_write(hvip, hypctx->guest_csrs.hvip);
+}
+
 int
 vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
@@ -1437,6 +1441,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #if 0
 		vgic_flush_hwstate(hypctx);
 #endif
+
+		riscv_sync_interrupts(hypctx);
 
 		/* Call into EL2 to switch to the guest */
 #if 0
