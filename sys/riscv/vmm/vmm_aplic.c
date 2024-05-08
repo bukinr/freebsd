@@ -47,10 +47,23 @@
 MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 
 #define	APLIC_DOMAINCFG		0x0000
-#define	 DOMAINCFG_IE		(1 << 8)	/* Interrupt Enable */
-#define	 DOMAINCFG_DM		(1 << 2)	/* Direct Mode */
-#define	 DOMAINCFG_BE		(1 << 0)	/* Big-Endian */
+#define	 DOMAINCFG_IE		(1 << 8)	/* Interrupt Enable. */
+#define	 DOMAINCFG_DM		(1 << 2)	/* Direct Mode. */
+#define	 DOMAINCFG_BE		(1 << 0)	/* Big-Endian. */
 #define	APLIC_SOURCECFG(x)	(0x0004 + ((x) - 1) * 4)
+#define	 SOURCECFG_D		(1 << 10) /* Delegate. */
+/* If D == 0. */
+#define	 SOURCECFG_SM_S		(0)
+#define	 SOURCECFG_SM_M		(0x7 << SOURCECFG_SM_S)
+#define	 SOURCECFG_SM_INACTIVE	(0)	/* Not delegated. */
+#define	 SOURCECFG_SM_DETACHED	(1 << 0)
+#define	 SOURCECFG_SM_EDGE1	(1 << 4) /* Rising edge. */
+#define	 SOURCECFG_SM_EDGE0	(1 << 5) /* Falling edge. */
+#define	 SOURCECFG_SM_LEVEL1	(1 << 6) /* High. */
+#define	 SOURCECFG_SM_LEVEL0	(1 << 7) /* Low. */
+/* If D == 1. */
+#define	 SOURCECFG_CHILD_INDEX_S	(0)
+#define	 SOURCECFG_CHILD_INDEX_M	(0x3ff << SOURCECFG_CHILD_INDEX_S)
 #define	APLIC_SETIPNUM		0x1cdc
 #define	APLIC_CLRIPNUM		0x1ddc
 #define	APLIC_SETIENUM		0x1edc
@@ -65,7 +78,7 @@ MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 #define	 IDC_CLAIMI(x)		(APLIC_IDC(x) + 0x1C)
 
 struct aplic_irq {
-	uint32_t source_cfg;
+	uint32_t sourcecfg;
 	uint32_t state;
 #define	APLIC_IRQ_STATE_PENDING	(1 << 0)
 #define	APLIC_IRQ_STATE_ENABLED	(1 << 1)
@@ -207,8 +220,7 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__,
 	    fault_ipa, wval, size);
 
-	if (fault_ipa < aplic->dist_start ||
-	    fault_ipa + size > aplic->dist_end)
+	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
 		return (EINVAL);
 
 	reg = fault_ipa - aplic->dist_start;
@@ -312,17 +324,29 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 int
 aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
-#if 0
 	struct aplic *aplic;
 	struct aplic_irq *irq;
 
 	aplic = hyp->aplic;
 
 	irq = &aplic->irqs[irqid];
-#endif
 
-	if (irqid != 32) // uart ?
-		printf("%s: %d %d\n", __func__, irqid, level);
+	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
+		return (0);
+
+	if (irq->sourcecfg & SOURCECFG_D)
+		return (0);
+
+	switch (irq->sourcecfg & SOURCECFG_SM_M) {
+	case SOURCECFG_SM_EDGE1:
+		if (level) {
+			irq->state |= APLIC_IRQ_STATE_PENDING;
+			printf("irq %d injected\n", irqid);
+		}
+		break;
+	default:
+		panic("implement me");
+	}
 
 	return (0);
 }
