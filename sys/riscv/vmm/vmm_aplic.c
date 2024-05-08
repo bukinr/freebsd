@@ -51,7 +51,7 @@ MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 #define	 DOMAINCFG_DM		(1 << 2) /* Direct Mode. */
 #define	 DOMAINCFG_BE		(1 << 0) /* Big-Endian. */
 #define	APLIC_SOURCECFG(x)	(0x0004 + ((x) - 1) * 4)
-#define	 SOURCECFG_D		(1 << 10) /* Delegate. */
+#define	 SOURCECFG_D		(1 << 10) /* D - Delegate. */
 /* If D == 0. */
 #define	 SOURCECFG_SM_S		(0)
 #define	 SOURCECFG_SM_M		(0x7 << SOURCECFG_SM_S)
@@ -296,8 +296,6 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 		return (EINVAL);
 
 	reg = fault_ipa - aplic->dist_start;
-
-	//printf("Reg %lx\n", reg);
 
 	val = wval;
 
