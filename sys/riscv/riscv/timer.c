@@ -93,8 +93,6 @@ set_timecmp(uint64_t timecmp)
 		csr_write(stimecmp, timecmp);
 	else
 		sbi_set_timer(timecmp);
-
-	//csr_set(sie, SIE_STIE);
 }
 
 static u_int
@@ -178,8 +176,6 @@ riscv_timer_get_timebase(device_t dev, uint32_t *freq)
 	}
 
 	OF_getencprop(node, "timebase-frequency", freq, len);
-
-	//*freq /= 100;
 
 	return (0);
 }
