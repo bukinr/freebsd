@@ -710,7 +710,8 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 #else
 	struct vie *vie;
 
-	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2);
+	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2) |
+	    (vme_ret->stval & 0x3);
 
 	uint64_t guest_addr;
 	uint64_t old_hstatus;
