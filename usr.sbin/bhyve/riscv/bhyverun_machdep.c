@@ -359,9 +359,7 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	const char *bootrom;
 	uint64_t elr;
 	int error;
-#if 0
 	int pcie_intrs[4] = {PCIE_INTA, PCIE_INTB, PCIE_INTC, PCIE_INTD};
-#endif
 
 	bootrom = get_config_value("bootrom");
 	if (bootrom == NULL) {
@@ -395,9 +393,9 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	init_mmio_rtc(ctx);
 	fdt_add_rtc(RTC_MMIO_BASE, RTC_MMIO_SIZE, RTC_INTR);
 	fdt_add_timer();
+#endif
 	pci_irq_init(pcie_intrs);
 	fdt_add_pcie(pcie_intrs);
-#endif
 
 	return (0);
 }

@@ -377,12 +377,14 @@ fdt_add_pcie(int intrs[static 4])
 	SET_PROP_U32(prop, 12, 0);
 	SET_PROP_U32(prop, 13, 0x3f000000);
 
+#if 0
 	fdt_property_placeholder(fdt, "msi-map", 4 * sizeof(uint32_t), &prop);
 	SET_PROP_U32(prop, 0, 0);		/* RID base */
 	SET_PROP_U32(prop, 1, aplic_phandle);	/* MSI parent */
 	SET_PROP_U32(prop, 2, 0);		/* MSI base */
 	SET_PROP_U32(prop, 3, 0x10000);		/* RID length */
 	fdt_property_u32(fdt, "msi-parent", aplic_phandle);
+#endif
 
 	fdt_property_u32(fdt, "#interrupt-cells", 1);
 	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);

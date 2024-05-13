@@ -13,3 +13,4 @@ echo bhyve -o bootrom=/bin/ls test
 echo bhyve -o bootrom=/kernel.bin test
 echo bhyve -m 256 -o bootrom=/kernel.bin test
 echo bhyve -m 256 -o bootrom=/kernel.bin -o console=stdio test
+echo bhyve -m 256 -o bootrom=/kernel.bin -o console=stdio -s 4,virtio-blk,/bin/ls test
