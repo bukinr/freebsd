@@ -400,7 +400,7 @@ fdt_add_pcie(int intrs[static 4])
 	SET_PROP_U32(prop, 2, 0);
 	SET_PROP_U32(prop, 3, 7);
 	fdt_property_placeholder(fdt, "interrupt-map",
-	    160 * sizeof(uint32_t), &prop);
+	    16 * 7 * sizeof(uint32_t), &prop);
 	for (i = 0; i < 16; ++i) {
 		pin = i % 4;
 		slot = i / 4;
@@ -411,11 +411,8 @@ fdt_add_pcie(int intrs[static 4])
 		SET_PROP_U32(prop, 10 * i + 2, 0);
 		SET_PROP_U32(prop, 10 * i + 3, pin + 1);
 		SET_PROP_U32(prop, 10 * i + 4, aplic_phandle);
-		SET_PROP_U32(prop, 10 * i + 5, 0);
-		SET_PROP_U32(prop, 10 * i + 6, 0);
-		SET_PROP_U32(prop, 10 * i + 7, GIC_SPI);
-		SET_PROP_U32(prop, 10 * i + 8, intr - GIC_FIRST_SPI);
-		SET_PROP_U32(prop, 10 * i + 9, IRQ_TYPE_LEVEL_HIGH);
+		SET_PROP_U32(prop, 10 * i + 5, intr);
+		SET_PROP_U32(prop, 10 * i + 6, IRQ_TYPE_LEVEL_HIGH);
 	}
 
 	fdt_end_node(fdt);
