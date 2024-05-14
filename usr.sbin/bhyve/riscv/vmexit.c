@@ -65,6 +65,13 @@ vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
 	vme = vmrun->vm_exit;
 	vie = &vme->u.inst_emul.vie;
 
+#if 0
+	if (vme->u.inst_emul.gpa >= 0x11000)
+		printf("%s: gpa %lx dir %d access_size %d reg %d sign %d\n",
+		    __func__, vme->u.inst_emul.gpa, vie->dir, vie->access_size,
+		    vie->reg, vie->sign_extend);
+#endif
+
 	err = emulate_mem(vcpu, vme->u.inst_emul.gpa, vie,
 	    &vme->u.inst_emul.paging);
 	if (err) {
