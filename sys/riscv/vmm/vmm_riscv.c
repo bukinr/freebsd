@@ -722,6 +722,12 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 	old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
 	//old_stvec = csr_swap(stvec, hypctx->guest_regs.hyp_stvec);
 
+#if 0
+	if (vme_ret->u.inst_emul.gpa >= 0x11000)
+		printf("htval %lx stval %lx sepc %lx\n",
+		    vme_ret->htval, vme_ret->stval, vme_ret->sepc);
+#endif
+
 	vie = &vme_ret->u.inst_emul.vie;
 	vie->dir = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
 	    VM_DIR_WRITE : VM_DIR_READ;
@@ -737,6 +743,8 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 			".option pop\n"
 	    : [insn] "=&r" (insn), [addr] "+&r" (guest_addr)
 	    :: "memory");
+
+	vie->sign_extend = 1;
 
 	if ((insn & 0x3) == 0x3) {
 		guest_addr += 2;
@@ -755,22 +763,35 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 		if (vie->dir == VM_DIR_WRITE) {
 			if (m_op(insn, MATCH_SB, MASK_SB))
 				vie->access_size = 1;
-			else if (m_op(insn, MATCH_SW, MASK_SW))
-				vie->access_size = 2;
 			else if (m_op(insn, MATCH_SH, MASK_SH))
+				vie->access_size = 2;
+			else if (m_op(insn, MATCH_SW, MASK_SW))
 				vie->access_size = 4;
 			else if (m_op(insn, MATCH_SD, MASK_SD))
 				vie->access_size = 8;
+			else
+				panic("unknown store instr at %lx", guest_addr);
 			reg_num = rs2;
-		} else  {
+		} else {
 			if (m_op(insn, MATCH_LB, MASK_LB))
 				vie->access_size = 1;
-			else if (m_op(insn, MATCH_LW, MASK_LW))
-				vie->access_size = 2;
 			else if (m_op(insn, MATCH_LH, MASK_LH))
+				vie->access_size = 2;
+			else if (m_op(insn, MATCH_LW, MASK_LW))
 				vie->access_size = 4;
 			else if (m_op(insn, MATCH_LD, MASK_LD))
 				vie->access_size = 8;
+			else if (m_op(insn, MATCH_LBU, MASK_LBU)) {
+				vie->access_size = 1;
+				vie->sign_extend = 0;
+			} else if (m_op(insn, MATCH_LHU, MASK_LHU)) {
+				vie->access_size = 2;
+				vie->sign_extend = 0;
+			} else if (m_op(insn, MATCH_LWU, MASK_LWU)) {
+				vie->access_size = 4;
+				vie->sign_extend = 0;
+			} else
+				panic("unknown load instr at %lx", guest_addr);
 			reg_num = rd;
 		}
 		vme_ret->inst_length = 4;
@@ -782,17 +803,20 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 
 		if (vie->dir == VM_DIR_WRITE) {
 			if (m_op(insn, MATCH_C_SW, MASK_C_SW))
-				vie->access_size = 2;
+				vie->access_size = 4;
 			else if (m_op(insn, MATCH_C_SD, MASK_C_SD))
 				vie->access_size = 8;
-			reg_num = rd;
+			else
+				panic("unknown store instr at %lx", guest_addr);
 		} else  {
 			if (m_op(insn, MATCH_C_LW, MASK_C_LW))
-				vie->access_size = 2;
+				vie->access_size = 4;
 			else if (m_op(insn, MATCH_C_LD, MASK_C_LD))
 				vie->access_size = 8;
-			reg_num = rd;
+			else
+				panic("unknown load instr at %lx", guest_addr);
 		}
+		reg_num = rd;
 		vme_ret->inst_length = 2;
 	}
 
@@ -802,7 +826,6 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 
 	csr_write(hstatus, old_hstatus);
 	//csr_write(stvec, old_stvec);
-	vie->sign_extend = 0;
 	vie->reg = reg_num;
 #endif
 }
@@ -997,7 +1020,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 	case SCAUSE_LOAD_GUEST_PAGE_FAULT:
 	case SCAUSE_STORE_GUEST_PAGE_FAULT:
 
-		gpa = (vme->htval << 2);
+		gpa = (vme->htval << 2) | (vme->stval & 0x3);
 #if 0
 		/* Check the IPA is valid */
 		if (gpa >= (1ul << vmm_max_ipa_bits)) {
@@ -1483,6 +1506,13 @@ printf("%s: leaving Guest VM\n", __func__);
 #else
 		/* TODO */
 #endif
+
+		vme->scause = csr_read(scause);
+		vme->sepc = csr_read(sepc);
+		vme->stval = csr_read(stval);
+		vme->htval = csr_read(htval);
+		vme->htinst = csr_read(htinst);
+
 		intr_restore(daif);
 
 		vmm_stat_incr(vcpu, VMEXIT_COUNT, 1);
@@ -1490,12 +1520,6 @@ printf("%s: leaving Guest VM\n", __func__);
 		if (excp_type == EXCP_TYPE_MAINT_IRQ)
 			continue;
 #endif
-
-		vme->scause = csr_read(scause);
-		vme->sepc = csr_read(sepc);
-		vme->stval = csr_read(stval);
-		vme->htval = csr_read(htval);
-		vme->htinst = csr_read(htinst);
 
 #if 0
 		uint64_t vsie, hvip;
@@ -1710,7 +1734,7 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 
 	hypctx = vcpui;
 
-//printf("%s: set reg %d val %ld\n", __func__, reg, val);
+//printf("%s: set reg %d val %lx\n", __func__, reg, val);
 
 	running = vcpu_is_running(hypctx->vcpu, &hostcpu);
 	if (running && hostcpu != curcpu)
