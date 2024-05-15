@@ -974,7 +974,6 @@ static int
 riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
     struct vm_exit *vme, pmap_t pmap)
 {
-	//uint64_t old_hstatus;
 	uint64_t gpa;
 	int handled;
 
@@ -1082,16 +1081,6 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		handled = UNHANDLED;
 		break;
 	case SCAUSE_VIRTUAL_INSTRUCTION:
-#if 0
-		old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
-		__asm __volatile(".option push\n"
-				 ".option norvc\n"
-				"hlvx.hu %[insn], (%[addr])\n"
-				".option pop\n"
-		    : [insn] "=&r" (insn), [addr] "+&r" (vme->sepc)
-		    :: "memory");
-		csr_write(hstatus, old_hstatus);
-#endif
 		insn = vme->stval;
 		if (m_op(insn, MATCH_WFI, MASK_WFI))
 			vme->exitcode = VM_EXITCODE_WFI;
