@@ -74,9 +74,11 @@
 #define	HANDLED		1
 #define	UNHANDLED	0
 
+#if 0
 /* Number of bits in an EL2 virtual address */
 #define	EL2_VIRT_BITS	48
 CTASSERT((1ul << EL2_VIRT_BITS) >= HYP_VM_MAX_ADDRESS);
+#endif
 
 /* TODO: Move the host hypctx off the stack */
 #define	VMM_STACK_PAGES	4
