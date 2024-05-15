@@ -365,12 +365,14 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 }
 
 int
-aplic_check_pending(struct hyp *hyp)
+aplic_check_pending(struct hypctx *hypctx)
 {
 	struct aplic_irq *irq;
 	struct aplic *aplic;
+	struct hyp *hyp;
 	int i;
 
+	hyp = hypctx->hyp;
 	aplic = hyp->aplic;
 	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
 		return (0);

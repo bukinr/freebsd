@@ -599,8 +599,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	uint64_t hstatus;
 	hstatus = 0;
 	hstatus |= (1 << 7); //SPV
-	/* Allow WFI for now. */
-	//hstatus |= (1 << 21); //VTW
+	hstatus |= (1 << 21); //VTW
 	hypctx->guest_regs.hyp_hstatus = hstatus;
 #endif
 
@@ -975,6 +974,7 @@ static int
 riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
     struct vm_exit *vme, pmap_t pmap)
 {
+	//uint64_t old_hstatus;
 	uint64_t gpa;
 	int handled;
 
@@ -1058,8 +1058,8 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-#if 0
-		printf("%s: Illegal instruction at %lx stval 0x%lx htval 0x%lx\n",
+#if 1
+		printf("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->sepc, vme->stval, vme->htval);
 #endif
 
@@ -1082,7 +1082,27 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		handled = UNHANDLED;
 		break;
 	case SCAUSE_VIRTUAL_INSTRUCTION:
+#if 0
+		old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
+		__asm __volatile(".option push\n"
+				 ".option norvc\n"
+				"hlvx.hu %[insn], (%[addr])\n"
+				".option pop\n"
+		    : [insn] "=&r" (insn), [addr] "+&r" (vme->sepc)
+		    :: "memory");
+		csr_write(hstatus, old_hstatus);
+#endif
+		insn = vme->stval;
+		if (m_op(insn, MATCH_WFI, MASK_WFI))
+			vme->exitcode = VM_EXITCODE_WFI;
+		else
+			vme->exitcode = VM_EXITCODE_BOGUS;
+		handled = UNHANDLED;
+		break;
 	default:
+#if 0
+		printf("unknown scause %lx\n", vme->scause);
+#endif
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;
 		handled = UNHANDLED;
@@ -1345,11 +1365,9 @@ fault:
 static void
 riscv_sync_interrupts(struct hypctx *hypctx)
 {
-	struct hyp *hyp;
 	int pending;
 
-	hyp = hypctx->hyp;
-	pending = aplic_check_pending(hyp);
+	pending = aplic_check_pending(hypctx);
 
 	if (pending)
 		hypctx->guest_csrs.hvip |= HVIP_VSEIP;
@@ -1388,6 +1406,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		hypctx->guest_regs.hyp_hstatus &= ~(1 << 8); //SPVP;
 
 	hypctx->guest_regs.hyp_hstatus |= (1 << 7); //SPV
+	hypctx->guest_regs.hyp_hstatus |= (1 << 21); //VTW
 
 #if 0
 	uint64_t hgatp;
@@ -1530,11 +1549,11 @@ printf("%s: leaving Guest VM\n", __func__);
 #endif
 
 #if 0
-	if (vme->scause == SCAUSE_ILLEGAL_INSTRUCTION)
-		printf("exit scause 0x%lx stval %lx sepc %lx htval %lx "
-		    "htinst %lx\n",
-		    vme->scause, vme->stval, vme->sepc, vme->htval,
-		    vme->htinst);
+		if (vme->scause == SCAUSE_ILLEGAL_INSTRUCTION)
+			printf("exit scause 0x%lx stval %lx sepc %lx htval %lx "
+			    "htinst %lx\n",
+			    vme->scause, vme->stval, vme->sepc, vme->htval,
+			    vme->htinst);
 #endif
 
 #if 0

@@ -164,9 +164,6 @@ struct vm {
 
 static bool vmm_initialized = false;
 
-static int vm_handle_wfi(struct vcpu *vcpu,
-			 struct vm_exit *vme, bool *retu);
-
 static MALLOC_DEFINE(M_VMM, "vmm", "vmm");
 
 /* statistics */
@@ -1414,7 +1411,8 @@ vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
 	if (from_idle) {
 		while (vcpu->state != VCPU_IDLE) {
 			vcpu_notify_event_locked(vcpu);
-			msleep_spin(&vcpu->state, &vcpu->mtx, "vmstat", hz);
+			msleep_spin(&vcpu->state, &vcpu->mtx, "vmstat",
+			    hz / 1000);
 		}
 	} else {
 		KASSERT(vcpu->state != VCPU_IDLE, ("invalid transition from "
@@ -1709,10 +1707,8 @@ vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 {
 	vcpu_lock(vcpu);
 	while (1) {
-#if 0
-		if (vgic_has_pending_irq(vcpu->cookie))
+		if (aplic_check_pending(vcpu->cookie))
 			break;
-#endif
 
 		if (vcpu_should_yield(vcpu))
 			break;
@@ -1722,7 +1718,7 @@ vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 		 * XXX msleep_spin() cannot be interrupted by signals so
 		 * wake up periodically to check pending signals.
 		 */
-		msleep_spin(vcpu, &vcpu->mtx, "vmidle", hz);
+		msleep_spin(vcpu, &vcpu->mtx, "vmidle", hz / 1000);
 		vcpu_require_state_locked(vcpu, VCPU_FROZEN);
 	}
 	vcpu_unlock(vcpu);
@@ -1844,12 +1840,12 @@ restart:
 			 */
 			error = vm_handle_smccc_call(vcpu, vme, &retu);
 			break;
+#endif
 
 		case VM_EXITCODE_WFI:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_wfi(vcpu, vme, &retu);
 			break;
-#endif
 		case VM_EXITCODE_ECALL:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vmm_sbi_ecall(vcpu, &retu);
