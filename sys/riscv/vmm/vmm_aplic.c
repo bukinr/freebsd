@@ -37,7 +37,6 @@
 #include <sys/rman.h>
 #include <sys/smp.h>
 
-#include <riscv/vmm/hyp.h>
 #include <riscv/vmm/riscv.h>
 #include <riscv/vmm/vmm_aplic.h>
 
