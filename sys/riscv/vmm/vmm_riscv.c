@@ -293,7 +293,6 @@ vmmops_modinit(int ipinum)
 		break;
 	}
 	pa_range_bits = pa_range_field >> ID_AA64MMFR0_PARange_SHIFT;
-#endif
 
 	/* Initialise the EL2 MMU */
 	if (!vmmpmap_init()) {
@@ -301,7 +300,6 @@ vmmops_modinit(int ipinum)
 		return (ENOMEM);
 	}
 
-#if 0
 	/* Set up the stage 2 pmap callbacks */
 	MPASS(pmap_clean_stage2_tlbi == NULL);
 	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;

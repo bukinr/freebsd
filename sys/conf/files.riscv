@@ -79,7 +79,6 @@ riscv/vmm/vmm_sbi.c				optional vmm
 riscv/vmm/vmm_riscv.c				optional vmm
 riscv/vmm/vmm_reset.c				optional vmm
 riscv/vmm/vmm_call.S				optional vmm
-riscv/vmm/vmm_mmu.c				optional vmm
 riscv/vmm/vmm_aplic.c				optional vmm
 
 # Zstd
