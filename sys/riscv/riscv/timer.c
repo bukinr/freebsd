@@ -144,7 +144,7 @@ riscv_timer_intr(void *arg)
 	sc = (struct riscv_timer_softc *)arg;
 
 	if (has_sstc)
-		csr_write(stimecmp, -1);
+		csr_write(stimecmp, -1UL);
 	else
 		csr_clear(sip, SIP_STIP);
 
