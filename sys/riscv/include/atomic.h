@@ -105,8 +105,6 @@ atomic_fcmpset_rel_##WIDTH(__volatile uint##WIDTH##_t *p,		\
 
 ATOMIC_CMPSET_ACQ_REL(8);
 ATOMIC_FCMPSET_ACQ_REL(8);
-ATOMIC_CMPSET_ACQ_REL(16);
-ATOMIC_FCMPSET_ACQ_REL(16);
 
 #define	atomic_cmpset_char		atomic_cmpset_8
 #define	atomic_cmpset_acq_char		atomic_cmpset_acq_8
@@ -114,13 +112,6 @@ ATOMIC_FCMPSET_ACQ_REL(16);
 #define	atomic_fcmpset_char		atomic_fcmpset_8
 #define	atomic_fcmpset_acq_char		atomic_fcmpset_acq_8
 #define	atomic_fcmpset_rel_char		atomic_fcmpset_rel_8
-
-#define	atomic_cmpset_short		atomic_cmpset_16
-#define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
-#define	atomic_cmpset_rel_short		atomic_cmpset_rel_16
-#define	atomic_fcmpset_short		atomic_fcmpset_16
-#define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
-#define	atomic_fcmpset_rel_short	atomic_fcmpset_rel_16
 
 static __inline void
 atomic_add_32(volatile uint32_t *p, uint32_t val)
@@ -293,7 +284,10 @@ atomic_store_rel_32(volatile uint32_t *p, uint32_t val)
 #define	atomic_subtract_rel_int	atomic_subtract_rel_32
 #define	atomic_store_rel_int	atomic_store_rel_32
 
-#if 0
+ATOMIC_CMPSET_ACQ_REL(16);
+ATOMIC_FCMPSET_ACQ_REL(16);
+
+#define	atomic_load_acq_16	atomic_load_acq_16
 static __inline uint16_t
 atomic_load_acq_16(volatile uint16_t *p)
 {
@@ -306,17 +300,24 @@ atomic_load_acq_16(volatile uint16_t *p)
 	return (ret);
 }
 
-#define	atomic_add_acq_short		atomic_add_acq_16
-#define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
-#define	atomic_clear_acq_short		atomic_clear_acq_16
+static __inline void
+atomic_store_rel_16(volatile uint16_t *p, uint16_t val)
+{
+
+	fence();
+
+	*p = val;
+}
+
+#define	atomic_cmpset_short		atomic_cmpset_16
 #define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
-#endif
+#define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
 #define	atomic_load_acq_short		atomic_load_acq_16
-#if 0
-#define	atomic_set_acq_short		atomic_set_acq_16
-#define	atomic_subtract_acq_short	atomic_subtract_acq_16
-#define	atomic_testandset_acq_short	atomic_testandset_acq_16
-#endif
+
+#define	atomic_fcmpset_short		atomic_fcmpset_16
+#define	atomic_cmpset_rel_short		atomic_cmpset_rel_16
+#define	atomic_fcmpset_rel_short	atomic_fcmpset_rel_16
+#define	atomic_store_rel_short		atomic_store_rel_16
 
 static __inline void
 atomic_add_64(volatile uint64_t *p, uint64_t val)
