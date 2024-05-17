@@ -89,6 +89,4 @@ typedef long		db_expr_t;
 
 #define	DB_ELFSIZE		64
 
-void print_instr(vm_offset_t insn);
-
 #endif /* !_MACHINE_DB_MACHDEP_H_ */

@@ -598,26 +598,3 @@ db_disasm(vm_offset_t loc, bool altfmt)
 
 	return(loc + 2);
 }
-
-void
-print_instr(vm_offset_t insn)
-{
-	struct riscv_op *op;
-	int j;
-
-	for (j = 0; riscv_opcodes[j].name != NULL; j++) {
-		op = &riscv_opcodes[j];
-		if (op->match_func(op, insn)) {
-			oprint(op, 0, insn);
-			return;
-		}
-	}
-
-	for (j = 0; riscv_c_opcodes[j].name != NULL; j++) {
-		op = &riscv_c_opcodes[j];
-		if (op->match_func(op, insn)) {
-			oprint(op, 0, insn);
-			return;
-		}
-	}
-}
