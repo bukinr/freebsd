@@ -275,15 +275,6 @@ intc_intr(void *arg)
 
 	active_irq = frame->tf_scause & SCAUSE_CODE;
 
-#if 0
-	//printf("%s: %ld\n", __func__, active_irq);
-	if (active_irq == 6) {
-		csr_clear(hip, (1 << 6));
-		csr_set(hvip, (1 << 6));
-		return (FILTER_HANDLED);
-	}
-#endif
-
 	if (active_irq >= INTC_NIRQS)
 		return (FILTER_HANDLED);
 
