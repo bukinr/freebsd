@@ -34,7 +34,6 @@
 
 #include "mmu.h"
 #include "vmm_aplic.h"
-#include "io/vtimer.h"
 
 struct aplic;
 
@@ -78,7 +77,6 @@ struct hypctx {
 
 struct hyp {
 	struct vm	*vm;
-	struct vtimer	vtimer;
 	uint64_t	vmid_generation;
 	uint64_t	vttbr_el2;
 	bool		aplic_attached;

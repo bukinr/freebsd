@@ -73,7 +73,6 @@
 #include "mmu.h"
 
 #include "vmm_aplic.h"
-#include "io/vtimer.h"
 
 struct vcpu {
 	int		flags;

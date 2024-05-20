@@ -68,7 +68,6 @@
 #include "hyp.h"
 #include "reset.h"
 #include "vmm_aplic.h"
-#include "io/vtimer.h"
 #include "vmm_stat.h"
 
 #define	HANDLED		1
