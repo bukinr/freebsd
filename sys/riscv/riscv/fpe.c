@@ -153,24 +153,28 @@ fpe_restore(struct fpreg *regs)
 struct fpreg *
 fpu_save_area_alloc(void)
 {
+
 	return (uma_zalloc(fpu_save_area_zone, M_WAITOK));
 }
 
 void
 fpu_save_area_free(struct fpreg *fsa)
 {
+
 	uma_zfree(fpu_save_area_zone, fsa);
 }
 
 void
 fpu_save_area_reset(struct fpreg *fsa)
 {
+
 	memcpy(fsa, fpu_initialstate, sizeof(*fsa));
 }
 
 static void
 vfp_init(const void *dummy __unused)
 {
+
 	/* TODO: check if FPU extension available. */
 
 	fpu_save_area_zone = uma_zcreate("FPE save area", sizeof(struct fpreg),
