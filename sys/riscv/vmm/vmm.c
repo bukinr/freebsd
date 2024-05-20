@@ -53,9 +53,7 @@
 
 #include <machine/riscvreg.h>
 #include <machine/cpu.h>
-#if 0
-#include <machine/fpu.h>
-#endif
+#include <machine/fpe.h>
 #include <machine/machdep.h>
 #include <machine/pcb.h>
 #include <machine/smp.h>
@@ -1358,12 +1356,12 @@ static void
 restore_guest_fpustate(struct vcpu *vcpu)
 {
 
-#if 0
 	/* flush host state to the pcb */
-	vfp_save_state(curthread, curthread->td_pcb);
+	fpe_state_save(curthread);
 	/* Ensure the VFP state will be re-loaded when exiting the guest */
 	PCPU_SET(fpcurthread, NULL);
 
+#if 0
 	/* restore guest FPU state */
 	vfp_enable();
 	vfp_restore(vcpu->guestfpu);
@@ -1388,10 +1386,10 @@ save_guest_fpustate(struct vcpu *vcpu)
 	vfp_enable();
 	vfp_store(vcpu->guestfpu);
 	vfp_disable();
+#endif
 
 	KASSERT(PCPU_GET(fpcurthread) == NULL,
 	    ("%s: fpcurthread set with guest registers", __func__));
-#endif
 }
 
 static int
