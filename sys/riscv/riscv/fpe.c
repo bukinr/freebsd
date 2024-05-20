@@ -27,17 +27,10 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/limits.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
-#include <sys/pcpu.h>
-#include <sys/proc.h>
 
 #include <vm/uma.h>
 
-#include <machine/riscvreg.h>
-#include <machine/md_var.h>
-#include <machine/pcb.h>
 #include <machine/fpe.h>
 #include <machine/reg.h>
 
@@ -157,9 +150,6 @@ fpe_restore(struct fpreg *regs)
 	    : : "r"(fcsr), "r"(fp_x));
 }
 
-/*
- * FPU save area alloc/free/init utility routines.
- */
 struct fpreg *
 fpu_save_area_alloc(void)
 {
@@ -183,18 +173,14 @@ vfp_init(const void *dummy __unused)
 {
 	/* TODO: check if FPU extension available. */
 
-	fpu_save_area_zone = uma_zcreate("VFP_save_area", sizeof(struct fpreg),
+	fpu_save_area_zone = uma_zcreate("FPE save area", sizeof(struct fpreg),
 	    NULL, NULL, NULL, NULL, _Alignof(struct fpreg) - 1, 0);
 	fpu_initialstate = uma_zalloc(fpu_save_area_zone, M_WAITOK | M_ZERO);
 
-	/* Ensure the FPE is enabled before accessing it in vfp_store */
 	fpe_enable();
 	fpe_store(fpu_initialstate);
-
-	/* Disable to be enabled when it's used */
 	fpe_disable();
 
-	/* Zero the FPE registers but keep fpcr. */
 	bzero(fpu_initialstate->fp_x, sizeof(fpu_initialstate->fp_x));
 }
 
