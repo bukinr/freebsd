@@ -275,15 +275,15 @@ vmm_regs_init(struct vmm_regs *regs, const struct vmm_regs *masks)
 static void
 vcpu_cleanup(struct vcpu *vcpu, bool destroy)
 {
-#if 0
 	vmmops_vcpu_cleanup(vcpu->cookie);
 	vcpu->cookie = NULL;
 	if (destroy) {
 		vmm_stat_free(vcpu->stats);
+#if 0
 		fpu_save_area_free(vcpu->guestfpu);
+#endif
 		vcpu_lock_destroy(vcpu);
 	}
-#endif
 }
 
 static struct vcpu *
