@@ -34,4 +34,14 @@
 void fpe_state_save(struct thread *td);
 void fpe_state_clear(void);
 
+struct fpreg *fpu_save_area_alloc(void);
+void fpu_save_area_free(struct fpreg *fsa);
+void fpu_save_area_reset(struct fpreg *fsa);
+
+void fpe_enable(void);
+void fpe_disable(void);
+
+void fpe_store(struct fpreg *state);
+void fpe_restore(struct fpreg *state);
+
 #endif /* !_MACHINE_FPE_H_ */

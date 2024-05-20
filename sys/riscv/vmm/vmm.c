@@ -83,7 +83,7 @@ struct vcpu {
 	uint64_t	nextpc;		/* (x) next instruction to execute */
 	struct vm	*vm;		/* (o) */
 	void		*cookie;	/* (i) cpu-specific data */
-	struct vfpstate	*guestfpu;	/* (a,i) guest fpu state */
+	struct fpreg	*guestfpu;	/* (a,i) guest fpu state */
 };
 
 #define	vcpu_lock_initialized(v) mtx_initialized(&((v)->mtx))
@@ -279,9 +279,7 @@ vcpu_cleanup(struct vcpu *vcpu, bool destroy)
 	vcpu->cookie = NULL;
 	if (destroy) {
 		vmm_stat_free(vcpu->stats);
-#if 0
 		fpu_save_area_free(vcpu->guestfpu);
-#endif
 		vcpu_lock_destroy(vcpu);
 	}
 }
@@ -300,9 +298,7 @@ vcpu_alloc(struct vm *vm, int vcpu_id)
 	vcpu->hostcpu = NOCPU;
 	vcpu->vcpuid = vcpu_id;
 	vcpu->vm = vm;
-#if 0
 	vcpu->guestfpu = fpu_save_area_alloc();
-#endif
 	vcpu->stats = vmm_stat_alloc();
 	return (vcpu);
 }
@@ -312,9 +308,7 @@ vcpu_init(struct vcpu *vcpu)
 {
 	vcpu->cookie = vmmops_vcpu_init(vcpu->vm->cookie, vcpu, vcpu->vcpuid);
 	MPASS(vcpu->cookie != NULL);
-#if 0
 	fpu_save_area_reset(vcpu->guestfpu);
-#endif
 	vmm_stat_init(vcpu->stats);
 }
 
@@ -1361,17 +1355,15 @@ restore_guest_fpustate(struct vcpu *vcpu)
 	/* Ensure the VFP state will be re-loaded when exiting the guest */
 	PCPU_SET(fpcurthread, NULL);
 
-#if 0
 	/* restore guest FPU state */
-	vfp_enable();
-	vfp_restore(vcpu->guestfpu);
+	fpe_enable();
+	fpe_restore(vcpu->guestfpu);
 
 	/*
 	 * The FPU is now "dirty" with the guest's state so turn on emulation
 	 * to trap any access to the FPU by the host.
 	 */
-	vfp_disable();
-#endif
+	fpe_disable();
 }
 
 static void
@@ -1381,12 +1373,12 @@ save_guest_fpustate(struct vcpu *vcpu)
 	if ((READ_SPECIALREG(cpacr_el1) & CPACR_FPEN_MASK) !=
 	    CPACR_FPEN_TRAP_ALL1)
 		panic("VFP not enabled in host!");
+#endif
 
 	/* save guest FPU state */
-	vfp_enable();
-	vfp_store(vcpu->guestfpu);
-	vfp_disable();
-#endif
+	fpe_enable();
+	fpe_store(vcpu->guestfpu);
+	fpe_disable();
 
 	KASSERT(PCPU_GET(fpcurthread) == NULL,
 	    ("%s: fpcurthread set with guest registers", __func__));
