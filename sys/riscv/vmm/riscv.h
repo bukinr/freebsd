@@ -107,10 +107,9 @@ DEFINE_VMMOPS_IFUNC(struct vmspace *, vmspace_alloc, (vm_offset_t min,
     vm_offset_t max))
 DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 
-uint64_t	vmm_call_hyp(struct hypctx *);
+uint64_t vmm_call_hyp(struct hypctx *);
 
 #if 0
-uint64_t	vmm_call_hyp(uint64_t, ...);
 #define	eprintf(fmt, ...)	printf("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #else
 #define	eprintf(fmt, ...)	do {} while(0)
