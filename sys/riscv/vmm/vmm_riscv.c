@@ -567,6 +567,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	uint64_t hideleg;
 
 	hedeleg  = (1UL << SCAUSE_INST_MISALIGNED);
+	hedeleg |= (1UL << SCAUSE_ILLEGAL_INSTRUCTION);
 	hedeleg |= (1UL << SCAUSE_BREAKPOINT);
 	hedeleg |= (1UL << SCAUSE_ECALL_USER);
 	hedeleg |= (1UL << SCAUSE_INST_PAGE_FAULT);
@@ -1056,25 +1057,8 @@ riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
 		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-#if 1
-		printf("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
+		panic("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->sepc, vme->stval, vme->htval);
-#endif
-
-		//old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
-		__asm __volatile(".option push\n"
-				 ".option norvc\n"
-				"hlvx.hu %[insn], (%[addr])\n"
-				".option pop\n"
-		    : [insn] "=&r" (insn), [addr] "+&r" (vme->sepc)
-		    :: "memory");
-
-		//printf("insn %lx\n", insn);
-		//print_instr(insn);
-		csr_write(vsstatus, SSTATUS_FS_INITIAL);
-		//panic("handle me");
-		handled = HANDLED;
-		break;
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
 		vme->exitcode = VM_EXITCODE_ECALL;
 		handled = UNHANDLED;
