@@ -53,8 +53,6 @@
 #include "mem.h"
 #include "vmexit.h"
 
-//static cpuset_t running_cpumask;
-
 static int __unused
 vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_run *vmrun)
@@ -65,13 +63,6 @@ vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
 
 	vme = vmrun->vm_exit;
 	vie = &vme->u.inst_emul.vie;
-
-#if 0
-	if (vme->u.inst_emul.gpa >= 0x11000)
-		printf("%s: gpa %lx dir %d access_size %d reg %d sign %d\n",
-		    __func__, vme->u.inst_emul.gpa, vie->dir, vie->access_size,
-		    vie->reg, vie->sign_extend);
-#endif
 
 	err = emulate_mem(vcpu, vme->u.inst_emul.gpa, vie,
 	    &vme->u.inst_emul.paging);
@@ -116,13 +107,17 @@ vmexit_suspend(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 		fprintf(stderr, "vmexit_suspend: invalid reason %d\n", how);
 		exit(100);
 	}
-	return (0);	/* NOTREACHED */
+
+	/* NOT REACHED. */
+
+	return (0);
 }
 
 static int
 vmexit_debug(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
     struct vm_run *vmrun __unused)
 {
+
 	return (VMEXIT_CONTINUE);
 }
 
@@ -130,50 +125,9 @@ static int
 vmexit_bogus(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
     struct vm_run *vmrun __unused)
 {
+
 	return (VMEXIT_CONTINUE);
 }
-
-#if 0
-static uint64_t
-smccc_affinity_info(uint64_t target_affinity __unused, uint32_t lowest_affinity_level __unused)
-{
-	uint64_t cpu_aff, mask = 0;
-
-	switch (lowest_affinity_level) {
-	case 0:
-		mask |= CPU_AFF0_MASK;
-		/* FALLTHROUGH */
-	case 1:
-		mask |= CPU_AFF1_MASK;
-		/* FALLTHROUGH */
-	case 2:
-		mask |= CPU_AFF2_MASK;
-		/* FALLTHROUGH */
-	case 3:
-		mask |= CPU_AFF3_MASK;
-		break;
-	default:
-		return (PSCI_RETVAL_INVALID_PARAMS);
-	}
-
-	for (int vcpu = 0; vcpu < guest_ncpus; vcpu++) {
-		/* TODO: We should get this from the kernel */
-		cpu_aff = (vcpu & 0xf) << MPIDR_AFF0_SHIFT |
-		    ((vcpu >> 4) & 0xff) << MPIDR_AFF1_SHIFT |
-		    ((vcpu >> 12) & 0xff) << MPIDR_AFF2_SHIFT |
-		    (uint64_t)((vcpu >> 20) & 0xff) << MPIDR_AFF3_SHIFT;
-
-		if ((cpu_aff & mask) == (target_affinity & mask) &&
-		    CPU_ISSET(vcpu, &running_cpumask)) {
-			/* Return ON if any CPUs are on */
-			return (PSCI_AFFINITY_INFO_ON);
-		}
-	}
-
-	/* No CPUs in the affinity mask are on, return OFF */
-	return (PSCI_AFFINITY_INFO_OFF);
-}
-#endif
 
 static void
 vmexit_ecall_srst(struct vmctx *ctx, struct vm_exit *vme)
