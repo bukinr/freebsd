@@ -1560,28 +1560,6 @@ vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
 }
 
 static int
-vm_handle_smccc_call(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
-{
-#if 0
-	struct hypctx *hypctx;
-	int i;
-
-	hypctx = vcpu_get_cookie(vcpu);
-
-	if ((hypctx->tf.tf_esr & ESR_ELx_ISS_MASK) != 0)
-		return (1);
-
-	vme->exitcode = VM_EXITCODE_SMCCC;
-	vme->u.smccc_call.func_id = hypctx->tf.tf_x[0];
-	for (i = 0; i < nitems(vme->u.smccc_call.args); i++)
-		vme->u.smccc_call.args[i] = hypctx->tf.tf_x[i + 1];
-
-#endif
-	*retu = true;
-	return (0);
-}
-
-static int
 vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 {
 	vcpu_lock(vcpu);
