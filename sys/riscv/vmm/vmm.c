@@ -172,26 +172,6 @@ static int vmm_ipinum;
 SYSCTL_INT(_hw_vmm, OID_AUTO, ipinum, CTLFLAG_RD, &vmm_ipinum, 0,
     "IPI vector used for vcpu notifications");
 
-struct vmm_regs {
-	uint64_t	id_aa64afr0;
-	uint64_t	id_aa64afr1;
-	uint64_t	id_aa64dfr0;
-	uint64_t	id_aa64dfr1;
-	uint64_t	id_aa64isar0;
-	uint64_t	id_aa64isar1;
-	uint64_t	id_aa64isar2;
-	uint64_t	id_aa64mmfr0;
-	uint64_t	id_aa64mmfr1;
-	uint64_t	id_aa64mmfr2;
-	uint64_t	id_aa64pfr0;
-	uint64_t	id_aa64pfr1;
-};
-
-/* Host registers masked by vmm_arch_regs_masks. */
-#if 0
-static struct vmm_regs vmm_arch_regs;
-#endif
-
 u_int vm_maxcpu;
 SYSCTL_UINT(_hw_vmm, OID_AUTO, maxcpu, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
     &vm_maxcpu, 0, "Maximum number of vCPUs");
@@ -462,26 +442,7 @@ static void
 vm_cleanup(struct vm *vm, bool destroy)
 {
 	struct mem_map *mm;
-#if 0
-	pmap_t pmap __diagused;
-#endif
 	int i;
-
-	if (destroy) {
-#if 0
-		pmap = vmspace_pmap(vm->vmspace);
-#endif
-		sched_pin();
-#if 0
-		PCPU_SET(curvmpmap, NULL);
-#endif
-		sched_unpin();
-		CPU_FOREACH(i) {
-#if 0
-			MPASS(cpuid_to_pcpu[i]->pc_curvmpmap != pmap);
-#endif
-		}
-	}
 
 #if 0
 	vgic_detach_from_vm(vm->cookie);
