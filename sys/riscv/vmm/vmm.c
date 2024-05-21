@@ -187,44 +187,6 @@ struct vmm_regs {
 	uint64_t	id_aa64pfr1;
 };
 
-#if 0
-static const struct vmm_regs vmm_arch_regs_masks = {
-	.id_aa64dfr0 =
-	    ID_AA64DFR0_CTX_CMPs_MASK |
-	    ID_AA64DFR0_WRPs_MASK |
-	    ID_AA64DFR0_BRPs_MASK |
-	    ID_AA64DFR0_PMUVer_3 |
-	    ID_AA64DFR0_DebugVer_8,
-	.id_aa64isar0 =
-	    ID_AA64ISAR0_TLB_TLBIOSR |
-	    ID_AA64ISAR0_SHA3_IMPL |
-	    ID_AA64ISAR0_RDM_IMPL |
-	    ID_AA64ISAR0_Atomic_IMPL |
-	    ID_AA64ISAR0_CRC32_BASE |
-	    ID_AA64ISAR0_SHA2_512 |
-	    ID_AA64ISAR0_SHA1_BASE |
-	    ID_AA64ISAR0_AES_PMULL,
-	.id_aa64mmfr0 =
-	    ID_AA64MMFR0_TGran4_IMPL |
-	    ID_AA64MMFR0_TGran64_IMPL |
-	    ID_AA64MMFR0_TGran16_IMPL |
-	    ID_AA64MMFR0_ASIDBits_16 |
-	    ID_AA64MMFR0_PARange_4P,
-	.id_aa64mmfr1 =
-	    ID_AA64MMFR1_SpecSEI_IMPL |
-	    ID_AA64MMFR1_PAN_ATS1E1 |
-	    ID_AA64MMFR1_HAFDBS_AF,
-	.id_aa64pfr0 =
-	    ID_AA64PFR0_GIC_CPUIF_NONE |
-	    ID_AA64PFR0_AdvSIMD_HP |
-	    ID_AA64PFR0_FP_HP |
-	    ID_AA64PFR0_EL3_64 |
-	    ID_AA64PFR0_EL2_64 |
-	    ID_AA64PFR0_EL1_64 |
-	    ID_AA64PFR0_EL0_64,
-};
-#endif
-
 /* Host registers masked by vmm_arch_regs_masks. */
 #if 0
 static struct vmm_regs vmm_arch_regs;
@@ -245,32 +207,6 @@ static void vcpu_notify_event_locked(struct vcpu *vcpu);
  * is a safe value for now.
  */
 #define	VM_MAXCPU	MIN(0xffff - 1, CPU_SETSIZE)
-
-static int
-vmm_regs_init(struct vmm_regs *regs, const struct vmm_regs *masks)
-{
-#if 0
-#define	_FETCH_KERN_REG(reg, field) do {				\
-	regs->field = vmm_arch_regs_masks.field;			\
-	if (!get_kernel_reg_masked(reg, &regs->field, masks->field))	\
-		regs->field = 0;					\
-} while (0)
-	_FETCH_KERN_REG(ID_AA64AFR0_EL1, id_aa64afr0);
-	_FETCH_KERN_REG(ID_AA64AFR1_EL1, id_aa64afr1);
-	_FETCH_KERN_REG(ID_AA64DFR0_EL1, id_aa64dfr0);
-	_FETCH_KERN_REG(ID_AA64DFR1_EL1, id_aa64dfr1);
-	_FETCH_KERN_REG(ID_AA64ISAR0_EL1, id_aa64isar0);
-	_FETCH_KERN_REG(ID_AA64ISAR1_EL1, id_aa64isar1);
-	_FETCH_KERN_REG(ID_AA64ISAR2_EL1, id_aa64isar2);
-	_FETCH_KERN_REG(ID_AA64MMFR0_EL1, id_aa64mmfr0);
-	_FETCH_KERN_REG(ID_AA64MMFR1_EL1, id_aa64mmfr1);
-	_FETCH_KERN_REG(ID_AA64MMFR2_EL1, id_aa64mmfr2);
-	_FETCH_KERN_REG(ID_AA64PFR0_EL1, id_aa64pfr0);
-	_FETCH_KERN_REG(ID_AA64PFR1_EL1, id_aa64pfr1);
-#undef _FETCH_KERN_REG
-#endif
-	return (0);
-}
 
 static void
 vcpu_cleanup(struct vcpu *vcpu, bool destroy)
@@ -321,25 +257,18 @@ vm_exitinfo(struct vcpu *vcpu)
 static int
 vmm_init(void)
 {
-#if 0
-	int error;
-#endif
 
 	vm_maxcpu = mp_ncpus;
+
 	TUNABLE_INT_FETCH("hw.vmm.maxcpu", &vm_maxcpu);
 
 	if (vm_maxcpu > VM_MAXCPU) {
 		printf("vmm: vm_maxcpu clamped to %u\n", VM_MAXCPU);
 		vm_maxcpu = VM_MAXCPU;
 	}
+
 	if (vm_maxcpu == 0)
 		vm_maxcpu = 1;
-
-#if 0
-	error = vmm_regs_init(&vmm_arch_regs, &vmm_arch_regs_masks);
-	if (error != 0)
-		return (error);
-#endif
 
 	return (vmmops_modinit(0));
 }
