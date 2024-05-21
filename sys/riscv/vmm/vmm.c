@@ -120,15 +120,6 @@ struct vmm_mmio_region {
 };
 #define	VM_MAX_MMIO_REGIONS	4
 
-struct vmm_special_reg {
-	uint32_t	esr_iss;
-	uint32_t	esr_mask;
-	reg_read_t	reg_read;
-	reg_write_t	reg_write;
-	void		*arg;
-};
-#define	VM_MAX_SPECIAL_REGS	16
-
 /*
  * Initialization:
  * (o) initialized the first time the VM is created
@@ -149,7 +140,6 @@ struct vm {
 	struct vcpu	**vcpu;			/* (i) guest vcpus */
 	struct vmm_mmio_region mmio_region[VM_MAX_MMIO_REGIONS];
 						/* (o) guest MMIO regions */
-	struct vmm_special_reg special_reg[VM_MAX_SPECIAL_REGS];
 	/* The following describe the vm cpu topology */
 	uint16_t	sockets;		/* (o) num of sockets */
 	uint16_t	cores;			/* (o) num of cores/socket */
@@ -312,7 +302,6 @@ vm_init(struct vm *vm, bool create)
 	CPU_ZERO(&vm->suspended_cpus);
 
 	memset(vm->mmio_region, 0, sizeof(vm->mmio_region));
-	memset(vm->special_reg, 0, sizeof(vm->special_reg));
 
 	if (!create) {
 		for (i = 0; i < vm->maxcpus; i++) {
@@ -806,174 +795,6 @@ vm_gla2gpa_nofault(struct vcpu *vcpu, struct vm_guest_paging *paging,
 {
 
 	vmmops_gla2gpa(vcpu->cookie, paging, gla, prot, gpa, is_fault);
-	return (0);
-}
-
-static int
-vmm_reg_raz(struct vcpu *vcpu, uint64_t *rval, void *arg)
-{
-	*rval = 0;
-	return (0);
-}
-
-static int
-vmm_reg_read_arg(struct vcpu *vcpu, uint64_t *rval, void *arg)
-{
-	*rval = *(uint64_t *)arg;
-	return (0);
-}
-
-static int
-vmm_reg_wi(struct vcpu *vcpu, uint64_t wval, void *arg)
-{
-	return (0);
-}
-
-static const struct vmm_special_reg vmm_special_regs[] = {
-#if 0
-#define	SPECIAL_REG(_reg, _read, _write)				\
-	{								\
-		.esr_iss = ((_reg ## _op0) << ISS_MSR_OP0_SHIFT) |	\
-		    ((_reg ## _op1) << ISS_MSR_OP1_SHIFT) |		\
-		    ((_reg ## _CRn) << ISS_MSR_CRn_SHIFT) |		\
-		    ((_reg ## _CRm) << ISS_MSR_CRm_SHIFT) |		\
-		    ((_reg ## _op2) << ISS_MSR_OP2_SHIFT),		\
-		.esr_mask = ISS_MSR_REG_MASK,				\
-		.reg_read = (_read),					\
-		.reg_write = (_write),					\
-		.arg = NULL,						\
-	}
-#define	ID_SPECIAL_REG(_reg, _name)					\
-	{								\
-		.esr_iss = ((_reg ## _op0) << ISS_MSR_OP0_SHIFT) |	\
-		    ((_reg ## _op1) << ISS_MSR_OP1_SHIFT) |		\
-		    ((_reg ## _CRn) << ISS_MSR_CRn_SHIFT) |		\
-		    ((_reg ## _CRm) << ISS_MSR_CRm_SHIFT) |		\
-		    ((_reg ## _op2) << ISS_MSR_OP2_SHIFT),		\
-		.esr_mask = ISS_MSR_REG_MASK,				\
-		.reg_read = vmm_reg_read_arg,				\
-		.reg_write = vmm_reg_wi,				\
-		.arg = &(vmm_arch_regs._name),				\
-	}
-
-	/* ID registers */
-	ID_SPECIAL_REG(ID_AA64PFR0_EL1, id_aa64pfr0),
-	ID_SPECIAL_REG(ID_AA64DFR0_EL1, id_aa64dfr0),
-	ID_SPECIAL_REG(ID_AA64ISAR0_EL1, id_aa64isar0),
-	ID_SPECIAL_REG(ID_AA64MMFR0_EL1, id_aa64mmfr0),
-	ID_SPECIAL_REG(ID_AA64MMFR1_EL1, id_aa64mmfr1),
-
-	/*
-	 * All other ID registers are read as zero.
-	 * They are all in the op0=3, op1=0, CRn=0, CRm={0..7} space.
-	 */
-	{
-		.esr_iss = (3 << ISS_MSR_OP0_SHIFT) |
-		    (0 << ISS_MSR_OP1_SHIFT) |
-		    (0 << ISS_MSR_CRn_SHIFT) |
-		    (0 << ISS_MSR_CRm_SHIFT),
-		.esr_mask = ISS_MSR_OP0_MASK | ISS_MSR_OP1_MASK |
-		    ISS_MSR_CRn_MASK | (0x8 << ISS_MSR_CRm_SHIFT),
-		.reg_read = vmm_reg_raz,
-		.reg_write = vmm_reg_wi,
-		.arg = NULL,
-	},
-
-	/* Counter physical registers */
-	SPECIAL_REG(CNTP_CTL_EL0, vtimer_phys_ctl_read, vtimer_phys_ctl_write),
-	SPECIAL_REG(CNTP_CVAL_EL0, vtimer_phys_cval_read,
-	    vtimer_phys_cval_write),
-	SPECIAL_REG(CNTP_TVAL_EL0, vtimer_phys_tval_read,
-	    vtimer_phys_tval_write),
-	SPECIAL_REG(CNTPCT_EL0, vtimer_phys_cnt_read, vtimer_phys_cnt_write),
-#undef SPECIAL_REG
-#endif
-};
-
-void
-vm_register_reg_handler(struct vm *vm, uint64_t iss, uint64_t mask,
-    reg_read_t reg_read, reg_write_t reg_write, void *arg)
-{
-	int i;
-
-	for (i = 0; i < nitems(vm->special_reg); i++) {
-		if (vm->special_reg[i].esr_iss == 0 &&
-		    vm->special_reg[i].esr_mask == 0) {
-			vm->special_reg[i].esr_iss = iss;
-			vm->special_reg[i].esr_mask = mask;
-			vm->special_reg[i].reg_read = reg_read;
-			vm->special_reg[i].reg_write = reg_write;
-			vm->special_reg[i].arg = arg;
-			return;
-		}
-	}
-
-	panic("%s: No free special register slot", __func__);
-}
-
-void
-vm_deregister_reg_handler(struct vm *vm, uint64_t iss, uint64_t mask)
-{
-	int i;
-
-	for (i = 0; i < nitems(vm->special_reg); i++) {
-		if (vm->special_reg[i].esr_iss == iss &&
-		    vm->special_reg[i].esr_mask == mask) {
-			memset(&vm->special_reg[i], 0,
-			    sizeof(vm->special_reg[i]));
-			return;
-		}
-	}
-
-	panic("%s: Invalid special register: iss %lx mask %lx", __func__, iss,
-	    mask);
-}
-
-static int
-vm_handle_reg_emul(struct vcpu *vcpu, bool *retu)
-{
-	struct vm *vm;
-	struct vm_exit *vme;
-	struct vre *vre;
-	int i, rv;
-
-	vm = vcpu->vm;
-	vme = &vcpu->exitinfo;
-	vre = &vme->u.reg_emul.vre;
-
-	for (i = 0; i < nitems(vm->special_reg); i++) {
-		if (vm->special_reg[i].esr_iss == 0 &&
-		    vm->special_reg[i].esr_mask == 0)
-			continue;
-
-		if ((vre->inst_syndrome & vm->special_reg[i].esr_mask) ==
-		    vm->special_reg[i].esr_iss) {
-			rv = vmm_emulate_register(vcpu, vre,
-			    vm->special_reg[i].reg_read,
-			    vm->special_reg[i].reg_write,
-			    vm->special_reg[i].arg);
-			if (rv == 0) {
-				*retu = false;
-			}
-			return (rv);
-		}
-	}
-	for (i = 0; i < nitems(vmm_special_regs); i++) {
-		if ((vre->inst_syndrome & vmm_special_regs[i].esr_mask) ==
-		    vmm_special_regs[i].esr_iss) {
-			rv = vmm_emulate_register(vcpu, vre,
-			    vmm_special_regs[i].reg_read,
-			    vmm_special_regs[i].reg_write,
-			    vmm_special_regs[i].arg);
-			if (rv == 0) {
-				*retu = false;
-			}
-			return (rv);
-		}
-	}
-
-
-	*retu = true;
 	return (0);
 }
 
@@ -1678,27 +1499,6 @@ restart:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_inst_emul(vcpu, &retu);
 			break;
-
-#if 0
-		case VM_EXITCODE_REG_EMUL:
-			vcpu->nextpc = vme->pc + vme->inst_length;
-			error = vm_handle_reg_emul(vcpu, &retu);
-			break;
-
-		case VM_EXITCODE_HVC:
-			/*
-			 * The HVC instruction saves the address for the
-			 * next instruction as the return address.
-			 */
-			vcpu->nextpc = vme->pc;
-			/*
-			 * The PSCI call can change the exit information in the
-			 * case of suspend/reset/poweroff/cpu off/cpu on.
-			 */
-			error = vm_handle_smccc_call(vcpu, vme, &retu);
-			break;
-#endif
-
 		case VM_EXITCODE_WFI:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_wfi(vcpu, vme, &retu);
