@@ -310,19 +310,8 @@ enum vm_exitcode {
 	VM_EXITCODE_SUSPENDED,
 	VM_EXITCODE_DEBUG,
 	VM_EXITCODE_INST_EMUL,
-	VM_EXITCODE_HYP,
 	VM_EXITCODE_SMCCC,
 	VM_EXITCODE_WFI,
-#if 0
-	VM_EXITCODE_BOGUS,
-	VM_EXITCODE_REG_EMUL,
-	VM_EXITCODE_HVC,
-	VM_EXITCODE_SUSPENDED,
-	VM_EXITCODE_WFI,
-	VM_EXITCODE_PAGING,
-	VM_EXITCODE_SMCCC,
-	VM_EXITCODE_DEBUG,
-#endif
 	VM_EXITCODE_MAX
 };
 
@@ -348,28 +337,25 @@ struct vm_exit {
 			uint64_t	far_el2;	/* Fault Address Register */
 			uint64_t	hpfar_el2;	/* Hypervisor IPA Fault Address Register */
 		} hyp;
+
 		struct {
 			struct vre 	vre;
 		} reg_emul;
+
 		struct {
 			uint64_t	gpa;
 			uint64_t	esr;
 		} paging;
+
 		struct {
 			uint64_t	gpa;
 			struct vm_guest_paging paging;
 			struct vie	vie;
 		} inst_emul;
 
-		/*
-		 * A SMCCC call, e.g. starting a core via PSCI.
-		 * Further arguments can be read by asking the kernel for
-		 * all register values.
-		 */
 		struct {
-			uint64_t	func_id;
-			uint64_t	args[7];
-		} smccc_call;
+			uint64_t	args[8];
+		} ecall;
 
 		struct {
 			enum vm_suspend_how how;

@@ -127,15 +127,12 @@ vmm_sbi_handle_srst(struct hypctx *hypctx, bool *retu)
 	func_id = hypctx->guest_regs.hyp_a[6];
 	type = hypctx->guest_regs.hyp_a[0];
 
-	//printf("srst %d %d\n", func_id, type);
-
 	switch (func_id) {
 	case SBI_SRST_SYSTEM_RESET:
 		switch (type) {
 		case SBI_SRST_TYPE_SHUTDOWN:
 		case SBI_SRST_TYPE_COLD_REBOOT:
 		case SBI_SRST_TYPE_WARM_REBOOT:
-			//printf("sbi reset issued");
 			*retu = true;
 		}
 	}

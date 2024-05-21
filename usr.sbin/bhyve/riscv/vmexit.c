@@ -34,6 +34,7 @@
 
 #include <machine/riscvreg.h>
 #include <machine/cpu.h>
+#include <machine/sbi.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 #include <machine/vmm_instruction_emul.h>
@@ -174,96 +175,55 @@ smccc_affinity_info(uint64_t target_affinity __unused, uint32_t lowest_affinity_
 }
 #endif
 
-static int __unused
-vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu __unused,
-    struct vm_run *vmrun __unused)
+static void
+vmexit_ecall_srst(struct vmctx *ctx, struct vm_exit *vme)
 {
-#if 0
-	struct vcpu *newvcpu;
-	struct vm_exit *vme;
-	uint64_t newcpu, smccc_rv;
 	enum vm_suspend_how how;
-	int error;
+	int func_id;
+	int type;
 
-	/* Return the Unknown Function Identifier  by default */
-	smccc_rv = SMCCC_RET_NOT_SUPPORTED;
+	func_id = vme->u.ecall.args[6];
+	type = vme->u.ecall.args[0];
+
+#if 0
+	printf("%s: srst %d %d\n", __func__, func_id, type);
+#endif
+
+	switch (func_id) {
+	case SBI_SRST_SYSTEM_RESET:
+		switch (type) {
+		case SBI_SRST_TYPE_SHUTDOWN:
+		case SBI_SRST_TYPE_COLD_REBOOT:
+		case SBI_SRST_TYPE_WARM_REBOOT:
+			how = VM_SUSPEND_POWEROFF;
+			vm_suspend(ctx, how);
+		default:
+			break;
+		}
+	default:
+		break;
+	}
+}
+
+static int
+vmexit_ecall(struct vmctx *ctx, struct vcpu *vcpu __unused,
+    struct vm_run *vmrun)
+{
+	int sbi_extension_id;
+	struct vm_exit *vme;
 
 	vme = vmrun->vm_exit;
-	switch (vme->u.smccc_call.func_id) {
-	case PSCI_FNID_VERSION:
-		/* We implement PSCI 1.0 */
-		smccc_rv = PSCI_VER(1, 0);
-		break;
-	case PSCI_FNID_CPU_SUSPEND:
-	case PSCI_FNID_CPU_OFF:
-		break;
-	case PSCI_FNID_CPU_ON:
-		newcpu = vme->u.smccc_call.args[0];
-		if (newcpu > (uint64_t)guest_ncpus) {
-			smccc_rv = PSCI_RETVAL_INVALID_PARAMS;
-			break;
-		}
 
-		if (CPU_ISSET(newcpu, &running_cpumask)) {
-			smccc_rv = PSCI_RETVAL_ALREADY_ON;
-			break;
-		}
-
-		newvcpu = fbsdrun_vcpu(newcpu);
-		assert(newvcpu != NULL);
-
-		/* Set the context ID */
-		error = vm_set_register(newvcpu, VM_REG_GUEST_X0,
-		    vme->u.smccc_call.args[2]);
-		assert(error == 0);
-
-		/* Set the start program counter */
-		error = vm_set_register(newvcpu, VM_REG_GUEST_PC,
-		    vme->u.smccc_call.args[1]);
-		assert(error == 0);
-
-		vm_resume_cpu(newvcpu);
-		CPU_SET_ATOMIC(newcpu, &running_cpumask);
-
-		smccc_rv = PSCI_RETVAL_SUCCESS;
-		break;
-	case PSCI_FNID_AFFINITY_INFO:
-		smccc_rv = smccc_affinity_info(vme->u.smccc_call.args[0],
-		    vme->u.smccc_call.args[1]);
-		break;
-	case PSCI_FNID_SYSTEM_OFF:
-	case PSCI_FNID_SYSTEM_RESET:
-		if (vme->u.smccc_call.func_id == PSCI_FNID_SYSTEM_OFF)
-			how = VM_SUSPEND_POWEROFF;
-		else
-			how = VM_SUSPEND_RESET;
-		vm_suspend(ctx, how);
+	sbi_extension_id = vme->u.ecall.args[7];
+	switch (sbi_extension_id) {
+	case SBI_EXT_ID_SRST:
+		vmexit_ecall_srst(ctx, vme);
 		break;
 	default:
 		break;
 	}
 
-	error = vm_set_register(vcpu, VM_REG_GUEST_X0, smccc_rv);
-	assert(error == 0);
-#endif
-
-	enum vm_suspend_how how;
-	how = VM_SUSPEND_POWEROFF;
-	vm_suspend(ctx, how);
-
 	return (VMEXIT_CONTINUE);
-}
-
-static int __unused
-vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
-    struct vm_run *vmrun)
-{
-	struct vm_exit *vme;
-
-	vme = vmrun->vm_exit;
-	printf("unhandled exception: esr %#lx, far %#lx\n",
-	    vme->u.hyp.esr_el2, vme->u.hyp.far_el2);
-	return (VMEXIT_ABORT);
 }
 
 const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
@@ -271,6 +231,5 @@ const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
-	[VM_EXITCODE_SMCCC] = vmexit_smccc,
-	[VM_EXITCODE_HYP] = vmexit_hyp,
+	[VM_EXITCODE_ECALL] = vmexit_ecall,
 };

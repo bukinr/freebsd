@@ -1838,7 +1838,14 @@ restart:
 		case VM_EXITCODE_ECALL:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vmm_sbi_ecall(vcpu, &retu);
-			vme->exitcode = VM_EXITCODE_SMCCC;
+			if (retu == true) {
+				struct hypctx *hypctx;
+				int i;
+				hypctx = vcpu_get_cookie(vcpu);
+				for (i = 0; i < nitems(vme->u.ecall.args); i++)
+					vme->u.ecall.args[i] =
+					    hypctx->guest_regs.hyp_a[i];
+			}
 			break;
 		case VM_EXITCODE_PAGING:
 			vcpu->nextpc = vme->pc;
