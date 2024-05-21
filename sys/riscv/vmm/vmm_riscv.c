@@ -592,7 +592,6 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->guest_scounteren = 0x1 | 0x2; /* rdtime */
 	csr_write(hie, (1 << 10) | (1 << 12));
 
-#if 1
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
 	hypctx->guest_regs.hyp_sstatus |= SSTATUS_FS_INITIAL;
 
@@ -601,7 +600,6 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hstatus |= (1 << 7); //SPV
 	hstatus |= (1 << 21); //VTW
 	hypctx->guest_regs.hyp_hstatus = hstatus;
-#endif
 
 	return (hypctx);
 }
