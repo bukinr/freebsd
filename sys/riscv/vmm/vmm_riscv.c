@@ -658,17 +658,6 @@ vmm_pmap_invalidate_all(uint64_t vttbr)
 #endif
 }
 
-static inline void
-arm64_print_hyp_regs(struct vm_exit *vme)
-{
-#if 0
-	printf("esr_el2:   0x%016lx\n", vme->u.hyp.esr_el2);
-	printf("far_el2:   0x%016lx\n", vme->u.hyp.far_el2);
-	printf("hpfar_el2: 0x%016lx\n", vme->u.hyp.hpfar_el2);
-	printf("elr_el2:   0x%016lx\n", vme->pc);
-#endif
-}
-
 static void
 riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
     struct vm_exit *vme_ret)
@@ -824,24 +813,6 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 	csr_write(hstatus, old_hstatus);
 	//csr_write(stvec, old_stvec);
 	vie->reg = reg_num;
-#endif
-}
-
-static void
-arm64_gen_reg_emul_data(uint32_t esr_iss, struct vm_exit *vme_ret)
-{
-#if 0
-	uint32_t reg_num;
-	struct vre *vre;
-
-	/* u.hyp member will be replaced by u.reg_emul */
-	vre = &vme_ret->u.reg_emul.vre;
-
-	vre->inst_syndrome = esr_iss;
-	/* ARMv8 Architecture Manual, p. D7-2273: 1 means read */
-	vre->dir = (esr_iss & ISS_MSR_DIR) ? VM_DIR_READ : VM_DIR_WRITE;
-	reg_num = ISS_MSR_Rt(esr_iss);
-	vre->reg = reg_num;
 #endif
 }
 
