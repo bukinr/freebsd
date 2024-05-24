@@ -1,8 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
- * Copyright (C) 2015 Mihai Carabas <mihai.carabas@gmail.com>
- * All rights reserved.
+ * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -141,12 +138,8 @@ vmmops_init(struct vm *vm, pmap_t pmap)
 	struct hyp *hyp;
 	vm_size_t size;
 
-printf("%s\n", __func__);
 	size = el2_hyp_size(vm);
-printf("%s size %ld\n", __func__, size);
 	hyp = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
-printf("%s hyp %p\n", __func__, hyp);
-
 	hyp->vm = vm;
 	hyp->aplic_attached = false;
 
