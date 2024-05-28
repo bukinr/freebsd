@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (C) 2015 Mihai Carabas <mihai.carabas@gmail.com>
+ * Copyright (c) 2015 Mihai Carabas <mihai.carabas@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
