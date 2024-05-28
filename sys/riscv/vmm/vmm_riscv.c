@@ -171,8 +171,6 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	vgic_cpuinit(hypctx);
 #endif
 
-//printf("%s hypctx->el2_addr %lx\n", __func__, hypctx->el2_addr);
-
 	uint64_t henvcfg;
 	uint64_t hedeleg;
 	uint64_t hideleg;
@@ -247,38 +245,6 @@ static void
 riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
     struct vm_exit *vme_ret)
 {
-#if 0
-	struct vm_guest_paging *paging;
-	struct vie *vie;
-	uint32_t esr_sas, reg_num;
-
-	/*
-	 * Get the page address from HPFAR_EL2.
-	 */
-	vme_ret->u.inst_emul.gpa =
-	    HPFAR_EL2_FIPA_ADDR(hypctx->exit_info.hpfar_el2);
-	/* Bits [11:0] are the same as bits [11:0] from the virtual address. */
-	vme_ret->u.inst_emul.gpa += hypctx->exit_info.far_el2 &
-	    FAR_EL2_HPFAR_PAGE_MASK;
-
-	esr_sas = (esr_iss & ISS_DATA_SAS_MASK) >> ISS_DATA_SAS_SHIFT;
-	reg_num = (esr_iss & ISS_DATA_SRT_MASK) >> ISS_DATA_SRT_SHIFT;
-
-	vie = &vme_ret->u.inst_emul.vie;
-	vie->access_size = 1 << esr_sas;
-	vie->sign_extend = (esr_iss & ISS_DATA_SSE) ? 1 : 0;
-	vie->dir = (esr_iss & ISS_DATA_WnR) ? VM_DIR_WRITE : VM_DIR_READ;
-	vie->reg = reg_num;
-
-	paging = &vme_ret->u.inst_emul.paging;
-	paging->ttbr0_addr = hypctx->ttbr0_el1 & ~(TTBR_ASID_MASK | TTBR_CnP);
-	paging->ttbr1_addr = hypctx->ttbr1_el1 & ~(TTBR_ASID_MASK | TTBR_CnP);
-	paging->tcr_el1 = hypctx->tcr_el1;
-	paging->tcr2_el1 = hypctx->tcr2_el1;
-	paging->flags = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
-	if ((hypctx->sctlr_el1 & SCTLR_M) != 0)
-		paging->flags |= VM_GP_MMU_ENABLED;
-#else
 	struct vie *vie;
 
 	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2) |
@@ -398,7 +364,6 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 	csr_write(hstatus, old_hstatus);
 	//csr_write(stvec, old_stvec);
 	vie->reg = reg_num;
-#endif
 }
 
 void

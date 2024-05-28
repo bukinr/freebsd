@@ -25,8 +25,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef _VMM_ARM64_H_
-#define _VMM_ARM64_H_
+#ifndef _VMM_RISCV_H_
+#define _VMM_RISCV_H_
 
 #include <machine/reg.h>
 #include <machine/hypervisor.h>
@@ -62,23 +62,14 @@ struct hypctx {
 	uint64_t host_stvec;
 	uint64_t host_scounteren;
 	uint64_t guest_scounteren;
-	struct trapframe tf; /* unused */
-
-	struct hyp	*hyp;
-	struct vcpu	*vcpu;
-
-	struct {
-		uint64_t	far_el2;
-		uint64_t	hpfar_el2;
-	} exit_info;
-
-	bool			has_exception;
+	struct hyp *hyp;
+	struct vcpu *vcpu;
+	bool has_exception;
 };
 
 struct hyp {
 	struct vm	*vm;
 	uint64_t	vmid_generation;
-	uint64_t	vttbr_el2;
 	bool		aplic_attached;
 	struct aplic	*aplic;
 	struct hypctx	*ctx[];
@@ -120,4 +111,4 @@ void raise_data_insn_abort(struct hypctx *, uint64_t, bool, int);
 
 int vmm_sbi_ecall(struct vcpu *, bool *);
 
-#endif /* !_VMM_ARM64_H_ */
+#endif /* !_VMM_RISCV_H_ */
