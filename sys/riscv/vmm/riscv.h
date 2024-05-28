@@ -1,8 +1,6 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
  * Copyright (c) 2015 Mihai Carabas <mihai.carabas@gmail.com>
- * All rights reserved.
+ * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,6 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 #ifndef _VMM_RISCV_H_
 #define _VMM_RISCV_H_
 
@@ -100,11 +99,8 @@ DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 
 uint64_t vmm_call_hyp(struct hypctx *);
 
-#if 0
-#define	eprintf(fmt, ...)	printf("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
-#else
-#define	eprintf(fmt, ...)	do {} while(0)
-#endif
+#define	dprintf(fmt, ...)	\
+    printf("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 struct hypctx *riscv_get_active_vcpu(void);
 void raise_data_insn_abort(struct hypctx *, uint64_t, bool, int);

@@ -1,9 +1,7 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
  * Copyright (c) 2011 NetApp, Inc.
  * Copyright (c) 2015 Mihai Carabas <mihai.carabas@gmail.com>
- * All rights reserved.
+ * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
