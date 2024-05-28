@@ -413,3 +413,12 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 
 	return (0);
 }
+
+int
+aplic_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr)
+{
+
+	/* TODO. */
+
+	return (ENXIO);
+}

@@ -1335,12 +1335,14 @@ vm_set_register(struct vcpu *vcpu, int reg, uint64_t val)
 void *
 vm_get_cookie(struct vm *vm)
 {
+
 	return (vm->cookie);
 }
 
 int
 vm_inject_exception(struct vcpu *vcpu, uint64_t scause)
 {
+
 	return (vmmops_exception(vcpu->cookie, scause));
 }
 
@@ -1354,12 +1356,14 @@ vm_attach_aplic(struct vm *vm, struct vm_aplic_descr *descr)
 int
 vm_assert_irq(struct vm *vm, uint32_t irq)
 {
+
 	return (aplic_inject_irq(vm->cookie, -1, irq, true));
 }
 
 int
 vm_deassert_irq(struct vm *vm, uint32_t irq)
 {
+
 	return (aplic_inject_irq(vm->cookie, -1, irq, false));
 }
 
@@ -1367,11 +1371,8 @@ int
 vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
     int func)
 {
-	/* TODO: Should we raise an SError? */
-#if 0
-	return (vgic_inject_msi(vm->cookie, msg, addr));
-#endif
-	return (0);
+
+	return (aplic_inject_msi(vm->cookie, msg, addr));
 }
 
 static int

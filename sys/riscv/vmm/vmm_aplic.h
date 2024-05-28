@@ -34,6 +34,7 @@ struct vm_aplic_descr;
 
 int aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr);
 int aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level);
+int aplic_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr);
 void aplic_vminit(struct hyp *hyp);
 int aplic_check_pending(struct hypctx *hypctx);
 
