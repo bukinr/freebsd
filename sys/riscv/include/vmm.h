@@ -177,7 +177,7 @@ int vm_set_capability(struct vcpu *vcpu, int type, int val);
 int vm_activate_cpu(struct vcpu *vcpu);
 int vm_suspend_cpu(struct vm *vm, struct vcpu *vcpu);
 int vm_resume_cpu(struct vm *vm, struct vcpu *vcpu);
-int vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far);
+int vm_inject_exception(struct vcpu *vcpu, uint64_t scause);
 int vm_attach_aplic(struct vm *vm, struct vm_aplic_descr *descr);
 int vm_assert_irq(struct vm *vm, uint32_t irq);
 int vm_deassert_irq(struct vm *vm, uint32_t irq);

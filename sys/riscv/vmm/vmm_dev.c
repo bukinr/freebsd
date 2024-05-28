@@ -616,7 +616,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		break;
 	case VM_INJECT_EXCEPTION:
 		vmexc = (struct vm_exception *)data;
-		error = vm_inject_exception(vcpu, vmexc->esr, vmexc->far);
+		error = vm_inject_exception(vcpu, vmexc->scause);
 		break;
 	case VM_GLA2GPA_NOFAULT:
 		gg = (struct vm_gla2gpa *)data;

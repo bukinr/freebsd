@@ -115,13 +115,12 @@ vm_raise_msi(struct vmctx *ctx, uint64_t addr, uint64_t msg,
 }
 
 int
-vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far)
+vm_inject_exception(struct vcpu *vcpu, uint64_t scause)
 {
 	struct vm_exception vmexc;
 
 	bzero(&vmexc, sizeof(vmexc));
-	vmexc.esr = esr;
-	vmexc.far = far;
+	vmexc.scause = scause;
 
 	return (vcpu_ioctl(vcpu, VM_INJECT_EXCEPTION, &vmexc));
 }

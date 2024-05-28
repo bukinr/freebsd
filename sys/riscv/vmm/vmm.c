@@ -1342,9 +1342,9 @@ vm_get_cookie(struct vm *vm)
 }
 
 int
-vm_inject_exception(struct vcpu *vcpu, uint64_t esr, uint64_t far)
+vm_inject_exception(struct vcpu *vcpu, uint64_t scause)
 {
-	return (vmmops_exception(vcpu->cookie, esr, far));
+	return (vmmops_exception(vcpu->cookie, scause));
 }
 
 int

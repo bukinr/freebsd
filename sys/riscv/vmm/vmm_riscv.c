@@ -366,10 +366,10 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 	vie->reg = reg_num;
 }
 
+#if 0
 void
 raise_data_insn_abort(struct hypctx *hypctx, uint64_t far, bool dabort, int fsc)
 {
-#if 0
 	uint64_t esr;
 
 	if ((hypctx->tf.tf_spsr & PSR_M_MASK) == PSR_M_EL0t)
@@ -383,8 +383,8 @@ raise_data_insn_abort(struct hypctx *hypctx, uint64_t far, bool dabort, int fsc)
 	esr |= hypctx->tf.tf_esr & ESR_ELx_IL;
 
 	vmmops_exception(hypctx, esr | fsc, far);
-#endif
 }
+#endif
 
 static int
 riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
@@ -530,7 +530,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
 	uint64_t excp_type;
 	int handled;
-	register_t daif;
+	register_t val;
 	//struct hyp *hyp;
 	struct hypctx *hypctx;
 	struct vcpu *vcpu;
@@ -575,54 +575,20 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
-#if 0
-			hypctx->elr_el1 = hypctx->tf.tf_sepc;
-
-			mode = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
-
-			if (mode == PSR_M_EL1t) {
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x0;
-			} else if (mode == PSR_M_EL1h) {
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x200;
-			} else if ((mode & PSR_M_32) == PSR_M_64) {
-				/* 64-bit EL0 */
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x400;
-			} else {
-				/* 32-bit EL0 */
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x600;
-			}
-
-			/* Set the new spsr */
-			hypctx->spsr_el1 = hypctx->tf.tf_spsr;
-
-			/* Set the new cpsr */
-			hypctx->tf.tf_spsr = hypctx->spsr_el1 & PSR_FLAGS;
-			hypctx->tf.tf_spsr |= PSR_DAIF | PSR_M_EL1h;
-
-			/*
-			 * Update fields that may change on exeption entry
-			 * based on how sctlr_el1 is configured.
-			 */
-			if ((hypctx->sctlr_el1 & SCTLR_SPAN) != 0)
-				hypctx->tf.tf_spsr |= PSR_PAN;
-			if ((hypctx->sctlr_el1 & SCTLR_DSSBS) == 0)
-				hypctx->tf.tf_spsr &= ~PSR_SSBS;
-			else
-				hypctx->tf.tf_spsr |= PSR_SSBS;
-#endif
+			/* TODO. */
 		}
 
-		daif = intr_disable();
+		val = intr_disable();
 
 		/* Check if the vcpu is suspended */
 		if (vcpu_suspended(evinfo)) {
-			intr_restore(daif);
+			intr_restore(val);
 			vm_exit_suspended(vcpu, pc);
 			break;
 		}
 
 		if (vcpu_debugged(vcpu)) {
-			intr_restore(daif);
+			intr_restore(val);
 			vm_exit_debug(vcpu, pc);
 			break;
 		}
@@ -680,7 +646,7 @@ printf("%s: leaving Guest VM\n", __func__);
 		vme->htval = csr_read(htval);
 		vme->htinst = csr_read(htinst);
 
-		intr_restore(daif);
+		intr_restore(val);
 
 		vmm_stat_incr(vcpu, VMEXIT_COUNT, 1);
 #if 0
@@ -909,7 +875,7 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 }
 
 int
-vmmops_exception(void *vcpui, uint64_t esr, uint64_t far)
+vmmops_exception(void *vcpui, uint64_t scause)
 {
 	struct hypctx *hypctx = vcpui;
 	int running, hostcpu;
@@ -919,10 +885,8 @@ vmmops_exception(void *vcpui, uint64_t esr, uint64_t far)
 		panic("%s: %s%d is running", __func__, vm_name(hypctx->hyp->vm),
 		    vcpu_vcpuid(hypctx->vcpu));
 
-#if 0
-	hypctx->far_el1 = far;
-	hypctx->esr_el1 = esr;
-#endif
+	/* TODO: set registers. */
+
 	hypctx->has_exception = true;
 
 	return (0);

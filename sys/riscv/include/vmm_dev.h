@@ -76,8 +76,7 @@ struct vm_run {
 
 struct vm_exception {
 	int		cpuid;
-	uint64_t	esr;
-	uint64_t	far;
+	uint64_t	scause;
 };
 
 struct vm_msi {
