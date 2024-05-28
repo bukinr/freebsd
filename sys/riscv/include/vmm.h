@@ -241,15 +241,6 @@ void vcpu_notify_event(struct vcpu *vcpu);
 
 enum vm_reg_name vm_segment_name(int seg_encoding);
 
-#if 0
-struct vm_copyinfo {
-	uint64_t	gpa;
-	size_t		len;
-	void		*hva;
-	void		*cookie;
-};
-#endif
-
 #endif	/* _KERNEL */
 
 #define	VM_DIR_READ	0
@@ -302,45 +293,27 @@ enum vm_exitcode {
 };
 
 struct vm_exit {
-
 	uint64_t scause;
 	uint64_t sepc;
 	uint64_t stval;
 	uint64_t htval;
 	uint64_t htinst;
-
-	enum vm_exitcode	exitcode;
-	int			inst_length;
-	uint64_t		pc;
+	enum vm_exitcode exitcode;
+	int inst_length;
+	uint64_t pc;
 	union {
-		/*
-		 * ARM specific payload.
-		 */
 		struct {
-			uint32_t	exception_nr;
-			uint32_t	pad;
-			uint64_t	esr_el2;	/* Exception Syndrome Register */
-			uint64_t	far_el2;	/* Fault Address Register */
-			uint64_t	hpfar_el2;	/* Hypervisor IPA Fault Address Register */
-		} hyp;
-
-		struct {
-			struct vre 	vre;
-		} reg_emul;
-
-		struct {
-			uint64_t	gpa;
-			uint64_t	esr;
+			uint64_t gpa;
 		} paging;
 
 		struct {
-			uint64_t	gpa;
+			uint64_t gpa;
 			struct vm_guest_paging paging;
-			struct vie	vie;
+			struct vie vie;
 		} inst_emul;
 
 		struct {
-			uint64_t	args[8];
+			uint64_t args[8];
 		} ecall;
 
 		struct {
