@@ -168,9 +168,7 @@ SYSCTL_UINT(_hw_vmm, OID_AUTO, maxcpu, CTLFLAG_RDTUN | CTLFLAG_NOFETCH,
 
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
-#if 0
 static void vcpu_notify_event_locked(struct vcpu *vcpu);
-#endif
 
 /*
  * Upper limit on vm_maxcpu. We could increase this to 28 bits, but this
@@ -1330,7 +1328,7 @@ vm_set_register(struct vcpu *vcpu, int reg, uint64_t val)
 	if (reg >= VM_REG_LAST)
 		return (EINVAL);
 	error = vmmops_setreg(vcpu->cookie, reg, val);
-	if (error || reg != VM_REG_GUEST_PC)
+	if (error || reg != VM_REG_GUEST_SEPC)
 		return (error);
 
 	vcpu->nextpc = val;

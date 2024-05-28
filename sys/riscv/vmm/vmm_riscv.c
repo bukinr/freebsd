@@ -827,81 +827,70 @@ static uint64_t *
 hypctx_regptr(struct hypctx *hypctx, int reg)
 {
 	switch (reg) {
-#if 0
-	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
-		return (&hypctx->tf.tf_x[reg]);
-	case VM_REG_GUEST_LR:
-		return (&hypctx->tf.tf_lr);
+	case VM_REG_GUEST_RA:
+		return (&hypctx->guest_regs.hyp_ra);
 	case VM_REG_GUEST_SP:
-		return (&hypctx->tf.tf_sp);
-	case VM_REG_GUEST_CPSR:
-		return (&hypctx->tf.tf_spsr);
-	case VM_REG_GUEST_PC:
-		return (&hypctx->tf.tf_elr);
-	case VM_REG_GUEST_SCTLR_EL1:
-		return (&hypctx->sctlr_el1);
-	case VM_REG_GUEST_TTBR0_EL1:
-		return (&hypctx->ttbr0_el1);
-	case VM_REG_GUEST_TTBR1_EL1:
-		return (&hypctx->ttbr1_el1);
-	case VM_REG_GUEST_TCR_EL1:
-		return (&hypctx->tcr_el1);
-	case VM_REG_GUEST_TCR2_EL1:
-		return (&hypctx->tcr2_el1);
-#else
-
-#if 0
-        "zero", "ra",   "sp",   "gp",   "tp",   "t0",   "t1",   "t2",
-        "s0",   "s1",   "a0",   "a1",   "a2",   "a3",   "a4",   "a5",
-        "a6",   "a7",   "s2",   "s3",   "s4",   "s5",   "s6",   "s7",
-        "s8",   "s9",   "s10",  "s11",  "t3",   "t4",   "t5",   "t6"
-#endif
-
-	case VM_REG_GUEST_X5:
+		return (&hypctx->guest_regs.hyp_sp);
+	case VM_REG_GUEST_GP:
+		return (&hypctx->guest_regs.hyp_gp);
+	case VM_REG_GUEST_TP:
+		return (&hypctx->guest_regs.hyp_tp);
+	case VM_REG_GUEST_T0:
 		return (&hypctx->guest_regs.hyp_t[0]);
-	case VM_REG_GUEST_X6:
+	case VM_REG_GUEST_T1:
 		return (&hypctx->guest_regs.hyp_t[1]);
-	case VM_REG_GUEST_X7:
+	case VM_REG_GUEST_T2:
 		return (&hypctx->guest_regs.hyp_t[2]);
-	case VM_REG_GUEST_X8:
+	case VM_REG_GUEST_S0:
 		return (&hypctx->guest_regs.hyp_s[0]);
-	case VM_REG_GUEST_X9:
+	case VM_REG_GUEST_S1:
 		return (&hypctx->guest_regs.hyp_s[1]);
-	case VM_REG_GUEST_X10 ... VM_REG_GUEST_X17:
-		return (&hypctx->guest_regs.hyp_a[reg - 10]);
-	case VM_REG_GUEST_X18:
+	case VM_REG_GUEST_A0:
+		return (&hypctx->guest_regs.hyp_a[0]);
+	case VM_REG_GUEST_A1:
+		return (&hypctx->guest_regs.hyp_a[1]);
+	case VM_REG_GUEST_A2:
+		return (&hypctx->guest_regs.hyp_a[2]);
+	case VM_REG_GUEST_A3:
+		return (&hypctx->guest_regs.hyp_a[3]);
+	case VM_REG_GUEST_A4:
+		return (&hypctx->guest_regs.hyp_a[4]);
+	case VM_REG_GUEST_A5:
+		return (&hypctx->guest_regs.hyp_a[5]);
+	case VM_REG_GUEST_A6:
+		return (&hypctx->guest_regs.hyp_a[6]);
+	case VM_REG_GUEST_A7:
+		return (&hypctx->guest_regs.hyp_a[7]);
+	case VM_REG_GUEST_S2:
 		return (&hypctx->guest_regs.hyp_s[2]);
-	case VM_REG_GUEST_X19:
+	case VM_REG_GUEST_S3:
 		return (&hypctx->guest_regs.hyp_s[3]);
-	case VM_REG_GUEST_X20:
+	case VM_REG_GUEST_S4:
 		return (&hypctx->guest_regs.hyp_s[4]);
-	case VM_REG_GUEST_X21:
+	case VM_REG_GUEST_S5:
 		return (&hypctx->guest_regs.hyp_s[5]);
-	case VM_REG_GUEST_X22:
+	case VM_REG_GUEST_S6:
 		return (&hypctx->guest_regs.hyp_s[6]);
-	case VM_REG_GUEST_X23:
+	case VM_REG_GUEST_S7:
 		return (&hypctx->guest_regs.hyp_s[7]);
-	case VM_REG_GUEST_X24:
+	case VM_REG_GUEST_S8:
 		return (&hypctx->guest_regs.hyp_s[8]);
-	case VM_REG_GUEST_X25:
+	case VM_REG_GUEST_S9:
 		return (&hypctx->guest_regs.hyp_s[9]);
-	case VM_REG_GUEST_X26:
+	case VM_REG_GUEST_S10:
 		return (&hypctx->guest_regs.hyp_s[10]);
-	case VM_REG_GUEST_X27:
+	case VM_REG_GUEST_S11:
 		return (&hypctx->guest_regs.hyp_s[11]);
-	case VM_REG_GUEST_X28:
+	case VM_REG_GUEST_T3:
 		return (&hypctx->guest_regs.hyp_t[3]);
-	case VM_REG_GUEST_X29:
+	case VM_REG_GUEST_T4:
 		return (&hypctx->guest_regs.hyp_t[4]);
-#if 0
-	case VM_REG_GUEST_X30:
+	case VM_REG_GUEST_T5:
 		return (&hypctx->guest_regs.hyp_t[5]);
-	case VM_REG_GUEST_X31:
+	case VM_REG_GUEST_T6:
 		return (&hypctx->guest_regs.hyp_t[6]);
-#endif
-	case VM_REG_GUEST_PC:
+	case VM_REG_GUEST_SEPC:
 		return (&hypctx->guest_regs.hyp_sepc);
-#endif
 	default:
 		break;
 	}

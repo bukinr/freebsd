@@ -367,9 +367,9 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 		return (ENOENT);
 	}
 	load_bootrom(ctx, bootrom, &elr);
-	error = vm_set_register(bsp, VM_REG_GUEST_PC, elr);
+	error = vm_set_register(bsp, VM_REG_GUEST_SEPC, elr);
 	if (error != 0) {
-		warn("vm_set_register(GUEST_PC)");
+		warn("vm_set_register(GUEST_SEPC)");
 		return (error);
 	}
 
@@ -408,10 +408,10 @@ bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
 	fdt_finalize();
 
 	/* TODO: set hart ID correctly. */
-	error = vm_set_register(bsp, VM_REG_GUEST_X10, 0);
+	error = vm_set_register(bsp, VM_REG_GUEST_A0, 0);
 	assert(error == 0);
 
-	error = vm_set_register(bsp, VM_REG_GUEST_X11, fdt_gpa(ctx));
+	error = vm_set_register(bsp, VM_REG_GUEST_A1, fdt_gpa(ctx));
 	assert(error == 0);
 
 	return (0);
