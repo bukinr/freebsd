@@ -1058,9 +1058,10 @@ static void
 restore_guest_fpustate(struct vcpu *vcpu)
 {
 
-	/* flush host state to the pcb */
+	/* Flush host state to the pcb. */
 	fpe_state_save(curthread);
-	/* Ensure the VFP state will be re-loaded when exiting the guest */
+
+	/* Ensure the VFP state will be re-loaded when exiting the guest. */
 	PCPU_SET(fpcurthread, NULL);
 
 	/* restore guest FPU state */
@@ -1077,13 +1078,9 @@ restore_guest_fpustate(struct vcpu *vcpu)
 static void
 save_guest_fpustate(struct vcpu *vcpu)
 {
-#if 0
-	if ((READ_SPECIALREG(cpacr_el1) & CPACR_FPEN_MASK) !=
-	    CPACR_FPEN_TRAP_ALL1)
-		panic("VFP not enabled in host!");
-#endif
 
-	/* save guest FPU state */
+	/* Save guest FPE state. */
+
 	fpe_enable();
 	fpe_store(vcpu->guestfpu);
 	fpe_disable();
