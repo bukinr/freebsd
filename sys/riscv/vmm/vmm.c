@@ -1080,7 +1080,6 @@ save_guest_fpustate(struct vcpu *vcpu)
 {
 
 	/* Save guest FPE state. */
-
 	fpe_enable();
 	fpe_store(vcpu->guestfpu);
 	fpe_disable();
@@ -1177,6 +1176,7 @@ vcpu_require_state_locked(struct vcpu *vcpu, enum vcpu_state newstate)
 int
 vm_get_capability(struct vcpu *vcpu, int type, int *retval)
 {
+
 	if (type < 0 || type >= VM_CAP_MAX)
 		return (EINVAL);
 
@@ -1186,6 +1186,7 @@ vm_get_capability(struct vcpu *vcpu, int type, int *retval)
 int
 vm_set_capability(struct vcpu *vcpu, int type, int val)
 {
+
 	if (type < 0 || type >= VM_CAP_MAX)
 		return (EINVAL);
 
@@ -1195,24 +1196,28 @@ vm_set_capability(struct vcpu *vcpu, int type, int val)
 struct vm *
 vcpu_vm(struct vcpu *vcpu)
 {
+
 	return (vcpu->vm);
 }
 
 int
 vcpu_vcpuid(struct vcpu *vcpu)
 {
+
 	return (vcpu->vcpuid);
 }
 
 void *
 vcpu_get_cookie(struct vcpu *vcpu)
 {
+
 	return (vcpu->cookie);
 }
 
 struct vcpu *
 vm_vcpu(struct vm *vm, int vcpuid)
 {
+
 	return (vm->vcpu[vcpuid]);
 }
 
