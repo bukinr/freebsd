@@ -139,39 +139,14 @@ vmmops_init(struct vm *vm, pmap_t pmap)
 	hyp->vm = vm;
 	hyp->aplic_attached = false;
 
-#if 0
-	vtimer_vminit(hyp);
-#endif
 	aplic_vminit(hyp);
 
 	return (hyp);
 }
 
-void *
-vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
+static void
+vmmops_delegate(void)
 {
-	struct hyp *hyp = vmi;
-	struct hypctx *hypctx;
-	vm_size_t size;
-
-	size = el2_hypctx_size();
-	hypctx = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
-
-	KASSERT(vcpuid >= 0 && vcpuid < vm_get_maxcpus(hyp->vm),
-	    ("%s: Invalid vcpuid %d", __func__, vcpuid));
-	hyp->ctx[vcpuid] = hypctx;
-
-	hypctx->hyp = hyp;
-	hypctx->vcpu = vcpu1;
-
-	/* TODO: Reset vm state here. */
-
-#if 0
-	vtimer_cpuinit(hypctx);
-	vgic_cpuinit(hypctx);
-#endif
-
-	uint64_t henvcfg;
 	uint64_t hedeleg;
 	uint64_t hideleg;
 
@@ -188,6 +163,36 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hideleg |= (1 << IRQ_TIMER_HYPERVISOR);
 	hideleg |= (1 << IRQ_EXTERNAL_HYPERVISOR);
 	csr_write(hideleg, hideleg);
+}
+
+void *
+vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
+{
+	struct hypctx *hypctx;
+	struct hyp *hyp;
+	vm_size_t size;
+	uint64_t hstatus;
+	uint64_t henvcfg;
+
+	hyp = vmi;
+
+	size = el2_hypctx_size();
+	hypctx = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
+
+	KASSERT(vcpuid >= 0 && vcpuid < vm_get_maxcpus(hyp->vm),
+	    ("%s: Invalid vcpuid %d", __func__, vcpuid));
+	hyp->ctx[vcpuid] = hypctx;
+
+	hypctx->hyp = hyp;
+	hypctx->vcpu = vcpu1;
+
+	/* TODO: Reset vm state here. */
+
+#if 0
+	aplic_cpuinit(hypctx);
+#endif
+
+	vmmops_delegate();
 
 /* xENVCFG flags */
 #define ENVCFG_STCE                     (1ULL << 63)
@@ -198,13 +203,13 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	/* TODO: should we trap rdcycle / rdtime ? */
 	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
+
 	hypctx->guest_scounteren = 0x1 | 0x2; /* rdtime */
 	csr_write(hie, (1 << 10) | (1 << 12));
 
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
 	hypctx->guest_regs.hyp_sstatus |= SSTATUS_FS_INITIAL;
 
-	uint64_t hstatus;
 	hstatus = 0;
 	hstatus |= (1 << 7); //SPV
 	hstatus |= (1 << 21); //VTW
@@ -217,10 +222,7 @@ static int
 riscv_vmm_pinit(pmap_t pmap)
 {
 
-#if 0
-	pmap_pinit_stage(pmap, PM_STAGE2, vmm_pmap_levels);
-#endif
-
+	/* Stage 2 pmap. */
 	pmap_pinit(pmap);
 
 	return (1);
@@ -258,12 +260,6 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 
 	old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
 	//old_stvec = csr_swap(stvec, hypctx->guest_regs.hyp_stvec);
-
-#if 0
-	if (vme_ret->u.inst_emul.gpa >= 0x11000)
-		printf("htval %lx stval %lx sepc %lx\n",
-		    vme_ret->htval, vme_ret->stval, vme_ret->sepc);
-#endif
 
 	vie = &vme_ret->u.inst_emul.vie;
 	vie->dir = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
@@ -531,23 +527,16 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	uint64_t excp_type;
 	int handled;
 	register_t val;
-	//struct hyp *hyp;
 	struct hypctx *hypctx;
 	struct vcpu *vcpu;
 	struct vm_exit *vme;
-#if 0
-	int mode;
-#endif
 
 	hypctx = (struct hypctx *)vcpui;
-	//hyp = hypctx->hyp;
 	vcpu = hypctx->vcpu;
 	vme = vm_exitinfo(vcpu);
 
-#if 0
-	hypctx->tf.tf_sepc = (uint64_t)pc;
-#endif
 	hypctx->guest_regs.hyp_sepc = (uint64_t)pc;
+
 	if (hypctx->guest_regs.hyp_sstatus & SSTATUS_SPP)
 		hypctx->guest_regs.hyp_hstatus |= (1 << 8); //SPVP;
 	else
@@ -556,19 +545,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hypctx->guest_regs.hyp_hstatus |= (1 << 7); //SPV
 	hypctx->guest_regs.hyp_hstatus |= (1 << 21); //VTW
 
-#if 0
-	uint64_t hgatp;
-
-	hgatp = (vmmpmap_to_ttbr0() >> PAGE_SHIFT) | SATP_MODE_SV48;
-	printf("hgatp %lx\n", hgatp);
-	csr_write(hgatp, hgatp);
-	printf("hgatp %lx\n", csr_read(hgatp));
-	printf("pm_satp %lx\n", pmap->pm_satp);
-#endif
 	csr_write(hgatp, pmap->pm_satp);
-#if 0
-	printf("hgatp %lx\n", csr_read(hgatp));
-#endif
 
 	for (;;) {
 		//printf("%s: pc %lx\n", __func__, pc);
@@ -606,7 +583,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		 */
 		riscv_set_active_vcpu(hypctx);
 #if 0
-		vgic_flush_hwstate(hypctx);
+		aplic_flush_hwstate(hypctx);
 #endif
 
 		riscv_sync_interrupts(hypctx);
@@ -621,15 +598,14 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 		excp_type = vmm_call_hyp(hypctx);
 #if 0
-printf("%s: leaving Guest VM\n", __func__);
+		printf("%s: leaving Guest VM\n", __func__);
 #endif
 
 #if 0
-		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
-		    hyp->el2_addr, hypctx->el2_addr);
-		vgic_sync_hwstate(hypctx);
-		vtimer_sync_hwstate(hypctx);
+		aplic_sync_hwstate(hypctx);
+#endif
 
+#if 0
 		/*
 		 * Deactivate the stage2 pmap. vmm_pmap_clean_stage2_tlbi
 		 * depends on this meaning we activate the VM before entering
@@ -736,8 +712,7 @@ vmmops_cleanup(void *vmi)
 	hyp = vmi;
 
 #if 0
-	vtimer_vmcleanup(hyp);
-	vgic_vmcleanup(hyp);
+	aplic_vmcleanup(hyp);
 #endif
 
 	smp_rendezvous(NULL, riscv_pcpu_vmcleanup, NULL, hyp);
@@ -752,6 +727,7 @@ vmmops_cleanup(void *vmi)
 static uint64_t *
 hypctx_regptr(struct hypctx *hypctx, int reg)
 {
+
 	switch (reg) {
 	case VM_REG_GUEST_RA:
 		return (&hypctx->guest_regs.hyp_ra);
