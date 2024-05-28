@@ -115,26 +115,14 @@ vmmops_modcleanup(void)
 	return (0);
 }
 
-static vm_size_t
-el2_hyp_size(struct vm *vm)
-{
-	return (round_page(sizeof(struct hyp) +
-	    sizeof(struct hypctx *) * vm_get_maxcpus(vm)));
-}
-
-static vm_size_t
-el2_hypctx_size(void)
-{
-	return (round_page(sizeof(struct hypctx)));
-}
-
 void *
 vmmops_init(struct vm *vm, pmap_t pmap)
 {
 	struct hyp *hyp;
 	vm_size_t size;
 
-	size = el2_hyp_size(vm);
+	size = round_page(sizeof(struct hyp) +
+	    sizeof(struct hypctx *) * vm_get_maxcpus(vm));
 	hyp = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
 	hyp->vm = vm;
 	hyp->aplic_attached = false;
@@ -176,7 +164,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	hyp = vmi;
 
-	size = el2_hypctx_size();
+	size = round_page(sizeof(struct hypctx));
 	hypctx = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
 
 	KASSERT(vcpuid >= 0 && vcpuid < vm_get_maxcpus(hyp->vm),
@@ -695,10 +683,7 @@ vmmops_vcpu_cleanup(void *vcpui)
 	hypctx = vcpui;
 
 #if 0
-	vtimer_cpucleanup(hypctx);
-	vgic_cpucleanup(hypctx);
-
-	vmmpmap_remove(hypctx->el2_addr, el2_hypctx_size(), true);
+	aplic_cpucleanup(hypctx);
 #endif
 
 	free(hypctx, M_HYP);
