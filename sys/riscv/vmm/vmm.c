@@ -68,7 +68,6 @@
 #include "vmm_ktr.h"
 #include "vmm_stat.h"
 #include "riscv.h"
-#include "mmu.h"
 
 #include "vmm_aplic.h"
 

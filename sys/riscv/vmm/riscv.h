@@ -31,8 +31,8 @@
 #include <machine/reg.h>
 #include <machine/hypervisor.h>
 #include <machine/pcpu.h>
+#include <machine/vmm.h>
 
-#include "mmu.h"
 #include "vmm_aplic.h"
 
 struct aplic;

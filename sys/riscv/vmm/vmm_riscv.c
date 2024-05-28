@@ -60,9 +60,7 @@
 #include <machine/encoding.h>
 #include <machine/db_machdep.h>
 
-#include "mmu.h"
 #include "riscv.h"
-#include "hyp.h"
 #include "reset.h"
 #include "vmm_aplic.h"
 #include "vmm_stat.h"
