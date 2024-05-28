@@ -23,7 +23,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/smp.h>
@@ -61,7 +60,6 @@
 #include <machine/db_machdep.h>
 
 #include "riscv.h"
-#include "reset.h"
 #include "vmm_aplic.h"
 #include "vmm_stat.h"
 
@@ -166,8 +164,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->hyp = hyp;
 	hypctx->vcpu = vcpu1;
 
-	reset_vm_el01_regs(hypctx);
-	reset_vm_el2_regs(hypctx);
+	/* TODO: Reset vm state here. */
 
 #if 0
 	vtimer_cpuinit(hypctx);
