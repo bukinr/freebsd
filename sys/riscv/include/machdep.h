@@ -45,6 +45,5 @@ struct riscv_bootparams {
 };
 
 void initriscv(struct riscv_bootparams *);
-bool has_hyp(void);
 
 #endif /* _MACHINE_MACHDEP_H_ */

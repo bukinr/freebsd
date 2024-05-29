@@ -86,12 +86,14 @@ m_op(uint32_t insn, int match, int mask)
 static inline void
 riscv_set_active_vcpu(struct hypctx *hypctx)
 {
+
 	DPCPU_SET(vcpu, hypctx);
 }
 
 struct hypctx *
 riscv_get_active_vcpu(void)
 {
+
 	return (DPCPU_GET(vcpu));
 }
 
@@ -99,10 +101,13 @@ int
 vmmops_modinit(int ipinum)
 {
 
+#if 0
+	/* TODO. */
 	if (!has_hyp()) {
 		printf("vmm: hart doesn't have support for H-extension.\n");
 		return (ENXIO);
 	}
+#endif
 
 	return (0);
 }
