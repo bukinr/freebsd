@@ -236,8 +236,7 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 }
 
 static void
-riscv_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
-    struct vm_exit *vme_ret)
+riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 {
 	struct vie *vie;
 
@@ -378,89 +377,34 @@ static int
 riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
     pmap_t pmap)
 {
+	uint64_t insn;
 	uint64_t gpa;
 	int handled;
 
-#if 0
-	switch (excp_type) {
-	case EXCP_TYPE_EL1_SYNC:
-		/* The exit code will be set by handle_el1_sync_excp(). */
-		handled = handle_el1_sync_excp(hypctx, vme, pmap);
-		break;
-
-	case EXCP_TYPE_EL1_IRQ:
-	case EXCP_TYPE_EL1_FIQ:
-		/* The host kernel will handle IRQs and FIQs. */
-		vmm_stat_incr(hypctx->vcpu,
-		    excp_type == EXCP_TYPE_EL1_IRQ ? VMEXIT_IRQ : VMEXIT_FIQ,1);
-		vme->exitcode = VM_EXITCODE_BOGUS;
-		handled = UNHANDLED;
-		break;
-
-	case EXCP_TYPE_EL1_ERROR:
-	case EXCP_TYPE_EL2_SYNC:
-	case EXCP_TYPE_EL2_IRQ:
-	case EXCP_TYPE_EL2_FIQ:
-	case EXCP_TYPE_EL2_ERROR:
-		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED_EL2, 1);
-		vme->exitcode = VM_EXITCODE_BOGUS;
-		handled = UNHANDLED;
-		break;
-
-	default:
-		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
-		vme->exitcode = VM_EXITCODE_BOGUS;
-		handled = UNHANDLED;
-		break;
-	}
-#endif
-
-	uint64_t insn;
 	handled = UNHANDLED;
+
+	if (vme->scause & SCAUSE_INTR) {
+		vmm_stat_incr(hypctx->vcpu, VMEXIT_IRQ, 1);
+		vme->exitcode = VM_EXITCODE_BOGUS;
+		return (handled);
+	}
 
 	switch (vme->scause) {
 	case SCAUSE_FETCH_GUEST_PAGE_FAULT:
 	case SCAUSE_LOAD_GUEST_PAGE_FAULT:
 	case SCAUSE_STORE_GUEST_PAGE_FAULT:
-
 		gpa = (vme->htval << 2) | (vme->stval & 0x3);
-#if 0
-		/* Check the IPA is valid */
-		if (gpa >= (1ul << vmm_max_ipa_bits)) {
-			raise_data_insn_abort(hypctx,
-			    hypctx->exit_info.far_el2,
-			    esr_ec == EXCP_DATA_ABORT_L,
-			    ISS_DATA_DFSC_ASF_L0);
-			vme_ret->inst_length = 0;
-			return (HANDLED);
-		}
-#endif
-
 		if (vm_mem_allocated(hypctx->vcpu, gpa)) {
 			vme->exitcode = VM_EXITCODE_PAGING;
 			vme->inst_length = 0;
-#if 0
-			vme->u.paging.esr = hypctx->tf.tf_esr;
-#endif
 			vme->u.paging.gpa = gpa;
-#if 0
-		} else if (esr_ec == EXCP_INSN_ABORT_L) {
-			/*
-			 * Raise an external abort. Device memory is
-			 * not executable
-			 */
-			raise_data_insn_abort(hypctx,
-			    hypctx->exit_info.far_el2, false,
-			    ISS_DATA_DFSC_EXT);
-			vme->inst_length = 0;
-			return (HANDLED);
-#endif
 		} else {
-			riscv_gen_inst_emul_data(hypctx, 0 /*esr_iss*/, vme);
+			riscv_gen_inst_emul_data(hypctx, vme);
 			vme->exitcode = VM_EXITCODE_INST_EMUL;
 		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
+		/* TODO. */
 		panic("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->sepc, vme->stval, vme->htval);
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
@@ -476,9 +420,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 		handled = UNHANDLED;
 		break;
 	default:
-#if 0
 		printf("unknown scause %lx\n", vme->scause);
-#endif
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;
 		handled = UNHANDLED;
