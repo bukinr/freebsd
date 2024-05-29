@@ -353,26 +353,6 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 	vie->reg = reg_num;
 }
 
-#if 0
-void
-raise_data_insn_abort(struct hypctx *hypctx, uint64_t far, bool dabort, int fsc)
-{
-	uint64_t esr;
-
-	if ((hypctx->tf.tf_spsr & PSR_M_MASK) == PSR_M_EL0t)
-		esr = EXCP_INSN_ABORT_L << ESR_ELx_EC_SHIFT;
-	else
-		esr = EXCP_INSN_ABORT << ESR_ELx_EC_SHIFT;
-	/* Set the bit that changes from insn -> data abort */
-	if (dabort)
-		esr |= EXCP_DATA_ABORT_L << ESR_ELx_EC_SHIFT;
-	/* Set the IL bit if set by hardware */
-	esr |= hypctx->tf.tf_esr & ESR_ELx_IL;
-
-	vmmops_exception(hypctx, esr | fsc, far);
-}
-#endif
-
 static int
 riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
     pmap_t pmap)
@@ -386,6 +366,8 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 	if (vme->scause & SCAUSE_INTR) {
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_IRQ, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;
+		vme->inst_length = 0;
+		handled = HANDLED;
 		return (handled);
 	}
 
@@ -503,13 +485,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 			break;
 		}
 
-#if 0
-		/* Activate the stage2 pmap so the vmid is valid */
-		pmap_activate_vm(pmap);
-		pmap_activate_boot(pmap);
-		hyp->vttbr_el2 = pmap_to_ttbr0(pmap);
-#endif
-
 		/*
 		 * TODO: What happens if a timer interrupt is asserted exactly
 		 * here, but for the previous VM?
@@ -523,7 +498,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		/* Call into EL2 to switch to the guest */
 #if 0
-		printf("%s: Entering Guest VM, vsatp %lx, ss %lx, "
+		printf("%s: Entering guest VM, vsatp %lx, ss %lx, "
 		 "hs %lx\n", __func__,
 		    csr_read(vsatp),
 		    hypctx->guest_regs.hyp_sstatus,
@@ -531,7 +506,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 		vmm_call_hyp(hypctx);
 #if 0
-		printf("%s: leaving Guest VM\n", __func__);
+		printf("%s: Leaving guest VM\n", __func__);
 #endif
 
 #if 0
@@ -539,14 +514,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 #endif
 
 #if 0
-		/*
-		 * Deactivate the stage2 pmap. vmm_pmap_clean_stage2_tlbi
-		 * depends on this meaning we activate the VM before entering
-		 * the vm again
-		 */
-		PCPU_SET(curvmpmap, NULL);
-#else
-		/* TODO */
+		/* TODO: deactivate stage 2 pmap. */
 #endif
 
 		vme->scause = csr_read(scause);
@@ -558,35 +526,6 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		intr_restore(val);
 
 		vmm_stat_incr(vcpu, VMEXIT_COUNT, 1);
-#if 0
-		if (excp_type == EXCP_TYPE_MAINT_IRQ)
-			continue;
-#endif
-
-#if 0
-		uint64_t vsie, hvip;
-		vsie = csr_read(vsie);
-		hvip = csr_read(hvip);
-		if (vsie & (1 << 5))
-			printf("vsie hvip %lx %lx\n", vsie, hvip);
-#endif
-
-#if 0
-		if (vme->scause == SCAUSE_ILLEGAL_INSTRUCTION)
-			printf("exit scause 0x%lx stval %lx sepc %lx htval %lx "
-			    "htinst %lx\n",
-			    vme->scause, vme->stval, vme->sepc, vme->htval,
-			    vme->htinst);
-#endif
-
-#if 0
-		printf("exit vsatp 0x%lx\n", csr_read(vsatp));
-		vme->u.hyp.exception_nr = excp_type;
-		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
-		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
-		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
-#endif
-
 		vme->pc = hypctx->guest_regs.hyp_sepc;
 		vme->inst_length = INSN_SIZE;
 
