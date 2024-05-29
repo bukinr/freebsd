@@ -53,7 +53,6 @@
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 #include <machine/atomic.h>
-#include <machine/hypervisor.h>
 #include <machine/pmap.h>
 #include <machine/intr.h>
 #include <machine/encoding.h>

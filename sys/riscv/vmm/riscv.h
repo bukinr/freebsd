@@ -28,13 +28,8 @@
 #define _VMM_RISCV_H_
 
 #include <machine/reg.h>
-#include <machine/hypervisor.h>
 #include <machine/pcpu.h>
 #include <machine/vmm.h>
-
-#include "vmm_aplic.h"
-
-struct aplic;
 
 struct hypregs {
 	uint64_t hyp_ra;
@@ -74,8 +69,8 @@ struct hyp {
 	struct hypctx	*ctx[];
 };
 
-#define	DEFINE_VMMOPS_IFUNC(ret_type, opname, args)			\
-	ret_type vmmops_##opname args;
+#define	DEFINE_VMMOPS_IFUNC(ret_type, opname, args)	\
+    ret_type vmmops_##opname args;
 
 DEFINE_VMMOPS_IFUNC(int, modinit, (int ipinum))
 DEFINE_VMMOPS_IFUNC(int, modcleanup, (void))
@@ -97,14 +92,9 @@ DEFINE_VMMOPS_IFUNC(struct vmspace *, vmspace_alloc, (vm_offset_t min,
     vm_offset_t max))
 DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 
-uint64_t vmm_call_hyp(struct hypctx *);
-
-#define	dprintf(fmt, ...)	\
-    printf("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)
-
 struct hypctx *riscv_get_active_vcpu(void);
 void raise_data_insn_abort(struct hypctx *, uint64_t, bool, int);
-
+uint64_t vmm_call_hyp(struct hypctx *);
 int vmm_sbi_ecall(struct vcpu *, bool *);
 
 #endif /* !_VMM_RISCV_H_ */
