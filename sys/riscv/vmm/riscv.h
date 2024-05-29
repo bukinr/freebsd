@@ -93,8 +93,7 @@ DEFINE_VMMOPS_IFUNC(struct vmspace *, vmspace_alloc, (vm_offset_t min,
 DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 
 struct hypctx *riscv_get_active_vcpu(void);
-void raise_data_insn_abort(struct hypctx *, uint64_t, bool, int);
-uint64_t vmm_call_hyp(struct hypctx *);
+void vmm_call_hyp(struct hypctx *);
 int vmm_sbi_ecall(struct vcpu *, bool *);
 
 #endif /* !_VMM_RISCV_H_ */

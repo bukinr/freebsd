@@ -375,8 +375,8 @@ raise_data_insn_abort(struct hypctx *hypctx, uint64_t far, bool dabort, int fsc)
 #endif
 
 static int
-riscv_handle_world_switch(struct hypctx *hypctx, int excp_type,
-    struct vm_exit *vme, pmap_t pmap)
+riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
+    pmap_t pmap)
 {
 	uint64_t gpa;
 	int handled;
@@ -516,12 +516,11 @@ riscv_sync_interrupts(struct hypctx *hypctx)
 int
 vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
-	uint64_t excp_type;
-	int handled;
-	register_t val;
 	struct hypctx *hypctx;
-	struct vcpu *vcpu;
 	struct vm_exit *vme;
+	struct vcpu *vcpu;
+	register_t val;
+	int handled;
 
 	hypctx = (struct hypctx *)vcpui;
 	vcpu = hypctx->vcpu;
@@ -588,7 +587,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		    hypctx->guest_regs.hyp_sstatus,
 		    hypctx->guest_regs.hyp_hstatus);
 #endif
-		excp_type = vmm_call_hyp(hypctx);
+		vmm_call_hyp(hypctx);
 #if 0
 		printf("%s: leaving Guest VM\n", __func__);
 #endif
@@ -649,8 +648,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		vme->pc = hypctx->guest_regs.hyp_sepc;
 		vme->inst_length = INSN_SIZE;
 
-		handled = riscv_handle_world_switch(hypctx, excp_type, vme,
-		    pmap);
+		handled = riscv_handle_world_switch(hypctx, vme, pmap);
 		if (handled == UNHANDLED)
 			/* Exit loop to emulate instruction. */
 			break;
