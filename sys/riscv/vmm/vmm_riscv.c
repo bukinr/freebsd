@@ -238,14 +238,13 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 static void
 riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 {
+	uint64_t guest_addr;
+	uint64_t old_hstatus;
+	//uint64_t old_stvec;
 	struct vie *vie;
 
 	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2) |
 	    (vme_ret->stval & 0x3);
-
-	uint64_t guest_addr;
-	uint64_t old_hstatus;
-	//uint64_t old_stvec;
 
 	guest_addr = vme_ret->sepc;
 
@@ -700,8 +699,6 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 
 	hypctx = vcpui;
 
-//printf("%s: set reg %d val %lx\n", __func__, reg, val);
-
 	running = vcpu_is_running(hypctx->vcpu, &hostcpu);
 	if (running && hostcpu != curcpu)
 		panic("%s: %s%d is running", __func__, vm_name(hypctx->hyp->vm),
@@ -712,8 +709,6 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 		return (EINVAL);
 
 	*regp = val;
-
-//printf("%s: set reg ok\n", __func__);
 
 	return (0);
 }
