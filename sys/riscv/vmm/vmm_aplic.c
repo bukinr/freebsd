@@ -337,6 +337,18 @@ aplic_vminit(struct hyp *hyp)
 	mtx_init(&aplic->mtx, "APLIC lock", NULL, MTX_SPIN);
 }
 
+void
+aplic_vmcleanup(struct hyp *hyp)
+{
+	struct aplic *aplic;
+
+	aplic = hyp->aplic;
+
+	mtx_destroy(&aplic->mtx);
+
+	free(hyp->aplic, M_APLIC);
+}
+
 int
 aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 {
@@ -356,12 +368,26 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 	aplic->nirqs = 63;
 	aplic->dist_start = descr->v3_regs.dist_start;
 	aplic->dist_end = descr->v3_regs.dist_start + descr->v3_regs.dist_size;
-	aplic->irqs = malloc(sizeof(struct aplic_irq) * aplic->nirqs, M_DEVBUF,
+	aplic->irqs = malloc(sizeof(struct aplic_irq) * aplic->nirqs, M_APLIC,
 	    M_WAITOK | M_ZERO);
 
 	hyp->aplic_attached = true;
 
 	return (0);
+}
+
+void
+aplic_detach_from_vm(struct hyp *hyp)
+{
+	struct aplic *aplic;
+
+	aplic = hyp->aplic;
+
+	if (hyp->aplic_attached) {
+		hyp->aplic_attached = false;
+
+		free(aplic->irqs, M_APLIC);
+	}
 }
 
 int

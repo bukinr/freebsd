@@ -428,9 +428,7 @@ vm_cleanup(struct vm *vm, bool destroy)
 	struct mem_map *mm;
 	int i;
 
-#if 0
-	vgic_detach_from_vm(vm->cookie);
-#endif
+	aplic_detach_from_vm(vm->cookie);
 
 	for (i = 0; i < vm->maxcpus; i++) {
 		if (vm->vcpu[i] != NULL)

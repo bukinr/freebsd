@@ -578,9 +578,7 @@ vmmops_cleanup(void *vmi)
 
 	hyp = vmi;
 
-#if 0
 	aplic_vmcleanup(hyp);
-#endif
 
 	smp_rendezvous(NULL, riscv_pcpu_vmcleanup, NULL, hyp);
 
