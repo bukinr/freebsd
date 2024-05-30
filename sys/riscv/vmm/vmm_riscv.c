@@ -378,10 +378,12 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 	handled = UNHANDLED;
 
 	if (vme->scause & SCAUSE_INTR) {
+		/*
+		 * Host interrupt? Leave critical section to handle.
+		 */
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_IRQ, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;
 		vme->inst_length = 0;
-		handled = HANDLED;
 		return (handled);
 	}
 
