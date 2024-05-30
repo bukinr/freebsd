@@ -157,6 +157,42 @@ vmmops_delegate(void)
 	csr_write(hideleg, hideleg);
 }
 
+static void
+vmmops_vcpu_restore_csrs(struct hypctx *hypctx)
+{
+	struct hypcsr *csrs;
+
+	csrs = &hypctx->guest_csrs;
+
+	csr_write(vsstatus, csrs->vsstatus);
+	csr_write(vsie, csrs->vsie);
+	csr_write(vstvec, csrs->vstvec);
+	csr_write(vsscratch, csrs->vsscratch);
+	csr_write(vsepc, csrs->vsepc);
+	csr_write(vscause, csrs->vscause);
+	csr_write(vstval, csrs->vstval);
+	csr_write(hvip, csrs->hvip);
+	csr_write(vsatp, csrs->vsatp);
+}
+
+static void
+vmmops_vcpu_save_csrs(struct hypctx *hypctx)
+{
+	struct hypcsr *csrs;
+
+	csrs = &hypctx->guest_csrs;
+
+	csrs->vsstatus = csr_read(sstatus);
+	csrs->vsie = csr_read(vsie);
+	csrs->vstvec = csr_read(vstvec);
+	csrs->vsscratch = csr_read(vsscratch);
+	csrs->vsepc = csr_read(vsepc);
+	csrs->vscause = csr_read(vscause);
+	csrs->vstval = csr_read(vstval);
+	csrs->hvip = csr_read(hvip);
+	csrs->vsatp = csr_read(vsatp);
+}
+
 void *
 vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 {
@@ -180,20 +216,10 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->hyp = hyp;
 	hypctx->vcpu = vcpu1;
 
-	struct hypcsr *csrs;
-
-	csrs = &hypctx->guest_csrs;
-
-	/* Reset vm state. */
-	csr_write(vsstatus, csrs->vsstatus);
-	csr_write(vsie, csrs->vsie);
-	csr_write(vstvec, csrs->vstvec);
-	csr_write(vsscratch, csrs->vsscratch);
-	csr_write(vsepc, csrs->vsepc);
-	csr_write(vscause, csrs->vscause);
-	csr_write(vstval, csrs->vstval);
-	csr_write(hvip, csrs->hvip);
-	csr_write(vsatp, csrs->vsatp);
+	/*
+	 * TODO: set initial state for CSRs.
+	 */
+	vmmops_vcpu_restore_csrs(hypctx);
 
 #if 0
 	aplic_cpuinit(hypctx);
@@ -402,7 +428,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-		/* TODO. */
+		/* TODO: handle this properly. */
 		panic("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->sepc, vme->stval, vme->htval);
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
@@ -478,6 +504,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	csr_write(hgatp, pmap->pm_satp);
 
+	vmmops_vcpu_restore_csrs(hypctx);
+
 	for (;;) {
 		dprintf("%s: pc %lx\n", __func__, pc);
 
@@ -551,6 +579,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 			hypctx->guest_regs.hyp_sepc += vme->inst_length;
 		}
 	}
+
+	vmmops_vcpu_save_csrs(hypctx);
 
 	return (0);
 }
