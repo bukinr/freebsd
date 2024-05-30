@@ -316,7 +316,7 @@ vm_alloc_vcpu(struct vm *vm, int vcpuid)
 
 	/* Some interrupt controllers may have a CPU limit */
 #if 0
-	if (vcpuid >= vgic_max_cpu_count(vm->cookie))
+	if (vcpuid >= aplic_max_cpu_count(vm->cookie))
 		return (NULL);
 #endif
 
@@ -471,7 +471,9 @@ vm_cleanup(struct vm *vm, bool destroy)
 void
 vm_destroy(struct vm *vm)
 {
+
 	vm_cleanup(vm, true);
+
 	free(vm, M_VMM);
 }
 
@@ -689,6 +691,8 @@ vm_munmap_memseg(struct vm *vm, vm_paddr_t gpa, size_t len)
 {
 	struct mem_map *m;
 	int i;
+
+printf("%s: gpa %lx len %lx\n", __func__, gpa, len);
 
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
 		m = &vm->mem_maps[i];
@@ -1414,10 +1418,10 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	vm = vcpu->vm;
 	vme = &vcpu->exitinfo;
 
-	pmap = vmspace_pmap(vcpu->vm->vmspace);
+	pmap = vmspace_pmap(vm->vmspace);
 	addr = (vme->htval << 2) & ~(PAGE_SIZE - 1);
 
-	//printf("%s: %lx\n", __func__, addr);
+	dprintf("%s: %lx\n", __func__, addr);
 
 	switch (vme->scause) {
 	case SCAUSE_STORE_GUEST_PAGE_FAULT:
@@ -1460,7 +1464,7 @@ vm_run(struct vcpu *vcpu)
 	bool retu;
 	pmap_t pmap;
 
-	//printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	vcpuid = vcpu->vcpuid;
 

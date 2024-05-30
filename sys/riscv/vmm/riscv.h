@@ -46,6 +46,16 @@ struct hypregs {
 
 struct hypcsr {
 	uint64_t hvip;
+	uint64_t vsstatus;
+	uint64_t vsie;
+	uint64_t vstvec;
+	uint64_t vsscratch;
+	uint64_t vsepc;
+	uint64_t vscause;
+	uint64_t vstval;
+	uint64_t vsatp;
+	uint64_t scounteren;
+	uint64_t senvcfg;
 };
 
 struct hypctx {
@@ -91,6 +101,8 @@ DEFINE_VMMOPS_IFUNC(int, setcap, (void *vcpui, int num, int val))
 DEFINE_VMMOPS_IFUNC(struct vmspace *, vmspace_alloc, (vm_offset_t min,
     vm_offset_t max))
 DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
+
+#define	dprintf(fmt, ...)
 
 struct hypctx *riscv_get_active_vcpu(void);
 void vmm_call_hyp(struct hypctx *);

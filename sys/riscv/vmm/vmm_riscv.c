@@ -168,6 +168,8 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	hyp = vmi;
 
+	dprintf("%s: hyp %p\n", __func__, hyp);
+
 	size = round_page(sizeof(struct hypctx));
 	hypctx = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
 
@@ -178,7 +180,20 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->hyp = hyp;
 	hypctx->vcpu = vcpu1;
 
-	/* TODO: Reset vm state here. */
+	struct hypcsr *csrs;
+
+	csrs = &hypctx->guest_csrs;
+
+	/* Reset vm state. */
+	csr_write(vsstatus, csrs->vsstatus);
+	csr_write(vsie, csrs->vsie);
+	csr_write(vstvec, csrs->vstvec);
+	csr_write(vsscratch, csrs->vsscratch);
+	csr_write(vsepc, csrs->vsepc);
+	csr_write(vscause, csrs->vscause);
+	csr_write(vstval, csrs->vstval);
+	csr_write(hvip, csrs->hvip);
+	csr_write(vsatp, csrs->vsatp);
 
 #if 0
 	aplic_cpuinit(hypctx);
@@ -213,6 +228,8 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 static int
 riscv_vmm_pinit(pmap_t pmap)
 {
+
+	dprintf("%s: pmap %p\n", __func__, pmap);
 
 	/* Stage 2 pmap. */
 	pmap_pinit(pmap);
@@ -343,9 +360,7 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 		vme_ret->inst_length = 2;
 	}
 
-#if 0
-	printf("guest_addr %lx insn %lx, reg %d\n", guest_addr, insn, reg_num);
-#endif
+	dprintf("guest_addr %lx insn %lx, reg %d\n", guest_addr, insn, reg_num);
 
 	csr_write(hstatus, old_hstatus);
 	//csr_write(stvec, old_stvec);
@@ -462,7 +477,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	csr_write(hgatp, pmap->pm_satp);
 
 	for (;;) {
-		//printf("%s: pc %lx\n", __func__, pc);
+		dprintf("%s: pc %lx\n", __func__, pc);
 
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
@@ -495,18 +510,15 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		riscv_sync_interrupts(hypctx);
 
-		/* Call into EL2 to switch to the guest */
-#if 0
-		printf("%s: Entering guest VM, vsatp %lx, ss %lx, "
+		dprintf("%s: Entering guest VM, vsatp %lx, ss %lx, "
 		 "hs %lx\n", __func__,
 		    csr_read(vsatp),
 		    hypctx->guest_regs.hyp_sstatus,
 		    hypctx->guest_regs.hyp_hstatus);
-#endif
+
 		vmm_call_hyp(hypctx);
-#if 0
-		printf("%s: Leaving guest VM\n", __func__);
-#endif
+
+		dprintf("%s: Leaving guest VM\n", __func__);
 
 #if 0
 		aplic_sync_hwstate(hypctx);
@@ -564,6 +576,8 @@ vmmops_vcpu_cleanup(void *vcpui)
 
 	hypctx = vcpui;
 
+	dprintf("%s\n", __func__);
+
 #if 0
 	aplic_cpucleanup(hypctx);
 #endif
@@ -577,6 +591,8 @@ vmmops_cleanup(void *vmi)
 	struct hyp *hyp;
 
 	hyp = vmi;
+
+	dprintf("%s\n", __func__);
 
 	aplic_vmcleanup(hyp);
 
