@@ -182,7 +182,7 @@ vmmops_vcpu_save_csrs(struct hypctx *hypctx)
 
 	csrs = &hypctx->guest_csrs;
 
-	csrs->vsstatus = csr_read(sstatus);
+	csrs->vsstatus = csr_read(vsstatus);
 	csrs->vsie = csr_read(vsie);
 	csrs->vstvec = csr_read(vstvec);
 	csrs->vsscratch = csr_read(vsscratch);
