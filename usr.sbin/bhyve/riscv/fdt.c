@@ -47,18 +47,12 @@
 #define	SET_PROP_U64(prop, idx, val)	\
     ((uint64_t *)(prop))[(idx)] = cpu_to_fdt64(val)
 
-#define	APLIC_SPI		0
-#define	APLIC_PPI		1
 #define	IRQ_TYPE_LEVEL_HIGH	4
 #define	IRQ_TYPE_LEVEL_LOW	8
-
-#define	APLIC_FIRST_PPI		16
-#define	APLIC_FIRST_SPI		32
 
 static void *fdtroot;
 static uint32_t aplic_phandle = 0;
 static uint32_t intc0_phandle = 0;
-//static uint32_t apb_pclk_phandle;
 
 static uint32_t
 assign_phandle(void *fdt)
@@ -243,11 +237,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 #endif
 	char node_name[32];
 
-#if 0
 	assert(aplic_phandle != 0);
-	assert(apb_pclk_phandle != 0);
-	assert(intr >= APLIC_FIRST_SPI);
-#endif
 
 	fdt = fdtroot;
 
@@ -292,8 +282,6 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 	char node_name[32];
 
 	assert(aplic_phandle != 0);
-	//assert(apb_pclk_phandle != 0);
-	//assert(intr >= APLIC_FIRST_SPI);
 
 	fdt = fdtroot;
 
@@ -320,24 +308,6 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 void
 fdt_add_timer(void)
 {
-	void *fdt, *interrupts;
-	uint32_t irqs[] = { 13, 14, 11 };
-
-	assert(aplic_phandle != 0);
-
-	fdt = fdtroot;
-
-	fdt_begin_node(fdt, "timer");
-	fdt_property_string(fdt, "compatible", "arm,armv8-timer");
-	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
-	fdt_property_placeholder(fdt, "interrupts", 9 * sizeof(uint32_t),
-	    &interrupts);
-	for (u_int i = 0; i < nitems(irqs); i++) {
-		SET_PROP_U32(interrupts, i * 3 + 0, APLIC_PPI);
-		SET_PROP_U32(interrupts, i * 3 + 1, irqs[i]);
-		SET_PROP_U32(interrupts, i * 3 + 2, IRQ_TYPE_LEVEL_LOW);
-	}
-	fdt_end_node(fdt);
 }
 
 void
@@ -409,7 +379,6 @@ fdt_add_pcie(int intrs[static 4])
 		pin = i % 4;
 		slot = i / 4;
 		intr = intrs[(pin + slot) % 4];
-		assert(intr >= APLIC_FIRST_SPI);
 		SET_PROP_U32(prop, 10 * i + 0, slot << 11);
 		SET_PROP_U32(prop, 10 * i + 1, 0);
 		SET_PROP_U32(prop, 10 * i + 2, 0);

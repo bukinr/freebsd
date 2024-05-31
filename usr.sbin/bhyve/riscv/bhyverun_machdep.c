@@ -58,18 +58,19 @@
 /* Start of lowmem + 64K */
 #define	UART_MMIO_BASE	0x10000
 #define	UART_MMIO_SIZE	0x1000
-#define	UART_INTR	32
+#define	UART_INTR	1
+
 #define	RTC_MMIO_BASE	0x11000
 #define	RTC_MMIO_SIZE	0x1000
-#define	RTC_INTR	33
+#define	RTC_INTR	2
 
-#define	APLIC_DIST_BASE		0x2f000000
-#define	APLIC_DIST_SIZE		0x10000
+#define	APLIC_MEM_BASE		0x2f000000
+#define	APLIC_MEM_SIZE		0x10000
 
-#define	PCIE_INTA	34
-#define	PCIE_INTB	35
-#define	PCIE_INTC	36
-#define	PCIE_INTD	37
+#define	PCIE_INTA	3
+#define	PCIE_INTB	4
+#define	PCIE_INTC	5
+#define	PCIE_INTD	6
 
 void
 bhyve_init_config(void)
@@ -373,8 +374,8 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	if (error != 0)
 		return (error);
 
-	fdt_add_aplic(APLIC_DIST_BASE, APLIC_DIST_SIZE);
-	error = vm_attach_aplic(ctx, APLIC_DIST_BASE, APLIC_DIST_SIZE);
+	fdt_add_aplic(APLIC_MEM_BASE, APLIC_MEM_SIZE);
+	error = vm_attach_aplic(ctx, APLIC_MEM_BASE, APLIC_MEM_SIZE);
 	if (error != 0) {
 		warn("vm_attach_aplic()");
 		return (error);
