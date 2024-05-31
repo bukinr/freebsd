@@ -279,50 +279,63 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 }
 
 static void
+riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data)
+{
+	uint64_t old_hstatus;
+	uint64_t val;
+	uint64_t tmp;
+
+	old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
+
+	/*
+	 * TODO: handle exceptions during unprivilege read.
+	 */
+
+	__asm __volatile(".option push\n"
+			 ".option norvc\n"
+			"hlvx.hu %[val], (%[addr])\n"
+			".option pop\n"
+	    : [val] "=&r" (val), [addr] "+&r" (guest_addr)
+	    :: "memory");
+
+	if ((val & 0x3) == 0x3) {
+		guest_addr += 2;
+		__asm __volatile(".option push\n"
+				 ".option norvc\n"
+				"hlvx.hu %[tmp], (%[addr])\n"
+				".option pop\n"
+		    : [tmp] "=&r" (tmp), [addr] "+&r" (guest_addr)
+		    :: "memory");
+		val |= (tmp << 16);
+	}
+
+	csr_write(hstatus, old_hstatus);
+
+	*data = val;
+}
+
+static void
 riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 {
 	uint64_t guest_addr;
-	uint64_t old_hstatus;
-	//uint64_t old_stvec;
 	struct vie *vie;
+	uint64_t insn;
+	int reg_num;
+	int rs2, rd;
 
 	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2) |
 	    (vme_ret->stval & 0x3);
 
 	guest_addr = vme_ret->sepc;
 
-	old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
-	//old_stvec = csr_swap(stvec, hypctx->guest_regs.hyp_stvec);
-
 	vie = &vme_ret->u.inst_emul.vie;
 	vie->dir = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
 	    VM_DIR_WRITE : VM_DIR_READ;
-
-	uint64_t insn;
-	uint64_t val1;
-	int reg_num;
-	int rs2, rd;
-
-	__asm __volatile(".option push\n"
-			 ".option norvc\n"
-			"hlvx.hu %[insn], (%[addr])\n"
-			".option pop\n"
-	    : [insn] "=&r" (insn), [addr] "+&r" (guest_addr)
-	    :: "memory");
-
 	vie->sign_extend = 1;
 
-	if ((insn & 0x3) == 0x3) {
-		guest_addr += 2;
-		__asm __volatile(".option push\n"
-				 ".option norvc\n"
-				"hlvx.hu %[val1], (%[addr])\n"
-				".option pop\n"
-		    : [val1] "=&r" (val1), [addr] "+&r" (guest_addr)
-		    :: "memory");
-		insn |= (val1 << 16);
+	riscv_unpriv_read(hypctx, guest_addr, &insn);
 
-		//rs1 = (insn & RS1_MASK) >> RS1_SHIFT;
+	if ((insn & 0x3) == 0x3) {
 		rs2 = (insn & RS2_MASK) >> RS2_SHIFT;
 		rd = (insn & RD_MASK) >> RD_SHIFT;
 
@@ -388,8 +401,6 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 
 	dprintf("guest_addr %lx insn %lx, reg %d\n", guest_addr, insn, reg_num);
 
-	csr_write(hstatus, old_hstatus);
-	//csr_write(stvec, old_stvec);
 	vie->reg = reg_num;
 }
 
