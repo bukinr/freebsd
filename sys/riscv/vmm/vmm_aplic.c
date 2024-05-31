@@ -91,8 +91,8 @@ struct aplic_irq {
 };
 
 struct aplic {
-	uint32_t dist_start;
-	uint32_t dist_end;
+	uint32_t mem_start;
+	uint32_t mem_end;
 	struct mtx mtx;
 	struct aplic_irq *irqs;
 	int nirqs;
@@ -241,7 +241,7 @@ aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 }
 
 static int
-dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
+mem_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
     int size, void *arg)
 {
 	struct hypctx *hypctx;
@@ -257,10 +257,10 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 
 	dprintf("%s: fault_ipa %lx size %d\n", __func__, fault_ipa, size);
 
-	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
+	if (fault_ipa < aplic->mem_start || fault_ipa + size > aplic->mem_end)
 		return (EINVAL);
 
-	reg = fault_ipa - aplic->dist_start;
+	reg = fault_ipa - aplic->mem_start;
 
 	error = aplic_mmio_access(aplic, reg, false, &val);
 	if (error == 0)
@@ -270,7 +270,7 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 }
 
 static int
-dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
+mem_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
     int size, void *arg)
 {
 	struct hypctx *hypctx;
@@ -287,10 +287,10 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	dprintf("%s: fault_ipa %lx wval %lx size %d\n", __func__, fault_ipa,
 	    wval, size);
 
-	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
+	if (fault_ipa < aplic->mem_start || fault_ipa + size > aplic->mem_end)
 		return (EINVAL);
 
-	reg = fault_ipa - aplic->dist_start;
+	reg = fault_ipa - aplic->mem_start;
 
 	val = wval;
 
@@ -333,13 +333,13 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 
 	printf("%s\n", __func__);
 
-	vm_register_inst_handler(vm, descr->v3_regs.dist_start,
-	    descr->v3_regs.dist_size, dist_read, dist_write);
+	vm_register_inst_handler(vm, descr->v3_regs.mem_start,
+	    descr->v3_regs.mem_size, mem_read, mem_write);
 
 	aplic = hyp->aplic;
 	aplic->nirqs = 63;
-	aplic->dist_start = descr->v3_regs.dist_start;
-	aplic->dist_end = descr->v3_regs.dist_start + descr->v3_regs.dist_size;
+	aplic->mem_start = descr->v3_regs.mem_start;
+	aplic->mem_end = descr->v3_regs.mem_start + descr->v3_regs.mem_size;
 	aplic->irqs = malloc(sizeof(struct aplic_irq) * aplic->nirqs, M_APLIC,
 	    M_WAITOK | M_ZERO);
 

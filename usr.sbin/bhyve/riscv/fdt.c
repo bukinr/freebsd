@@ -47,8 +47,8 @@
 #define	SET_PROP_U64(prop, idx, val)	\
     ((uint64_t *)(prop))[(idx)] = cpu_to_fdt64(val)
 
-#define	APLIC_SPI			0
-#define	APLIC_PPI			1
+#define	APLIC_SPI		0
+#define	APLIC_PPI		1
 #define	IRQ_TYPE_LEVEL_HIGH	4
 #define	IRQ_TYPE_LEVEL_LOW	8
 
@@ -200,7 +200,7 @@ aplic1: interrupt-controller@d000000 {
 #endif
 
 void
-fdt_add_aplic(uint64_t dist_base, uint64_t dist_size)
+fdt_add_aplic(uint64_t mem_base, uint64_t mem_size)
 {
 	char node_name[32];
 	void *fdt, *prop;
@@ -208,7 +208,7 @@ fdt_add_aplic(uint64_t dist_base, uint64_t dist_size)
 	fdt = fdtroot;
 
 	snprintf(node_name, sizeof(node_name), "interrupt-controller@%lx",
-	    (unsigned long)dist_base);
+	    (unsigned long)mem_base);
 	fdt_begin_node(fdt, node_name);
 
 	aplic_phandle = assign_phandle(fdt);
@@ -219,8 +219,8 @@ fdt_add_aplic(uint64_t dist_base, uint64_t dist_size)
 	fdt_property_u32(fdt, "#address-cells", 2);
 	fdt_property_u32(fdt, "#interrupt-cells", 2);
 	fdt_property_placeholder(fdt, "reg", 2 * sizeof(uint64_t), &prop);
-	SET_PROP_U64(prop, 0, dist_base);
-	SET_PROP_U64(prop, 1, dist_size);
+	SET_PROP_U64(prop, 0, mem_base);
+	SET_PROP_U64(prop, 1, mem_size);
 
 	fdt_property_placeholder(fdt, "interrupts-extended",
 	    2 * sizeof(uint32_t), &prop);

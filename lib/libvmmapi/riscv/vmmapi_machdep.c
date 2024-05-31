@@ -58,7 +58,7 @@ const cap_ioctl_t vm_ioctl_cmds[] = {
 size_t vm_ioctl_ncmds = nitems(vm_ioctl_cmds);
 
 int
-vm_attach_aplic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size)
+vm_attach_aplic(struct vmctx *ctx, uint64_t mem_start, size_t mem_size)
 {
 	struct vm_aplic_descr aplic;
 	int error;
@@ -68,8 +68,8 @@ vm_attach_aplic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size)
 	if (error != 0)
 		return (error);
 	assert(aplic.ver.version == 3);
-	aplic.v3_regs.dist_start = dist_start;
-	aplic.v3_regs.dist_size = dist_size;
+	aplic.v3_regs.mem_start = mem_start;
+	aplic.v3_regs.mem_size = mem_size;
 
 	return (ioctl(ctx->fd, VM_ATTACH_APLIC, &aplic));
 }

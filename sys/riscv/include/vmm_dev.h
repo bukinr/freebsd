@@ -142,8 +142,8 @@ struct vm_aplic_descr {
 	struct vm_aplic_version ver;
 	union {
 		struct {
-			uint64_t dist_start;
-			uint64_t dist_size;
+			uint64_t mem_start;
+			uint64_t mem_size;
 		} v3_regs;
 	};
 };
