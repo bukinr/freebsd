@@ -359,8 +359,8 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_register *vmreg;
 	struct vm_register_set *vmregset;
 	struct vm_run *vmrun;
-	struct vm_vgic_version *vgv;
-	struct vm_aplic_descr *vgic;
+	struct vm_aplic_version *vav;
+	struct vm_aplic_descr *aplic;
 	struct vm_cpuset *vm_cpuset;
 	struct vm_irq *vi;
 	struct vm_capability *vmcap;
@@ -428,7 +428,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_MMAP_MEMSEG:
 	case VM_MUNMAP_MEMSEG:
 	case VM_REINIT:
-	case VM_ATTACH_VGIC:
+	case VM_ATTACH_APLIC:
 		/*
 		 * ioctls that modify the memory map must lock memory
 		 * segments exclusively.
@@ -656,16 +656,16 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_RESUME_CPU:
 		error = vm_resume_cpu(sc->vm, vcpu);
 		break;
-	case VM_GET_VGIC_VERSION:
-		vgv = (struct vm_vgic_version *)data;
-		/* TODO: Query the vgic driver for this */
-		vgv->version = 3;
-		vgv->flags = 0;
+	case VM_GET_APLIC_VERSION:
+		vav = (struct vm_aplic_version *)data;
+		/* TODO: Query the aplic driver for this */
+		vav->version = 3;
+		vav->flags = 0;
 		error = 0;
 		break;
-	case VM_ATTACH_VGIC:
-		vgic = (struct vm_aplic_descr *)data;
-		error = vm_attach_aplic(sc->vm, vgic);
+	case VM_ATTACH_APLIC:
+		aplic = (struct vm_aplic_descr *)data;
+		error = vm_attach_aplic(sc->vm, aplic);
 		break;
 	case VM_RAISE_MSI:
 		vmsi = (struct vm_msi *)data;

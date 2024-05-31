@@ -37,8 +37,7 @@ struct vmctx;
 
 int	fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t addrp,
 	    vm_size_t size);
-void	fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
-	    uint64_t redist_base, uint64_t redist_size);
+void	fdt_add_aplic(uint64_t dist_base, uint64_t dist_size);
 void	fdt_add_timer(void);
 void	fdt_add_pcie(int intrs[static 4]);
 void	fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr);

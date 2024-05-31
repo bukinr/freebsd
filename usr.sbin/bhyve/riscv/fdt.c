@@ -47,13 +47,13 @@
 #define	SET_PROP_U64(prop, idx, val)	\
     ((uint64_t *)(prop))[(idx)] = cpu_to_fdt64(val)
 
-#define	GIC_SPI			0
-#define	GIC_PPI			1
+#define	APLIC_SPI			0
+#define	APLIC_PPI			1
 #define	IRQ_TYPE_LEVEL_HIGH	4
 #define	IRQ_TYPE_LEVEL_LOW	8
 
-#define	GIC_FIRST_PPI		16
-#define	GIC_FIRST_SPI		32
+#define	APLIC_FIRST_PPI		16
+#define	APLIC_FIRST_SPI		32
 
 static void *fdtroot;
 static uint32_t aplic_phandle = 0;
@@ -200,8 +200,7 @@ aplic1: interrupt-controller@d000000 {
 #endif
 
 void
-fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
-    uint64_t redist_base __unused, uint64_t redist_size __unused)
+fdt_add_aplic(uint64_t dist_base, uint64_t dist_size)
 {
 	char node_name[32];
 	void *fdt, *prop;
@@ -247,7 +246,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 #if 0
 	assert(aplic_phandle != 0);
 	assert(apb_pclk_phandle != 0);
-	assert(intr >= GIC_FIRST_SPI);
+	assert(intr >= APLIC_FIRST_SPI);
 #endif
 
 	fdt = fdtroot;
@@ -290,7 +289,7 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 
 	assert(aplic_phandle != 0);
 	assert(apb_pclk_phandle != 0);
-	assert(intr >= GIC_FIRST_SPI);
+	assert(intr >= APLIC_FIRST_SPI);
 
 	fdt = fdtroot;
 
@@ -303,8 +302,8 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
 	fdt_property_placeholder(fdt, "interrupts", 3 * sizeof(uint32_t),
 	    &interrupts);
-	SET_PROP_U32(interrupts, 0, GIC_SPI);
-	SET_PROP_U32(interrupts, 1, intr - GIC_FIRST_SPI);
+	SET_PROP_U32(interrupts, 0, APLIC_SPI);
+	SET_PROP_U32(interrupts, 1, intr - APLIC_FIRST_SPI);
 	SET_PROP_U32(interrupts, 2, IRQ_TYPE_LEVEL_HIGH);
 	fdt_property_placeholder(fdt, "clocks", sizeof(uint32_t), &prop);
 	SET_PROP_U32(prop, 0, apb_pclk_phandle);
@@ -329,7 +328,7 @@ fdt_add_timer(void)
 	fdt_property_placeholder(fdt, "interrupts", 9 * sizeof(uint32_t),
 	    &interrupts);
 	for (u_int i = 0; i < nitems(irqs); i++) {
-		SET_PROP_U32(interrupts, i * 3 + 0, GIC_PPI);
+		SET_PROP_U32(interrupts, i * 3 + 0, APLIC_PPI);
 		SET_PROP_U32(interrupts, i * 3 + 1, irqs[i]);
 		SET_PROP_U32(interrupts, i * 3 + 2, IRQ_TYPE_LEVEL_LOW);
 	}
@@ -405,7 +404,7 @@ fdt_add_pcie(int intrs[static 4])
 		pin = i % 4;
 		slot = i / 4;
 		intr = intrs[(pin + slot) % 4];
-		assert(intr >= GIC_FIRST_SPI);
+		assert(intr >= APLIC_FIRST_SPI);
 		SET_PROP_U32(prop, 10 * i + 0, slot << 11);
 		SET_PROP_U32(prop, 10 * i + 1, 0);
 		SET_PROP_U32(prop, 10 * i + 2, 0);

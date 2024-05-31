@@ -63,10 +63,8 @@
 #define	RTC_MMIO_SIZE	0x1000
 #define	RTC_INTR	33
 
-#define	GIC_DIST_BASE		0x2f000000
-#define	GIC_DIST_SIZE		0x10000
-#define	GIC_REDIST_BASE		0 /* 0x2f100000 */
-#define	GIC_REDIST_SIZE(ncpu)	0 /* ((ncpu) * 2 * PAGE_SIZE_64K) */
+#define	APLIC_DIST_BASE		0x2f000000
+#define	APLIC_DIST_SIZE		0x10000
 
 #define	PCIE_INTA	34
 #define	PCIE_INTB	35
@@ -377,10 +375,8 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	if (error != 0)
 		return (error);
 
-	fdt_add_gic(GIC_DIST_BASE, GIC_DIST_SIZE, GIC_REDIST_BASE,
-	    GIC_REDIST_SIZE(guest_ncpus));
-	error = vm_attach_aplic(ctx, GIC_DIST_BASE, GIC_DIST_SIZE,
-	    GIC_REDIST_BASE, GIC_REDIST_SIZE(guest_ncpus));
+	fdt_add_aplic(APLIC_DIST_BASE, APLIC_DIST_SIZE);
+	error = vm_attach_aplic(ctx, APLIC_DIST_BASE, APLIC_DIST_SIZE);
 	if (error != 0) {
 		warn("vm_attach_aplic()");
 		return (error);

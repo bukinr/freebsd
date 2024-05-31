@@ -29,7 +29,7 @@
 #define	__PCI_IRQ_MD_H__
 
 struct pci_irq {
-	int	gic_irq;
+	int	aplic_irq;
 };
 
 void	pci_irq_init(int intrs[static 4]);
@@ -37,7 +37,7 @@ void	pci_irq_init(int intrs[static 4]);
 static inline void
 pci_irq_init_irq(struct pci_irq *irq)
 {
-	irq->gic_irq = 0;
+	irq->aplic_irq = 0;
 }
 
 static inline uint8_t

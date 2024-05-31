@@ -255,9 +255,7 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 	hyp = hypctx->hyp;
 	aplic = hyp->aplic;
 
-#if 0
-	printf("%s: fault_ipa %lx size %d\n", __func__, fault_ipa, size);
-#endif
+	dprintf("%s: fault_ipa %lx size %d\n", __func__, fault_ipa, size);
 
 	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
 		return (EINVAL);
@@ -286,10 +284,8 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	hyp = hypctx->hyp;
 	aplic = hyp->aplic;
 
-#if 0
-	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__, fault_ipa,
+	dprintf("%s: fault_ipa %lx wval %lx size %d\n", __func__, fault_ipa,
 	    wval, size);
-#endif
 
 	if (fault_ipa < aplic->dist_start || fault_ipa + size > aplic->dist_end)
 		return (EINVAL);
@@ -301,28 +297,6 @@ dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 	error = aplic_mmio_access(aplic, reg, true, &val);
 
 	return (error);
-}
-
-static int
-redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
-    int size, void *arg)
-{
-
-	printf("%s: fault_ipa %lx size %d\n", __func__,
-	    fault_ipa, size);
-
-	return (0);
-}
-
-static int
-redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
-    int size, void *arg)
-{
-
-	printf("%s: fault_ipa %lx wval %lx size %d\n", __func__,
-	    fault_ipa, wval, size);
-
-	return (0);
 }
 
 void
@@ -361,8 +335,6 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 
 	vm_register_inst_handler(vm, descr->v3_regs.dist_start,
 	    descr->v3_regs.dist_size, dist_read, dist_write);
-	vm_register_inst_handler(vm, descr->v3_regs.redist_start,
-	    descr->v3_regs.redist_size, redist_read, redist_write);
 
 	aplic = hyp->aplic;
 	aplic->nirqs = 63;
