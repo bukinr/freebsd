@@ -40,4 +40,9 @@ void aplic_vminit(struct hyp *hyp);
 void aplic_vmcleanup(struct hyp *hyp);
 int aplic_check_pending(struct hypctx *hypctx);
 
+void aplic_cpuinit(struct hypctx *hypctx);
+void aplic_cpucleanup(struct hypctx *hypctx);
+void aplic_flush_hwstate(struct hypctx *hypctx);
+void aplic_sync_hwstate(struct hypctx *hypctx);
+
 #endif /* !_VMM_APLIC_H_ */

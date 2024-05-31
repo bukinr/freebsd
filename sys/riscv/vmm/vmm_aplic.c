@@ -450,3 +450,27 @@ aplic_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr)
 
 	return (ENXIO);
 }
+
+void
+aplic_cpuinit(struct hypctx *hypctx)
+{
+
+}
+
+void
+aplic_cpucleanup(struct hypctx *hypctx)
+{
+
+}
+
+void
+aplic_flush_hwstate(struct hypctx *hypctx)
+{
+
+}
+
+void
+aplic_sync_hwstate(struct hypctx *hypctx)
+{
+
+}

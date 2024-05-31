@@ -221,9 +221,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	 */
 	vmmops_vcpu_restore_csrs(hypctx);
 
-#if 0
 	aplic_cpuinit(hypctx);
-#endif
 
 	vmmops_delegate();
 
@@ -545,9 +543,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		 * here, but for the previous VM?
 		 */
 		riscv_set_active_vcpu(hypctx);
-#if 0
 		aplic_flush_hwstate(hypctx);
-#endif
 
 		riscv_sync_interrupts(hypctx);
 
@@ -561,9 +557,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		dprintf("%s: Leaving guest VM\n", __func__);
 
-#if 0
 		aplic_sync_hwstate(hypctx);
-#endif
 
 #if 0
 		/* TODO: deactivate stage 2 pmap. */
@@ -621,9 +615,7 @@ vmmops_vcpu_cleanup(void *vcpui)
 
 	dprintf("%s\n", __func__);
 
-#if 0
 	aplic_cpucleanup(hypctx);
-#endif
 
 	free(hypctx, M_HYP);
 }
