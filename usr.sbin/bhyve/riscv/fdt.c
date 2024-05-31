@@ -58,7 +58,7 @@
 static void *fdtroot;
 static uint32_t aplic_phandle = 0;
 static uint32_t intc0_phandle = 0;
-static uint32_t apb_pclk_phandle;
+//static uint32_t apb_pclk_phandle;
 
 static uint32_t
 assign_phandle(void *fdt)
@@ -284,12 +284,16 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 void
 fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 {
+#if 0
 	void *fdt, *interrupts, *prop;
+#else
+	void *fdt, *interrupts;
+#endif
 	char node_name[32];
 
 	assert(aplic_phandle != 0);
-	assert(apb_pclk_phandle != 0);
-	assert(intr >= APLIC_FIRST_SPI);
+	//assert(apb_pclk_phandle != 0);
+	//assert(intr >= APLIC_FIRST_SPI);
 
 	fdt = fdtroot;
 
@@ -300,14 +304,15 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 #undef RTC_COMPAT
 	set_single_reg(fdt, rtc_base, rtc_size);
 	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
-	fdt_property_placeholder(fdt, "interrupts", 3 * sizeof(uint32_t),
+	fdt_property_placeholder(fdt, "interrupts", 2 * sizeof(uint32_t),
 	    &interrupts);
-	SET_PROP_U32(interrupts, 0, APLIC_SPI);
-	SET_PROP_U32(interrupts, 1, intr - APLIC_FIRST_SPI);
-	SET_PROP_U32(interrupts, 2, IRQ_TYPE_LEVEL_HIGH);
+	SET_PROP_U32(interrupts, 0, intr);
+	SET_PROP_U32(interrupts, 1, IRQ_TYPE_LEVEL_HIGH);
+#if 0
 	fdt_property_placeholder(fdt, "clocks", sizeof(uint32_t), &prop);
 	SET_PROP_U32(prop, 0, apb_pclk_phandle);
 	fdt_property_string(fdt, "clock-names", "apb_pclk");
+#endif
 
 	fdt_end_node(fdt);
 }

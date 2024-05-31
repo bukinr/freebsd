@@ -289,7 +289,6 @@ init_mmio_uart(struct vmctx *ctx)
 	return (true);
 }
 
-#if 0
 static void
 mmio_rtc_intr_assert(void *arg)
 {
@@ -343,7 +342,6 @@ init_mmio_rtc(struct vmctx *ctx)
 	error = register_mem(&mr);
 	assert(error == 0);
 }
-#endif
 
 static vm_paddr_t
 fdt_gpa(struct vmctx *ctx)
@@ -385,9 +383,9 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	if (init_mmio_uart(ctx))
 		fdt_add_uart(UART_MMIO_BASE, UART_MMIO_SIZE, UART_INTR);
 
-#if 0
 	init_mmio_rtc(ctx);
 	fdt_add_rtc(RTC_MMIO_BASE, RTC_MMIO_SIZE, RTC_INTR);
+#if 0
 	fdt_add_timer();
 #endif
 	pci_irq_init(pcie_intrs);
