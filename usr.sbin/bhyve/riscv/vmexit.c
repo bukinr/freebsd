@@ -137,10 +137,6 @@ vmexit_ecall_srst(struct vmctx *ctx, struct vm_exit *vme)
 	func_id = vme->u.ecall.args[6];
 	type = vme->u.ecall.args[0];
 
-#if 0
-	printf("%s: srst %d %d\n", __func__, func_id, type);
-#endif
-
 	switch (func_id) {
 	case SBI_SRST_SYSTEM_RESET:
 		switch (type) {

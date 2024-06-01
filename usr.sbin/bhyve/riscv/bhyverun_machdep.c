@@ -386,9 +386,6 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 
 	init_mmio_rtc(ctx);
 	fdt_add_rtc(RTC_MMIO_BASE, RTC_MMIO_SIZE, RTC_INTR);
-#if 0
-	fdt_add_timer();
-#endif
 	pci_irq_init(pcie_intrs);
 	fdt_add_pcie(pcie_intrs);
 

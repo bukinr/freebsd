@@ -161,37 +161,11 @@ fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t fdtaddr, vm_size_t fdtsize)
 
 	add_cpus(fdt, ncpu);
 
-#if 0
-	fdt_begin_node(fdt, "psci");
-	fdt_property_string(fdt, "compatible", "arm,psci-1.0");
-	fdt_property_string(fdt, "method", "hvc");
-	fdt_end_node(fdt);
-
-	fdt_begin_node(fdt, "apb-pclk");
-	fdt_property_string(fdt, "compatible", "fixed-clock");
-	fdt_property_string(fdt, "clock-output-names", "clk24mhz");
-	fdt_property_u32(fdt, "#clock-cells", 0);
-	fdt_property_u32(fdt, "clock-frequency", 24000000);
-	apb_pclk_phandle = assign_phandle(fdt);
-	fdt_end_node(fdt);
-#endif
-
 	/* Finalized by fdt_finalized(). */
 	fdtroot = fdt;
 
 	return (0);
 }
-
-#if 0
-aplic1: interrupt-controller@d000000 {
-  compatible = "qemu,aplic", "riscv,aplic";
-  interrupts-extended = <&cpu1_intc 9>, <&cpu2_intc 9>;
-  reg = <0xd000000 0x4080>;
-  interrupt-controller;
-  #interrupt-cells = <2>;
-  riscv,num-sources = <63>;
-};
-#endif
 
 void
 fdt_add_aplic(uint64_t mem_base, uint64_t mem_size)
@@ -208,7 +182,9 @@ fdt_add_aplic(uint64_t mem_base, uint64_t mem_size)
 	aplic_phandle = assign_phandle(fdt);
 	fdt_property_string(fdt, "compatible", "riscv,aplic");
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
-	//fdt_property(fdt, "msi-controller", NULL, 0);
+#if 0
+	fdt_property(fdt, "msi-controller", NULL, 0);
+#endif
 	/* XXX: Needed given the root #address-cells? */
 	fdt_property_u32(fdt, "#address-cells", 2);
 	fdt_property_u32(fdt, "#interrupt-cells", 2);
@@ -230,11 +206,7 @@ fdt_add_aplic(uint64_t mem_base, uint64_t mem_size)
 void
 fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 {
-#if 0
-	void *fdt, *interrupts, *prop;
-#else
 	void *fdt, *interrupts;
-#endif
 	char node_name[32];
 
 	assert(aplic_phandle != 0);
@@ -253,16 +225,6 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 	SET_PROP_U32(interrupts, 0, intr);
 	SET_PROP_U32(interrupts, 1, IRQ_TYPE_LEVEL_HIGH);
 
-#if 0
-	fdt_property_placeholder(fdt, "clocks", 2 * sizeof(uint32_t), &prop);
-	SET_PROP_U32(prop, 0, apb_pclk_phandle);
-	SET_PROP_U32(prop, 1, apb_pclk_phandle);
-#define	UART_CLK_NAMES	"uartclk\0apb_pclk"
-	fdt_property(fdt, "clock-names", UART_CLK_NAMES,
-	    sizeof(UART_CLK_NAMES));
-#undef UART_CLK_NAMES
-#endif
-
 	fdt_end_node(fdt);
 
 	snprintf(node_name, sizeof(node_name), "/serial@%lx", uart_base);
@@ -274,11 +236,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 void
 fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 {
-#if 0
-	void *fdt, *interrupts, *prop;
-#else
 	void *fdt, *interrupts;
-#endif
 	char node_name[32];
 
 	assert(aplic_phandle != 0);
@@ -296,18 +254,8 @@ fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
 	    &interrupts);
 	SET_PROP_U32(interrupts, 0, intr);
 	SET_PROP_U32(interrupts, 1, IRQ_TYPE_LEVEL_HIGH);
-#if 0
-	fdt_property_placeholder(fdt, "clocks", sizeof(uint32_t), &prop);
-	SET_PROP_U32(prop, 0, apb_pclk_phandle);
-	fdt_property_string(fdt, "clock-names", "apb_pclk");
-#endif
 
 	fdt_end_node(fdt);
-}
-
-void
-fdt_add_timer(void)
-{
 }
 
 void
