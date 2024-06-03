@@ -255,8 +255,7 @@ riscv_vmm_pinit(pmap_t pmap)
 
 	dprintf("%s: pmap %p\n", __func__, pmap);
 
-	/* Stage 2 pmap. */
-	pmap_pinit(pmap);
+	pmap_pinit_stage(pmap, PM_STAGE2);
 
 	return (1);
 }

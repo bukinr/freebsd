@@ -1324,6 +1324,7 @@ pmap_pinit0(pmap_t pmap)
 {
 	PMAP_LOCK_INIT(pmap);
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
+	pmap->pm_stage = PM_STAGE1;
 	pmap->pm_top = kernel_pmap->pm_top;
 	pmap->pm_satp = pmap_satp_mode() |
 	    (vtophys(pmap->pm_top) >> PAGE_SHIFT);
@@ -1334,7 +1335,7 @@ pmap_pinit0(pmap_t pmap)
 }
 
 int
-pmap_pinit(pmap_t pmap)
+pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
 {
 	vm_paddr_t topphys;
 	vm_page_t mtop;
@@ -1346,6 +1347,7 @@ pmap_pinit(pmap_t pmap)
 	topphys = VM_PAGE_TO_PHYS(mtop);
 	pmap->pm_top = (pd_entry_t *)PHYS_TO_DMAP(topphys);
 	pmap->pm_satp = pmap_satp_mode() | (topphys >> PAGE_SHIFT);
+	pmap->pm_stage = stage;
 
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 
@@ -1375,6 +1377,13 @@ pmap_pinit(pmap_t pmap)
 	vm_radix_init(&pmap->pm_root);
 
 	return (1);
+}
+
+int
+pmap_pinit(pmap_t pmap)
+{
+
+	return (pmap_pinit_stage(pmap, PM_STAGE1));
 }
 
 /*
@@ -2890,6 +2899,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	int rv;
 	bool nosleep;
 
+	if (pmap->pm_stage == PM_STAGE2)
+		printf("%s: %lx\n", __func__, va);
+
 	va = trunc_page(va);
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
@@ -3397,6 +3409,9 @@ void
 pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
 	struct rwlock *lock;
+
+	if (pmap->pm_stage == PM_STAGE2)
+		printf("%s: %lx\n", __func__, va);
 
 	lock = NULL;
 	rw_rlock(&pvh_global_lock);
