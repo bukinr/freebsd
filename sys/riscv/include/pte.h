@@ -66,11 +66,6 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	Ln_ENTRIES	(1 << Ln_ENTRIES_SHIFT)
 #define	Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 
-/* Stage 2. */
-#define	Ln_ENTRIESx4_SHIFT 11
-#define	Ln_ENTRIESx4	(1 << Ln_ENTRIESx4_SHIFT)
-#define	Ln_ADDRx4_MASK	(Ln_ENTRIESx4 - 1)
-
 /* Bits 9:8 are reserved for software */
 #define	PTE_SW_MANAGED	(1 << 9)
 #define	PTE_SW_WIRED	(1 << 8)
