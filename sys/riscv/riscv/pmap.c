@@ -174,12 +174,6 @@
     pmap_mode == PMAP_MODE_SV39) ? Ln_ENTRIESx4 : Ln_ENTRIES) * NUL0E(pmap))
 #define	NUL2E(pmap)	(Ln_ENTRIES * NUL1E(pmap))
 
-#if 0
-#define	NUL0E(pmap)	Ln_ENTRIES
-#define	NUL1E(pmap)	(Ln_ENTRIES * NUL0E(pmap))
-#define	NUL2E(pmap)	(Ln_ENTRIES * NUL1E(pmap))
-#endif
-
 #ifdef PV_STATS
 #define PV_STAT(x)	do { x ; } while (0)
 #define	__pv_stat_used
