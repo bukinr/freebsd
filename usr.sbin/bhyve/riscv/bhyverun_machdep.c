@@ -405,7 +405,9 @@ bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
 
 	fdt_finalize();
 
-	/* TODO: set hart ID correctly. */
+	/*
+	 * TODO: set hart ID for secondary CPUs somewhere.
+	 */
 	error = vm_set_register(bsp, VM_REG_GUEST_A0, 0);
 	assert(error == 0);
 
