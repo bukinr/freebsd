@@ -51,7 +51,7 @@
 #include "rtc_pl031.h"
 #include "uart_emul.h"
 
-/* Start of mem + 1M */
+/* Start of mem + 32M */
 #define	FDT_BASE	0x2000000
 #define	FDT_SIZE	(64 * 1024)
 
