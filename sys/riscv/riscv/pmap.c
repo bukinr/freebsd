@@ -1339,7 +1339,7 @@ int
 pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
 {
 	vm_paddr_t topphys;
-	vm_page_t mtop;
+	vm_page_t m;
 	size_t i;
 
 	/*
@@ -1347,13 +1347,13 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
 	 * Current address space layout makes 3 of them unused.
 	 */
 	if (stage == PM_STAGE1)
-		mtop = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO |
+		m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO |
 		    VM_ALLOC_WAITOK);
 	else
-		mtop = vm_page_alloc_noobj_contig(VM_ALLOC_WIRED |VM_ALLOC_ZERO,
+		m = vm_page_alloc_noobj_contig(VM_ALLOC_WIRED | VM_ALLOC_ZERO,
 		    4, 0, ~0ul, L2_SIZE, 0, VM_MEMATTR_DEFAULT);
 
-	topphys = VM_PAGE_TO_PHYS(mtop);
+	topphys = VM_PAGE_TO_PHYS(m);
 	pmap->pm_top = (pd_entry_t *)PHYS_TO_DMAP(topphys);
 	pmap->pm_satp = pmap_satp_mode() | (topphys >> PAGE_SHIFT);
 	pmap->pm_stage = stage;
