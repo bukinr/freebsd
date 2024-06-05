@@ -53,8 +53,8 @@
 #define	SET_PROP_U64(prop, idx, val)	\
     ((uint64_t *)(prop))[(idx)] = cpu_to_fdt64(val)
 
-#define	IRQ_TYPE_LEVEL_HIGH	4
-#define	IRQ_TYPE_LEVEL_LOW	8
+#define	IRQ_TYPE_LEVEL_HIGH	0
+#define	IRQ_TYPE_LEVEL_LOW	1
 
 static void *fdtroot;
 static uint32_t aplic_phandle = 0;
@@ -96,15 +96,12 @@ add_cpu(void *fdt, int cpuid)
 	fdt_property_u64(fdt, "reg", cpuid);
 	fdt_property_string(fdt, "riscv,isa", "rv64imafdch_zicntr_zihpm_sstc");
 	fdt_property_string(fdt, "mmu-type", "riscv,sv39");
-	fdt_property_string(fdt, "riscv,pmpregions", "16");
-	fdt_property_string(fdt, "riscv,pmpgranularity", "4");
 	fdt_property_string(fdt, "clock-frequency", "1000000000");
 
 	fdt_begin_node(fdt, "interrupt-controller");
 	intc0_phandle = assign_phandle(fdt);
 	fdt_property_u32(fdt, "#address-cells", 2);
 	fdt_property_u32(fdt, "#interrupt-cells", 1);
- //	fdt_property_u32(fdt, "#size-cells", 1);
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
 	fdt_property_string(fdt, "compatible", "riscv,cpu-intc");
 	fdt_end_node(fdt);
