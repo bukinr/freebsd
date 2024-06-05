@@ -154,7 +154,7 @@ fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t fdtaddr, vm_size_t fdtsize)
 
 	fdt_begin_node(fdt, "memory");
 	fdt_property_string(fdt, "device_type", "memory");
-	/* There is no lowmem on arm64. */
+	/* There is no lowmem on riscv. */
 	assert(vm_get_lowmem_size(ctx) == 0);
 	set_single_reg(fdt, vm_get_highmem_base(ctx), vm_get_highmem_size(ctx));
 	fdt_end_node(fdt);

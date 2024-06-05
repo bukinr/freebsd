@@ -71,7 +71,7 @@ bhyvectl_handle_opt(const struct option *opts __unused, int opt __unused)
 const char *
 bhyvectl_opt_desc(int opt __unused)
 {
-	/* No arm64-specific options yet. */
+	/* No riscv-specific options yet. */
 	return ("???");
 }
 

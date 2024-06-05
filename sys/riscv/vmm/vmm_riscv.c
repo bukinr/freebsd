@@ -65,11 +65,7 @@
 #define	HANDLED		1
 #define	UNHANDLED	0
 
-/* TODO: Move the host hypctx off the stack */
-#define	VMM_STACK_PAGES	4
-#define	VMM_STACK_SIZE	(VMM_STACK_PAGES * PAGE_SIZE)
-
-MALLOC_DEFINE(M_HYP, "ARM VMM HYP", "ARM VMM HYP");
+MALLOC_DEFINE(M_HYP, "RISC-V VMM HYP", "RISC-V VMM HYP");
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
 
