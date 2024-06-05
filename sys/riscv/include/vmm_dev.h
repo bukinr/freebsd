@@ -184,7 +184,7 @@ enum {
 	IOCNUM_GET_REGISTER_SET = 25,
 
 	/* statistics */
-	IOCNUM_VM_STATS = 50, 
+	IOCNUM_VM_STATS = 50,
 	IOCNUM_VM_STAT_DESC = 51,
 
 	/* CPU Topology */
