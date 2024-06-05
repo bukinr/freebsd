@@ -79,6 +79,8 @@ bhyve_init_config(void)
 	init_config();
 
 	/* Set default values prior to option parsing. */
+	set_config_bool("acpi_tables", false);
+	set_config_bool("acpi_tables_in_memory", false);
 	set_config_value("memory.size", "256M");
 }
 
