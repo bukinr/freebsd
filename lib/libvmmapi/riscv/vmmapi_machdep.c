@@ -50,8 +50,7 @@ const char *vm_capstrmap[] = {
 };
 
 #define	VM_MD_IOCTLS		\
-	VM_GET_APLIC_VERSION,	\
-	VM_ATTACH_APLIC,		\
+	VM_ATTACH_APLIC,	\
 	VM_ASSERT_IRQ,		\
 	VM_DEASSERT_IRQ,	\
 	VM_RAISE_MSI
@@ -66,15 +65,10 @@ int
 vm_attach_aplic(struct vmctx *ctx, uint64_t mem_start, size_t mem_size)
 {
 	struct vm_aplic_descr aplic;
-	int error;
 
 	bzero(&aplic, sizeof(aplic));
-	error = ioctl(ctx->fd, VM_GET_APLIC_VERSION, &aplic.ver);
-	if (error != 0)
-		return (error);
-	assert(aplic.ver.version == 3);
-	aplic.v3_regs.mem_start = mem_start;
-	aplic.v3_regs.mem_size = mem_size;
+	aplic.mem_start = mem_start;
+	aplic.mem_size = mem_size;
 
 	return (ioctl(ctx->fd, VM_ATTACH_APLIC, &aplic));
 }

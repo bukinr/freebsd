@@ -359,7 +359,6 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_register *vmreg;
 	struct vm_register_set *vmregset;
 	struct vm_run *vmrun;
-	struct vm_aplic_version *vav;
 	struct vm_aplic_descr *aplic;
 	struct vm_cpuset *vm_cpuset;
 	struct vm_irq *vi;
@@ -655,13 +654,6 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		break;
 	case VM_RESUME_CPU:
 		error = vm_resume_cpu(sc->vm, vcpu);
-		break;
-	case VM_GET_APLIC_VERSION:
-		vav = (struct vm_aplic_version *)data;
-		/* TODO: Query the aplic driver for this */
-		vav->version = 3;
-		vav->flags = 0;
-		error = 0;
 		break;
 	case VM_ATTACH_APLIC:
 		aplic = (struct vm_aplic_descr *)data;

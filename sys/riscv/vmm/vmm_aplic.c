@@ -333,13 +333,13 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 
 	printf("%s\n", __func__);
 
-	vm_register_inst_handler(vm, descr->v3_regs.mem_start,
-	    descr->v3_regs.mem_size, mem_read, mem_write);
+	vm_register_inst_handler(vm, descr->mem_start, descr->mem_size,
+	    mem_read, mem_write);
 
 	aplic = hyp->aplic;
 	aplic->nirqs = 63;
-	aplic->mem_start = descr->v3_regs.mem_start;
-	aplic->mem_end = descr->v3_regs.mem_start + descr->v3_regs.mem_size;
+	aplic->mem_start = descr->mem_start;
+	aplic->mem_end = descr->mem_start + descr->mem_size;
 	aplic->irqs = malloc(sizeof(struct aplic_irq) * aplic->nirqs, M_APLIC,
 	    M_WAITOK | M_ZERO);
 

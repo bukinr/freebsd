@@ -133,19 +133,9 @@ struct vm_cpuset {
 #define	VM_SUSPENDED_CPUS	1
 #define	VM_DEBUG_CPUS		2
 
-struct vm_aplic_version {
-	u_int version;
-	u_int flags;
-};
-
 struct vm_aplic_descr {
-	struct vm_aplic_version ver;
-	union {
-		struct {
-			uint64_t mem_start;
-			uint64_t mem_size;
-		} v3_regs;
-	};
+	uint64_t mem_start;
+	uint64_t mem_size;
 };
 
 struct vm_irq {
@@ -204,8 +194,7 @@ enum {
 	IOCNUM_RESUME_CPU = 93,
 
 	/* vm_attach_aplic */
-	IOCNUM_GET_APLIC_VERSION = 110,
-	IOCNUM_ATTACH_APLIC = 111,
+	IOCNUM_ATTACH_APLIC = 110,
 };
 
 #define	VM_RUN		\
@@ -262,8 +251,6 @@ enum {
 	_IOW('v', IOCNUM_SUSPEND_CPU, struct vm_activate_cpu)
 #define	VM_RESUME_CPU \
 	_IOW('v', IOCNUM_RESUME_CPU, struct vm_activate_cpu)
-#define	VM_GET_APLIC_VERSION	\
-	_IOR('v', IOCNUM_GET_APLIC_VERSION, struct vm_aplic_version)
 #define	VM_ATTACH_APLIC	\
 	_IOW('v', IOCNUM_ATTACH_APLIC, struct vm_aplic_descr)
 #endif
