@@ -37,7 +37,7 @@ etc/pam.d/login
 etc/pam.d/passwd
 etc/pam.d/sshd
 etc/pam.d/system
-etc/passwd 
+etc/passwd
 etc/pccard_ether
 etc/protocols
 etc/pwd.db
