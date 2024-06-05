@@ -1,4 +1,4 @@
-SRCS+=	\
+SRCS+=			\
 	fdt.c		\
 	rtc_pl031.c	\
 	uart_pl011.c

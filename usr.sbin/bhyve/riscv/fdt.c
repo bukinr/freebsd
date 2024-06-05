@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2022 The FreeBSD Foundation
+ * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by Andrew Turner under sponsorship from
  * the FreeBSD Foundation.

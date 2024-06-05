@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
+ * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -78,8 +79,6 @@ bhyve_init_config(void)
 	init_config();
 
 	/* Set default values prior to option parsing. */
-	set_config_bool("acpi_tables", false);
-	set_config_bool("acpi_tables_in_memory", false);
 	set_config_value("memory.size", "256M");
 }
 
