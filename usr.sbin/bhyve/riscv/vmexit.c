@@ -56,7 +56,7 @@
 #include "mem.h"
 #include "vmexit.h"
 
-static int __unused
+static int
 vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_run *vmrun)
 {
