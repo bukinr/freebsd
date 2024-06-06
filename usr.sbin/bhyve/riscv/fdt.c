@@ -186,7 +186,7 @@ fdt_add_aplic(uint64_t mem_base, uint64_t mem_size)
 	aplic_phandle = assign_phandle(fdt);
 	fdt_property_string(fdt, "compatible", "riscv,aplic");
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
-#if 0
+#if notyet
 	fdt_property(fdt, "msi-controller", NULL, 0);
 #endif
 	/* XXX: Needed given the root #address-cells? */
@@ -276,7 +276,7 @@ fdt_add_pcie(int intrs[static 4])
 	SET_PROP_U32(prop, 12, 0);
 	SET_PROP_U32(prop, 13, 0x3f000000);
 
-#if 0
+#if notyet
 	fdt_property_placeholder(fdt, "msi-map", 4 * sizeof(uint32_t), &prop);
 	SET_PROP_U32(prop, 0, 0);		/* RID base */
 	SET_PROP_U32(prop, 1, aplic_phandle);	/* MSI parent */
