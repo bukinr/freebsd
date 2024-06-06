@@ -315,10 +315,8 @@ vm_alloc_vcpu(struct vm *vm, int vcpuid)
 		return (NULL);
 
 	/* Some interrupt controllers may have a CPU limit */
-#if 0
 	if (vcpuid >= aplic_max_cpu_count(vm->cookie))
 		return (NULL);
-#endif
 
 	vcpu = atomic_load_ptr(&vm->vcpu[vcpuid]);
 	if (__predict_true(vcpu != NULL))
@@ -768,7 +766,6 @@ sysmem_mapping(struct vm *vm, struct mem_map *mm)
 vm_paddr_t
 vmm_sysmem_maxaddr(struct vm *vm)
 {
-#if 0
 	struct mem_map *mm;
 	vm_paddr_t maxaddr;
 	int i;
@@ -782,8 +779,6 @@ vmm_sysmem_maxaddr(struct vm *vm)
 		}
 	}
 	return (maxaddr);
-#endif
-	return (0);
 }
 
 int
