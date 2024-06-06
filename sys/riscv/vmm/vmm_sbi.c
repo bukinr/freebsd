@@ -176,8 +176,7 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 
 	hypctx = riscv_get_active_vcpu();
 
-#if 0
-	printf("%s: args %lx %lx %lx %lx %lx %lx %lx %lx\n", __func__,
+	dprintf("%s: args %lx %lx %lx %lx %lx %lx %lx %lx\n", __func__,
 	    hypctx->guest_regs.hyp_a[0],
 	    hypctx->guest_regs.hyp_a[1],
 	    hypctx->guest_regs.hyp_a[2],
@@ -186,7 +185,6 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 	    hypctx->guest_regs.hyp_a[5],
 	    hypctx->guest_regs.hyp_a[6],
 	    hypctx->guest_regs.hyp_a[7]);
-#endif
 
 	sbi_extension_id = hypctx->guest_regs.hyp_a[7];
 
