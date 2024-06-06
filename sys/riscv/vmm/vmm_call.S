@@ -28,8 +28,6 @@
 #include <machine/asm.h>
 #include "assym.inc"
 
-#include <machine/riscvreg.h>
-
 	.text
 
 /*
