@@ -53,9 +53,8 @@
 #define	SET_PROP_U64(prop, idx, val)	\
     ((uint64_t *)(prop))[(idx)] = cpu_to_fdt64(val)
 
-/* TODO: check these. */
-#define	IRQ_TYPE_LEVEL_HIGH	0
-#define	IRQ_TYPE_LEVEL_LOW	1
+#define	IRQ_TYPE_LEVEL_HIGH	4
+#define	IRQ_TYPE_LEVEL_LOW	8
 
 static void *fdtroot;
 static uint32_t aplic_phandle = 0;
