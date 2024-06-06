@@ -446,3 +446,13 @@ aplic_sync_hwstate(struct hypctx *hypctx)
 {
 
 }
+
+int
+aplic_max_cpu_count(struct hyp *hyp)
+{
+	int16_t max_count;
+
+	max_count = vm_get_maxcpus(hyp->vm);
+
+	return (max_count);
+}
