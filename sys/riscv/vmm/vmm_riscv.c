@@ -554,9 +554,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		aplic_sync_hwstate(hypctx);
 
-#if 0
-		/* TODO: deactivate stage 2 pmap. */
-#endif
+		/* TODO: deactivate stage 2 pmap here. */
 
 		vme->scause = csr_read(scause);
 		vme->sepc = csr_read(sepc);
