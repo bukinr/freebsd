@@ -100,7 +100,7 @@ vmmops_modinit(int ipinum)
 #if 0
 	/* TODO. */
 	if (!has_hyp()) {
-		printf("vmm: hart doesn't have support for H-extension.\n");
+		printf("vmm: riscv hart doesn't include H-extension.\n");
 		return (ENXIO);
 	}
 #endif
