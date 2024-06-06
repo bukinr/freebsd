@@ -219,9 +219,7 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 
 	snprintf(node_name, sizeof(node_name), "serial@%lx", uart_base);
 	fdt_begin_node(fdt, node_name);
-#define	UART_COMPAT	"arm,pl011\0arm,primecell"
-	fdt_property(fdt, "compatible", UART_COMPAT, sizeof(UART_COMPAT));
-#undef UART_COMPAT
+	fdt_property_string(fdt, "compatible", "ns16550");
 	set_single_reg(fdt, uart_base, uart_size);
 	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
 	fdt_property_placeholder(fdt, "interrupts", 2 * sizeof(uint32_t),

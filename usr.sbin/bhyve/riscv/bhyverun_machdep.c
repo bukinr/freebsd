@@ -247,17 +247,17 @@ mmio_uart_intr_deassert(void *arg)
 }
 
 static int
-mmio_uart_mem_handler(struct vcpu *vcpu __unused, int dir,
-    uint64_t addr, int size __unused, uint64_t *val, void *arg1, long arg2)
+mmio_uart_mem_handler(struct vcpu *vcpu __unused, int dir, uint64_t addr,
+    int size __unused, uint64_t *val, void *arg1, long arg2)
 {
-	struct uart_pl011_softc *sc = arg1;
+	struct uart_ns16550_softc *sc = arg1;
 	long reg;
 
-	reg = (addr - arg2) >> 2;
+	reg = addr - arg2;
 	if (dir == MEM_F_WRITE)
-		uart_pl011_write(sc, reg, *val);
+		uart_ns16550_write(sc, reg, *val);
 	else
-		*val = uart_pl011_read(sc, reg);
+		*val = uart_ns16550_read(sc, reg);
 
 	return (0);
 }
@@ -265,7 +265,7 @@ mmio_uart_mem_handler(struct vcpu *vcpu __unused, int dir,
 static bool
 init_mmio_uart(struct vmctx *ctx)
 {
-	struct uart_pl011_softc *sc;
+	struct uart_ns16550_softc *sc;
 	struct mem_range mr;
 	const char *path;
 	int error;
@@ -274,9 +274,9 @@ init_mmio_uart(struct vmctx *ctx)
 	if (path == NULL)
 		return (false);
 
-	sc = uart_pl011_init(mmio_uart_intr_assert, mmio_uart_intr_deassert,
+	sc = uart_ns16550_init(mmio_uart_intr_assert, mmio_uart_intr_deassert,
 	    ctx);
-	if (uart_pl011_tty_open(sc, path) != 0) {
+	if (uart_ns16550_tty_open(sc, path) != 0) {
 		EPRINTLN("Unable to initialize backend '%s' for mmio uart",
 		    path);
 		assert(0);
