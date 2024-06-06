@@ -40,7 +40,6 @@ int	fdt_init(struct vmctx *ctx, int ncpu, vm_paddr_t addrp,
 void	fdt_add_aplic(uint64_t dist_base, uint64_t dist_size);
 void	fdt_add_pcie(int intrs[static 4]);
 void	fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr);
-void	fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr);
 void	fdt_finalize(void);
 
 #endif	/* _FDT_H_ */

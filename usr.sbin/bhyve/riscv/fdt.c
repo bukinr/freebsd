@@ -236,31 +236,6 @@ fdt_add_uart(uint64_t uart_base, uint64_t uart_size, int intr)
 }
 
 void
-fdt_add_rtc(uint64_t rtc_base, uint64_t rtc_size, int intr)
-{
-	void *fdt, *interrupts;
-	char node_name[32];
-
-	assert(aplic_phandle != 0);
-
-	fdt = fdtroot;
-
-	snprintf(node_name, sizeof(node_name), "rtc@%lx", rtc_base);
-	fdt_begin_node(fdt, node_name);
-#define	RTC_COMPAT	"arm,pl031\0arm,primecell"
-	fdt_property(fdt, "compatible", RTC_COMPAT, sizeof(RTC_COMPAT));
-#undef RTC_COMPAT
-	set_single_reg(fdt, rtc_base, rtc_size);
-	fdt_property_u32(fdt, "interrupt-parent", aplic_phandle);
-	fdt_property_placeholder(fdt, "interrupts", 2 * sizeof(uint32_t),
-	    &interrupts);
-	SET_PROP_U32(interrupts, 0, intr);
-	SET_PROP_U32(interrupts, 1, IRQ_TYPE_LEVEL_HIGH);
-
-	fdt_end_node(fdt);
-}
-
-void
 fdt_add_pcie(int intrs[static 4])
 {
 	void *fdt, *prop;

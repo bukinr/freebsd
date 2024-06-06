@@ -1,6 +1,5 @@
 SRCS+=			\
-	fdt.c		\
-	rtc_pl031.c
+	fdt.c
 
 .PATH:  ${BHYVE_SYSDIR}/sys/riscv/vmm
 SRCS+=	vmm_instruction_emul.c
