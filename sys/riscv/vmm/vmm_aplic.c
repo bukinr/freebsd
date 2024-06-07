@@ -241,8 +241,8 @@ aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 }
 
 static int
-mem_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
-    int size, void *arg)
+mem_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval, int size,
+    void *arg)
 {
 	struct hypctx *hypctx;
 	struct hyp *hyp;
@@ -270,8 +270,8 @@ mem_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 }
 
 static int
-mem_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
-    int size, void *arg)
+mem_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval, int size,
+    void *arg)
 {
 	struct hypctx *hypctx;
 	struct hyp *hyp;
