@@ -624,7 +624,7 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 	vm_ooffset_t last;
 	int i, error;
 
-printf("%s: gpa %lx first %lx len %lx\n", __func__, gpa, first, len);
+	dprintf("%s: gpa %lx first %lx len %lx\n", __func__, gpa, first, len);
 
 	if (prot == 0 || (prot & ~(VM_PROT_ALL)) != 0)
 		return (EINVAL);
@@ -690,7 +690,7 @@ vm_munmap_memseg(struct vm *vm, vm_paddr_t gpa, size_t len)
 	struct mem_map *m;
 	int i;
 
-printf("%s: gpa %lx len %lx\n", __func__, gpa, len);
+	dprintf("%s: gpa %lx len %lx\n", __func__, gpa, len);
 
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
 		m = &vm->mem_maps[i];
@@ -1378,7 +1378,9 @@ vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
 static int
 vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 {
+
 	vcpu_lock(vcpu);
+
 	while (1) {
 		if (aplic_check_pending(vcpu->cookie))
 			break;
@@ -1397,6 +1399,7 @@ vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 	vcpu_unlock(vcpu);
 
 	*retu = false;
+
 	return (0);
 }
 
