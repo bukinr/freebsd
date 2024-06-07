@@ -198,7 +198,6 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	struct hypctx *hypctx;
 	struct hyp *hyp;
 	vm_size_t size;
-	uint64_t hstatus;
 
 	hyp = vmi;
 
@@ -223,23 +222,17 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	vmmops_delegate();
 
-	csr_write(henvcfg, ENVCFG_STCE);
+	csr_write(henvcfg, HENVCFG_STCE);
+	csr_write(hie, HIE_VSEIE | HIE_SGEIE);
 
 	/*
 	 * TODO: should we trap rdcycle / rdtime ?
 	 */
-	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
-
-	hypctx->guest_scounteren = 0x1 | 0x2; /* rdtime */
-	csr_write(hie, (1 << 10) | (1 << 12));
-
+	csr_write(hcounteren, HCOUNTEREN_CY | HCOUNTEREN_TM);
+	hypctx->guest_scounteren = HCOUNTEREN_CY | HCOUNTEREN_TM;
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
 	hypctx->guest_regs.hyp_sstatus |= SSTATUS_FS_INITIAL;
-
-	hstatus = 0;
-	hstatus |= (1 << 7); //SPV
-	hstatus |= (1 << 21); //VTW
-	hypctx->guest_regs.hyp_hstatus = hstatus;
+	hypctx->guest_regs.hyp_hstatus = HSTATUS_SPV | HSTATUS_VTW;
 
 	return (hypctx);
 }
@@ -500,12 +493,11 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hypctx->guest_regs.hyp_sepc = (uint64_t)pc;
 
 	if (hypctx->guest_regs.hyp_sstatus & SSTATUS_SPP)
-		hypctx->guest_regs.hyp_hstatus |= (1 << 8); //SPVP;
+		hypctx->guest_regs.hyp_hstatus |= HSTATUS_SPVP;
 	else
-		hypctx->guest_regs.hyp_hstatus &= ~(1 << 8); //SPVP;
+		hypctx->guest_regs.hyp_hstatus &= HSTATUS_SPVP;
 
-	hypctx->guest_regs.hyp_hstatus |= (1 << 7); //SPV
-	hypctx->guest_regs.hyp_hstatus |= (1 << 21); //VTW
+	hypctx->guest_regs.hyp_hstatus |= HSTATUS_SPV | HSTATUS_VTW;
 
 	csr_write(hgatp, pmap->pm_satp);
 
@@ -516,7 +508,9 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		if (hypctx->has_exception) {
 			hypctx->has_exception = false;
-			/* TODO. */
+			/*
+			 * TODO: implement exception injection.
+			 */
 		}
 
 		val = intr_disable();

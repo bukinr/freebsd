@@ -122,6 +122,17 @@
 #define	MSTATUS_PRV_H			2	/* hypervisor */
 #define	MSTATUS_PRV_M			3	/* machine */
 
+#define	HSTATUS_VSBE	(1 << 5)
+#define	HSTATUS_GVA	(1 << 6)
+#define	HSTATUS_SPV	(1 << 7)
+#define	HSTATUS_SPVP	(1 << 8)
+#define	HSTATUS_HU	(1 << 9)
+#define	HSTATUS_VGEIN_S	(1 << 12)
+#define	HSTATUS_VGEIN_M	(0xf << HSTATUS_VGEIN_S)
+#define	HSTATUS_VTVM	(1 << 20)
+#define	HSTATUS_VTW	(1 << 21)
+#define	HSTATUS_VTSR	(1 << 22)
+
 #define	MIE_USIE	(1 << 0)
 #define	MIE_SSIE	(1 << 1)
 #define	MIE_HSIE	(1 << 2)
@@ -153,21 +164,30 @@
 #define	HVIP_VSTIP	(1 << 6)
 #define	HVIP_VSEIP	(1 << 10)
 
+#define	HIE_VSSIE	(1 << 2)
+#define	HIE_VSTIE	(1 << 6)
+#define	HIE_VSEIE	(1 << 10)
+#define	HIE_SGEIE	(1 << 12)
+
 /* Note: sip register has no SIP_STIP bit in Spike simulator */
 #define	SIP_SSIP	(1 << 1)
 #define	SIP_STIP	(1 << 5)
 
-#define	ENVCFG_STCE	(1ULL << 63)
-#define	ENVCFG_PBMTE	(1ULL << 62)
-#define	ENVCFG_ADUE	(1ULL << 61)
-#define	ENVCFG_CDE	(1ULL << 60)
-#define	ENVCFG_PMM_S	(1ULL << 31)
-#define	ENVCFG_PMM_M	(0x3 << ENVCFG_PMM_S)
-#define	ENVCFG_CBZE	(1ULL << 7)
-#define	ENVCFG_CBCFE	(1ULL << 6)
-#define	ENVCFG_CBIE_S	(1ULL << 4)
-#define	ENVCFG_CBIE_M	(0x3 << ENVCFG_CBIE_S)
-#define	ENVCFG_FIOM	(1ULL << 0)
+#define	HENVCFG_STCE	(1ULL << 63)
+#define	HENVCFG_PBMTE	(1ULL << 62)
+#define	HENVCFG_ADUE	(1ULL << 61)
+#define	HENVCFG_CDE	(1ULL << 60)
+#define	HENVCFG_PMM_S	(1ULL << 31)
+#define	HENVCFG_PMM_M	(0x3 << HENVCFG_PMM_S)
+#define	HENVCFG_CBZE	(1ULL << 7)
+#define	HENVCFG_CBCFE	(1ULL << 6)
+#define	HENVCFG_CBIE_S	(1ULL << 4)
+#define	HENVCFG_CBIE_M	(0x3 << HENVCFG_CBIE_S)
+#define	HENVCFG_FIOM	(1ULL << 0)
+
+#define	HCOUNTEREN_CY	(1ULL << 0) /* Cycle */
+#define	HCOUNTEREN_TM	(1ULL << 1) /* Time */
+#define	HCOUNTEREN_IR	(1ULL << 2) /* Instret */
 
 #define	SATP_PPN_S	0
 #define	SATP_PPN_M	(0xfffffffffffUL << SATP_PPN_S)
