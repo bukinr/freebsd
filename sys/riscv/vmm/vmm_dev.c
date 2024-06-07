@@ -53,6 +53,7 @@
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 
+#include "riscv.h"
 #include "vmm_stat.h"
 #include "vmm_aplic.h"
 
@@ -377,7 +378,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	enum { NONE, SINGLE, ALL } vcpus_locked;
 	bool memsegs_locked;
 
-	//printf("%s: cmd %ld\n", __func__, cmd);
+	dprintf("%s: cmd %ld\n", __func__, cmd);
 
 	error = vmm_priv_check(curthread->td_ucred);
 	if (error)
@@ -398,7 +399,6 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	 */
 	switch (cmd) {
 	case VM_RUN:
-		//printf("%s: cmd %ld RUN\n", __func__, cmd);
 	case VM_GET_REGISTER:
 	case VM_SET_REGISTER:
 	case VM_GET_REGISTER_SET:
@@ -849,10 +849,8 @@ out:
 	free(buf, M_VMMDEV);
 	return (error);
 }
-SYSCTL_PROC(_hw_vmm, OID_AUTO, destroy,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
-    NULL, 0, sysctl_vmm_destroy, "A",
-    NULL);
+SYSCTL_PROC(_hw_vmm, OID_AUTO, destroy, CTLTYPE_STRING | CTLFLAG_RW |
+    CTLFLAG_PRISON | CTLFLAG_MPSAFE, NULL, 0, sysctl_vmm_destroy, "A", NULL);
 
 static struct cdevsw vmmdevsw = {
 	.d_name		= "vmmdev",
@@ -934,10 +932,8 @@ out:
 	free(buf, M_VMMDEV);
 	return (error);
 }
-SYSCTL_PROC(_hw_vmm, OID_AUTO, create,
-    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
-    NULL, 0, sysctl_vmm_create, "A",
-    NULL);
+SYSCTL_PROC(_hw_vmm, OID_AUTO, create, CTLTYPE_STRING | CTLFLAG_RW |
+    CTLFLAG_PRISON | CTLFLAG_MPSAFE, NULL, 0, sysctl_vmm_create, "A", NULL);
 
 void
 vmmdev_init(void)
@@ -969,7 +965,7 @@ devmem_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t len,
 	int error;
 	bool sysmem;
 
-printf("%s: offset %lx len %lx\n", __func__, *offset, len);
+	dprintf("%s: offset %lx len %lx\n", __func__, *offset, len);
 
 	dsc = cdev->si_drv1;
 	if (dsc == NULL) {
