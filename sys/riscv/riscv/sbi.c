@@ -147,7 +147,7 @@ sbi_print_version(void)
 		printf("SBI: Diosix %lu\n", sbi_impl_version);
 		break;
 	case (SBI_IMPL_ID_BHYVE):
-		printf("SBI: BHYVE %lu\n", sbi_impl_version);
+		printf("SBI: bhyve %lu\n", sbi_impl_version);
 		break;
 	case (SBI_IMPL_ID_OPENSBI):
 		major = sbi_impl_version >> OPENSBI_VERSION_MAJOR_OFFSET;
