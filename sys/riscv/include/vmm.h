@@ -97,8 +97,6 @@ enum vm_reg_name {
 
 #define VM_MAX_SUFFIXLEN 15
 
-#define VM_GUEST_BASE_IPA	0x80000000UL	/* Guest kernel start ipa */
-
 #ifdef _KERNEL
 
 #define	VM_MAX_NAMELEN	32
