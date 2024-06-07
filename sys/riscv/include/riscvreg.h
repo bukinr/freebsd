@@ -157,6 +157,18 @@
 #define	SIP_SSIP	(1 << 1)
 #define	SIP_STIP	(1 << 5)
 
+#define	ENVCFG_STCE	(1ULL << 63)
+#define	ENVCFG_PBMTE	(1ULL << 62)
+#define	ENVCFG_ADUE	(1ULL << 61)
+#define	ENVCFG_CDE	(1ULL << 60)
+#define	ENVCFG_PMM_S	(1ULL << 31)
+#define	ENVCFG_PMM_M	(0x3 << ENVCFG_PMM_S)
+#define	ENVCFG_CBZE	(1ULL << 7)
+#define	ENVCFG_CBCFE	(1ULL << 6)
+#define	ENVCFG_CBIE_S	(1ULL << 4)
+#define	ENVCFG_CBIE_M	(0x3 << ENVCFG_CBIE_S)
+#define	ENVCFG_FIOM	(1ULL << 0)
+
 #define	SATP_PPN_S	0
 #define	SATP_PPN_M	(0xfffffffffffUL << SATP_PPN_S)
 #define	SATP_ASID_S	44

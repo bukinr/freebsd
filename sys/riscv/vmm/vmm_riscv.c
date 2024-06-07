@@ -147,9 +147,9 @@ vmmops_delegate(void)
 	hedeleg |= (1UL << SCAUSE_STORE_PAGE_FAULT);
 	csr_write(hedeleg, hedeleg);
 
-	hideleg  = (1 << IRQ_SOFTWARE_HYPERVISOR);
-	hideleg |= (1 << IRQ_TIMER_HYPERVISOR);
-	hideleg |= (1 << IRQ_EXTERNAL_HYPERVISOR);
+	hideleg  = (1UL << IRQ_SOFTWARE_HYPERVISOR);
+	hideleg |= (1UL << IRQ_TIMER_HYPERVISOR);
+	hideleg |= (1UL << IRQ_EXTERNAL_HYPERVISOR);
 	csr_write(hideleg, hideleg);
 }
 
@@ -196,7 +196,6 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	struct hyp *hyp;
 	vm_size_t size;
 	uint64_t hstatus;
-	uint64_t henvcfg;
 
 	hyp = vmi;
 
@@ -213,7 +212,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->vcpu = vcpu1;
 
 	/*
-	 * TODO: set initial state for CSRs.
+	 * TODO: set initial state for CSRs if needed.
 	 */
 	vmmops_vcpu_restore_csrs(hypctx);
 
@@ -221,12 +220,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	vmmops_delegate();
 
-/* xENVCFG flags */
-#define ENVCFG_STCE                     (1ULL << 63)
-#define ENVCFG_PBMTE                    (1ULL << 62)
-
-	henvcfg = ENVCFG_STCE | ENVCFG_PBMTE;
-	csr_write(henvcfg, henvcfg);
+	csr_write(henvcfg, ENVCFG_STCE);
 
 	/* TODO: should we trap rdcycle / rdtime ? */
 	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
