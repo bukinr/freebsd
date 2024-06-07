@@ -248,10 +248,6 @@ enum vm_reg_name vm_segment_name(int seg_encoding);
 #define	VM_GP_MMU_ENABLED	(1 << 5)
 
 struct vm_guest_paging {
-	uint64_t	ttbr0_addr;
-	uint64_t	ttbr1_addr;
-	uint64_t	tcr_el1;
-	uint64_t	tcr2_el1;
 	int		flags;
 	int		padding;
 };
