@@ -225,7 +225,9 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	csr_write(henvcfg, ENVCFG_STCE);
 
-	/* TODO: should we trap rdcycle / rdtime ? */
+	/*
+	 * TODO: should we trap rdcycle / rdtime ?
+	 */
 	csr_write(hcounteren, 0x1 | 0x2 /* rdtime */);
 
 	hypctx->guest_scounteren = 0x1 | 0x2; /* rdtime */
@@ -429,7 +431,9 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 		}
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-		/* TODO: handle this properly. */
+		/*
+		 * TODO: handle illegal instruction properly.
+		 */
 		panic("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->sepc, vme->stval, vme->htval);
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
@@ -539,10 +543,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		riscv_sync_interrupts(hypctx);
 
-		dprintf("%s: Entering guest VM, vsatp %lx, ss %lx, "
-		 "hs %lx\n", __func__,
-		    csr_read(vsatp),
-		    hypctx->guest_regs.hyp_sstatus,
+		dprintf("%s: Entering guest VM, vsatp %lx, ss %lx hs %lx\n",
+		    __func__, csr_read(vsatp), hypctx->guest_regs.hyp_sstatus,
 		    hypctx->guest_regs.hyp_hstatus);
 
 		vmm_call_hyp(hypctx);
@@ -551,7 +553,9 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		aplic_sync_hwstate(hypctx);
 
-		/* TODO: deactivate stage 2 pmap here. */
+		/*
+		 * TODO: deactivate stage 2 pmap here if needed.
+		 */
 
 		vme->scause = csr_read(scause);
 		vme->sepc = csr_read(sepc);
