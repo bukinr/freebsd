@@ -72,6 +72,7 @@ register_t mimpid;	/* The implementation ID */
 u_int mmu_caps;
 
 /* Supervisor-mode extension support. */
+bool has_hyp;
 bool __read_frequently has_sstc;
 bool __read_frequently has_sscofpmf;
 
@@ -413,6 +414,7 @@ update_global_capabilities(u_int cpu, struct cpu_desc *desc)
 	UPDATE_CAP(mmu_caps, desc->mmu_caps);
 
 	/* Supervisor-mode extension support. */
+	UPDATE_CAP(has_hyp, (desc->isa_extensions & HWCAP_ISA_H) != 0);
 	UPDATE_CAP(has_sstc, (desc->smode_extensions & SV_SSTC) != 0);
 	UPDATE_CAP(has_sscofpmf, (desc->smode_extensions & SV_SSCOFPMF) != 0);
 

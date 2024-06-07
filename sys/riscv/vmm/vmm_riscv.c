@@ -45,6 +45,7 @@
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
 
+#include <machine/md_var.h>
 #include <machine/riscvreg.h>
 #include <machine/vm.h>
 #include <machine/cpufunc.h>
@@ -97,13 +98,15 @@ int
 vmmops_modinit(int ipinum)
 {
 
-#if 0
-	/* TODO. */
-	if (!has_hyp()) {
-		printf("vmm: riscv hart doesn't include H-extension.\n");
+	if (!has_hyp) {
+		printf("vmm: riscv hart doesn't support H-extension.\n");
 		return (ENXIO);
 	}
-#endif
+
+	if (!has_sstc) {
+		printf("vmm: riscv hart doesn't support SSTC extension.\n");
+		return (ENXIO);
+	}
 
 	return (0);
 }
