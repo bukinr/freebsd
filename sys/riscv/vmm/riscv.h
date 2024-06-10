@@ -82,7 +82,7 @@ struct hyp {
 #define	DEFINE_VMMOPS_IFUNC(ret_type, opname, args)	\
     ret_type vmmops_##opname args;
 
-DEFINE_VMMOPS_IFUNC(int, modinit, (int ipinum))
+DEFINE_VMMOPS_IFUNC(int, modinit, (void))
 DEFINE_VMMOPS_IFUNC(int, modcleanup, (void))
 DEFINE_VMMOPS_IFUNC(void *, init, (struct vm *vm, struct pmap *pmap))
 DEFINE_VMMOPS_IFUNC(int, gla2gpa, (void *vcpui, struct vm_guest_paging *paging,

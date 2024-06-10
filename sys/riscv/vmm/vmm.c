@@ -235,7 +235,7 @@ vmm_init(void)
 	if (vm_maxcpu == 0)
 		vm_maxcpu = 1;
 
-	return (vmmops_modinit(0));
+	return (vmmops_modinit());
 }
 
 static int
@@ -245,14 +245,14 @@ vmm_handler(module_t mod, int what, void *arg)
 
 	switch (what) {
 	case MOD_LOAD:
-		/* TODO: if (vmm_is_hw_supported()) { */
+		/* TODO: check if has_hyp here? */
 		vmmdev_init();
 		error = vmm_init();
 		if (error == 0)
 			vmm_initialized = true;
 		break;
 	case MOD_UNLOAD:
-		/* TODO: if (vmm_is_hw_supported()) { */
+		/* TODO: check if has_hyp here? */
 		error = vmmdev_cleanup();
 		if (error == 0 && vmm_initialized) {
 			error = vmmops_modcleanup();

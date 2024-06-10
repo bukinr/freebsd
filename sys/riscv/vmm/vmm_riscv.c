@@ -95,7 +95,7 @@ riscv_get_active_vcpu(void)
 }
 
 int
-vmmops_modinit(int ipinum)
+vmmops_modinit(void)
 {
 
 	if (!has_hyp) {
