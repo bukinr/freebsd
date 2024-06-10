@@ -71,15 +71,14 @@ riscv/riscv/timer.c		standard
 riscv/riscv/uio_machdep.c	standard
 riscv/riscv/unwind.c		optional	ddb | kdtrace_hooks | stack
 riscv/riscv/vm_machdep.c	standard
-
 riscv/vmm/vmm.c					optional vmm
+riscv/vmm/vmm_aplic.c				optional vmm
 riscv/vmm/vmm_dev.c				optional vmm
 riscv/vmm/vmm_instruction_emul.c		optional vmm
-riscv/vmm/vmm_stat.c				optional vmm
-riscv/vmm/vmm_sbi.c				optional vmm
 riscv/vmm/vmm_riscv.c				optional vmm
-riscv/vmm/vmm_call.S				optional vmm
-riscv/vmm/vmm_aplic.c				optional vmm
+riscv/vmm/vmm_sbi.c				optional vmm
+riscv/vmm/vmm_stat.c				optional vmm
+riscv/vmm/vmm_switch.S				optional vmm
 
 # Zstd
 contrib/zstd/lib/freebsd/zstd_kfreebsd.c		optional zstdio compile-with ${ZSTD_C}
