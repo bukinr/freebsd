@@ -36,7 +36,7 @@
 /*
  * a0 == hypctx *
  */
-ENTRY(vmm_call_hyp)
+ENTRY(vmm_switch)
 	sd	ra, (HYP_H_RA)(a0)
 	sd	sp, (HYP_H_SP)(a0)
 	sd	tp, (HYP_H_TP)(a0)
@@ -199,4 +199,4 @@ ENTRY(vmm_call_hyp)
 
 	ret
 
-END(vmm_call_hyp)
+END(vmm_switch)

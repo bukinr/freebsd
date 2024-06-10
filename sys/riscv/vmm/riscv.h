@@ -110,7 +110,7 @@ DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 #define	dprintf(fmt, ...)
 
 struct hypctx *riscv_get_active_vcpu(void);
-void vmm_call_hyp(struct hypctx *);
+void vmm_switch(struct hypctx *);
 int vmm_sbi_ecall(struct vcpu *, bool *);
 
 #endif /* !_VMM_RISCV_H_ */

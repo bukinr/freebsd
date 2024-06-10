@@ -546,7 +546,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		    __func__, csr_read(vsatp), hypctx->guest_regs.hyp_sstatus,
 		    hypctx->guest_regs.hyp_hstatus);
 
-		vmm_call_hyp(hypctx);
+		vmm_switch(hypctx);
 
 		dprintf("%s: Leaving guest VM\n", __func__);
 

@@ -127,7 +127,7 @@
 #define	HSTATUS_SPV	(1 << 7)
 #define	HSTATUS_SPVP	(1 << 8)
 #define	HSTATUS_HU	(1 << 9)
-#define	HSTATUS_VGEIN_S	(1 << 12)
+#define	HSTATUS_VGEIN_S	12
 #define	HSTATUS_VGEIN_M	(0xf << HSTATUS_VGEIN_S)
 #define	HSTATUS_VTVM	(1 << 20)
 #define	HSTATUS_VTW	(1 << 21)
