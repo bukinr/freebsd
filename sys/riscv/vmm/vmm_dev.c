@@ -6,6 +6,11 @@
  * All rights reserved.
  * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
+ * This software was developed by the University of Cambridge Computer
+ * Laboratory (Department of Computer Science and Technology) under Innovate
+ * UK project 105694, "Digital Security by Design (DSbD) Technology Platform
+ * Prototype".
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
