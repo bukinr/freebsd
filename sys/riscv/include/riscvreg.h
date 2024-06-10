@@ -173,21 +173,21 @@
 #define	SIP_SSIP	(1 << 1)
 #define	SIP_STIP	(1 << 5)
 
-#define	HENVCFG_STCE	(1ULL << 63)
-#define	HENVCFG_PBMTE	(1ULL << 62)
-#define	HENVCFG_ADUE	(1ULL << 61)
-#define	HENVCFG_CDE	(1ULL << 60)
-#define	HENVCFG_PMM_S	(1ULL << 31)
+#define	HENVCFG_STCE	(1UL << 63)
+#define	HENVCFG_PBMTE	(1UL << 62)
+#define	HENVCFG_ADUE	(1UL << 61)
+#define	HENVCFG_CDE	(1UL << 60)
+#define	HENVCFG_PMM_S	(1UL << 31)
 #define	HENVCFG_PMM_M	(0x3 << HENVCFG_PMM_S)
-#define	HENVCFG_CBZE	(1ULL << 7)
-#define	HENVCFG_CBCFE	(1ULL << 6)
-#define	HENVCFG_CBIE_S	(1ULL << 4)
+#define	HENVCFG_CBZE	(1UL << 7)
+#define	HENVCFG_CBCFE	(1UL << 6)
+#define	HENVCFG_CBIE_S	(1UL << 4)
 #define	HENVCFG_CBIE_M	(0x3 << HENVCFG_CBIE_S)
-#define	HENVCFG_FIOM	(1ULL << 0)
+#define	HENVCFG_FIOM	(1UL << 0)
 
-#define	HCOUNTEREN_CY	(1ULL << 0) /* Cycle */
-#define	HCOUNTEREN_TM	(1ULL << 1) /* Time */
-#define	HCOUNTEREN_IR	(1ULL << 2) /* Instret */
+#define	HCOUNTEREN_CY	(1UL << 0) /* Cycle */
+#define	HCOUNTEREN_TM	(1UL << 1) /* Time */
+#define	HCOUNTEREN_IR	(1UL << 2) /* Instret */
 
 #define	SATP_PPN_S	0
 #define	SATP_PPN_M	(0xfffffffffffUL << SATP_PPN_S)
