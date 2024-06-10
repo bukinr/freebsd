@@ -173,8 +173,6 @@ static void
 vfp_init(const void *dummy __unused)
 {
 
-	/* TODO: check if FPU extension available. */
-
 	fpu_save_area_zone = uma_zcreate("FPE save area", sizeof(struct fpreg),
 	    NULL, NULL, NULL, NULL, _Alignof(struct fpreg) - 1, 0);
 	fpu_initialstate = uma_zalloc(fpu_save_area_zone, M_WAITOK | M_ZERO);
