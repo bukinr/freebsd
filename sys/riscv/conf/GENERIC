@@ -94,6 +94,7 @@ device		riscv_syscon
 device		pci
 
 # Block devices
+device		ahci
 device		scbus
 device		da
 
