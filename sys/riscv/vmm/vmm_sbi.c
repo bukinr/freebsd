@@ -60,8 +60,8 @@
 /*
  * SBI is fully handled in userspace.
  *
- * TODO: Do we need to handle the SBI time extension here in kernel in case of
- * no SSTC support (?).
+ * TODO: We may need to handle the IPI extension here in kernel.
+ * The same for the TIME extension in case of no SSTC support.
  */
 
 int
