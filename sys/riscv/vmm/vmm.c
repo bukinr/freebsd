@@ -1460,12 +1460,17 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 int
 vm_run(struct vcpu *vcpu)
 {
-	struct vm *vm = vcpu->vm;
 	struct vm_eventinfo evinfo;
-	int error, vcpuid;
 	struct vm_exit *vme;
-	bool retu;
+	struct vm *vm;
+	struct hypctx *hypctx;
 	pmap_t pmap;
+	int error;
+	int vcpuid;
+	int i;
+	bool retu;
+
+	vm = vcpu->vm;
 
 	dprintf("%s\n", __func__);
 
@@ -1507,11 +1512,10 @@ restart:
 			error = vm_handle_wfi(vcpu, vme, &retu);
 			break;
 		case VM_EXITCODE_ECALL:
+			/* Handle in userland. */
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vmm_sbi_ecall(vcpu, &retu);
 			if (retu == true) {
-				struct hypctx *hypctx;
-				int i;
 				hypctx = vcpu_get_cookie(vcpu);
 				for (i = 0; i < nitems(vme->u.ecall.args); i++)
 					vme->u.ecall.args[i] =
@@ -1523,7 +1527,7 @@ restart:
 			error = vm_handle_paging(vcpu, &retu);
 			break;
 		default:
-			/* Handle in userland */
+			/* Handle in userland. */
 			vcpu->nextpc = vme->pc;
 			retu = true;
 			break;

@@ -56,6 +56,8 @@
 #include "mem.h"
 #include "vmexit.h"
 
+#define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
+
 static int
 vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_run *vmrun)
@@ -132,6 +134,86 @@ vmexit_bogus(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 	return (VMEXIT_CONTINUE);
 }
 
+static int
+vmm_sbi_probe_extension(int ext_id)
+{
+
+	switch (ext_id) {
+	case SBI_EXT_ID_TIME:
+	case SBI_EXT_ID_IPI:
+	case SBI_EXT_ID_RFNC:
+	case SBI_EXT_ID_SRST:
+	case SBI_CONSOLE_PUTCHAR:
+	case SBI_CONSOLE_GETCHAR:
+		break;
+	default:
+		return (0);
+	}
+
+	return (1);
+}
+
+static int
+vmexit_ecall_time(struct vmctx *ctx __unused, struct vm_exit *vme __unused)
+{
+
+	return (0);
+}
+
+static int
+vmexit_ecall_base(struct vmctx *ctx __unused, struct vcpu *vcpu,
+    struct vm_exit *vme)
+{
+	int sbi_function_id;
+	int ext_id;
+	int error;
+	uint32_t val;
+	int ret;
+
+	sbi_function_id = vme->u.ecall.args[6];
+
+	ret = 0;
+
+	switch (sbi_function_id) {
+	case SBI_BASE_GET_SPEC_VERSION:
+		val = 2 << SBI_SPEC_VERS_MAJOR_OFFSET;
+		val |= 0 << SBI_SPEC_VERS_MINOR_OFFSET;
+		break;
+	case SBI_BASE_GET_IMPL_ID:
+		val = SBI_IMPL_ID_BHYVE;
+		break;
+	case SBI_BASE_GET_IMPL_VERSION:
+		val = BHYVE_VERSION;
+		break;
+	case SBI_BASE_PROBE_EXTENSION:
+		ext_id = vme->u.ecall.args[0];
+		val = vmm_sbi_probe_extension(ext_id);
+		break;
+	case SBI_BASE_GET_MVENDORID:
+		val = MVENDORID_UNIMPL;
+		break;
+	case SBI_BASE_GET_MARCHID:
+		val = MARCHID_UNIMPL;
+		break;
+	case SBI_BASE_GET_MIMPID:
+		val = 0;
+		break;
+	default:
+		ret = 1;
+		break;
+	}
+
+	error = vm_set_register(vcpu, VM_REG_GUEST_A0, ret);
+	assert(error == 0);
+
+	if (ret == 0) {
+		error = vm_set_register(vcpu, VM_REG_GUEST_A1, val);
+		assert(error == 0);
+	}
+
+	return (0);
+}
+
 static void
 vmexit_ecall_srst(struct vmctx *ctx, struct vm_exit *vme)
 {
@@ -160,8 +242,7 @@ vmexit_ecall_srst(struct vmctx *ctx, struct vm_exit *vme)
 }
 
 static int
-vmexit_ecall(struct vmctx *ctx, struct vcpu *vcpu __unused,
-    struct vm_run *vmrun)
+vmexit_ecall(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 {
 	int sbi_extension_id;
 	struct vm_exit *vme;
@@ -173,7 +254,16 @@ vmexit_ecall(struct vmctx *ctx, struct vcpu *vcpu __unused,
 	case SBI_EXT_ID_SRST:
 		vmexit_ecall_srst(ctx, vme);
 		break;
+	case SBI_EXT_ID_BASE:
+		vmexit_ecall_base(ctx, vcpu, vme);
+		break;
+	case SBI_EXT_ID_TIME:
+		vmexit_ecall_time(ctx, vme);
+		break;
+	case SBI_CONSOLE_PUTCHAR:
+	case SBI_CONSOLE_GETCHAR:
 	default:
+		/* Unknown SBI extension. */
 		break;
 	}
 
