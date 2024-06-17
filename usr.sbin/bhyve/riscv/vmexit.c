@@ -150,6 +150,7 @@ vmexit_ecall_srst(struct vmctx *ctx, struct vm_exit *vme)
 		case SBI_SRST_TYPE_WARM_REBOOT:
 			how = VM_SUSPEND_POWEROFF;
 			vm_suspend(ctx, how);
+			break;
 		default:
 			break;
 		}
