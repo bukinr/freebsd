@@ -1,7 +1,4 @@
-
-#-
-# Copyright (c) 2015 M. Warner Losh <imp@FreeBSD.org>
-# Copyright (c) 2010-2011 iXsystems, Inc.
+#
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -15,7 +12,7 @@
 # THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 # ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED.  IN NO EVENT SHALL iXsystems, Inc. OR CONTRIBUTORS BE LIABLE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
 # FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 # DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
 # OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -25,11 +22,11 @@
 # SUCH DAMAGE.
 #
 
-NANO_ARCH=armv6
-NANO_KERNEL=RPI-B
-NANO_DRIVE=mmcsd0
-NANO_NAME=rpi-b
-NANO_BOOT_PKG=u-boot-rpi
-NANO_CPUTYPE=arm1176jzf-s
+.PATH: ${SRCTOP}/sys/dev/virtio/p9fs
 
-. common	# Pull in common definitions, keep last
+KMOD=	virtio_p9fs
+SRCS=	virtio_p9fs.c
+SRCS+=	virtio_bus_if.h virtio_if.h
+SRCS+=	bus_if.h device_if.h
+
+.include <bsd.kmod.mk>
