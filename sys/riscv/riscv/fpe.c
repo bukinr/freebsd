@@ -63,10 +63,9 @@ fpe_disable(void)
 void
 fpe_store(struct fpreg *regs)
 {
-	uint64_t fcsr;
-	void *fp_x;
+	uint64_t fcsr, (*fp_x)[32][2];
 
-	fp_x = (void *)regs->fp_x;
+	fp_x = &regs->fp_x;
 
 	__asm __volatile(
 	    "frcsr	%0		\n"
@@ -102,7 +101,7 @@ fpe_store(struct fpreg *regs)
 	    "fsd	f29, (16 * 29)(%1)\n"
 	    "fsd	f30, (16 * 30)(%1)\n"
 	    "fsd	f31, (16 * 31)(%1)\n"
-	    : "=&r"(fcsr) : "r"(fp_x));
+	    : "=&r"(fcsr), "=r"(fp_x), "=m"(*fp_x));
 
 	regs->fp_fcsr = fcsr;
 }
@@ -110,10 +109,9 @@ fpe_store(struct fpreg *regs)
 void
 fpe_restore(struct fpreg *regs)
 {
-	uint64_t fcsr;
-	void *fp_x;
+	uint64_t fcsr, (*fp_x)[32][2];
 
-	fp_x = (void *)regs->fp_x;
+	fp_x = &regs->fp_x;
 	fcsr = regs->fp_fcsr;
 
 	__asm __volatile(
@@ -150,7 +148,7 @@ fpe_restore(struct fpreg *regs)
 	    "fld	f29, (16 * 29)(%1)\n"
 	    "fld	f30, (16 * 30)(%1)\n"
 	    "fld	f31, (16 * 31)(%1)\n"
-	    : : "r"(fcsr), "r"(fp_x));
+	    :: "r"(fcsr), "r"(fp_x), "m"(*fp_x));
 }
 
 struct fpreg *
