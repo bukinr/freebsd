@@ -173,7 +173,7 @@ fpu_save_area_reset(struct fpreg *fsa)
 }
 
 static void
-vfp_init(const void *dummy __unused)
+fpe_init(const void *dummy __unused)
 {
 
 	fpu_save_area_zone = uma_zcreate("FPE save area", sizeof(struct fpreg),
@@ -187,4 +187,4 @@ vfp_init(const void *dummy __unused)
 	bzero(fpu_initialstate->fp_x, sizeof(fpu_initialstate->fp_x));
 }
 
-SYSINIT(vfp, SI_SUB_CPU, SI_ORDER_ANY, vfp_init, NULL);
+SYSINIT(fpe, SI_SUB_CPU, SI_ORDER_ANY, fpe_init, NULL);
