@@ -68,9 +68,6 @@
 #include "vmm_aplic.h"
 #include "vmm_stat.h"
 
-#define	HANDLED		1
-#define	UNHANDLED	0
-
 MALLOC_DEFINE(M_HYP, "RISC-V VMM HYP", "RISC-V VMM HYP");
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
@@ -394,15 +391,15 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 	vie->reg = reg_num;
 }
 
-static int
+static bool
 riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
     pmap_t pmap)
 {
 	uint64_t insn;
 	uint64_t gpa;
-	int handled;
+	bool handled;
 
-	handled = UNHANDLED;
+	handled = false;
 
 	if (vme->scause & SCAUSE_INTR) {
 		/*
@@ -436,7 +433,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 		    __func__, vme->sepc, vme->stval, vme->htval);
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
 		vme->exitcode = VM_EXITCODE_ECALL;
-		handled = UNHANDLED;
+		handled = false;
 		break;
 	case SCAUSE_VIRTUAL_INSTRUCTION:
 		insn = vme->stval;
@@ -444,13 +441,13 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 			vme->exitcode = VM_EXITCODE_WFI;
 		else
 			vme->exitcode = VM_EXITCODE_BOGUS;
-		handled = UNHANDLED;
+		handled = false;
 		break;
 	default:
 		printf("unknown scause %lx\n", vme->scause);
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
 		vme->exitcode = VM_EXITCODE_BOGUS;
-		handled = UNHANDLED;
+		handled = false;
 		break;
 	}
 
@@ -569,7 +566,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		vme->inst_length = INSN_SIZE;
 
 		handled = riscv_handle_world_switch(hypctx, vme, pmap);
-		if (handled == UNHANDLED)
+		if (handled == false)
 			/* Exit loop to emulate instruction. */
 			break;
 		else {
