@@ -205,36 +205,22 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 
 	dprintf("%s: hyp %p\n", __func__, hyp);
 
-	size = round_page(sizeof(struct hypctx));
-	hypctx = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
-
 	KASSERT(vcpuid >= 0 && vcpuid < vm_get_maxcpus(hyp->vm),
 	    ("%s: Invalid vcpuid %d", __func__, vcpuid));
-	hyp->ctx[vcpuid] = hypctx;
 
+	size = round_page(sizeof(struct hypctx));
+
+	hypctx = malloc_aligned(size, PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
 	hypctx->hyp = hyp;
 	hypctx->vcpu = vcpu1;
-
-	/*
-	 * TODO: set initial state for CSRs if needed.
-	 */
-	vmmops_vcpu_restore_csrs(hypctx);
-
-	aplic_cpuinit(hypctx);
-
-	vmmops_delegate();
-
-	csr_write(henvcfg, HENVCFG_STCE);
-	csr_write(hie, HIE_VSEIE | HIE_SGEIE);
-
-	/*
-	 * TODO: should we trap rdcycle / rdtime ?
-	 */
-	csr_write(hcounteren, HCOUNTEREN_CY | HCOUNTEREN_TM);
 	hypctx->guest_scounteren = HCOUNTEREN_CY | HCOUNTEREN_TM;
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
 	hypctx->guest_regs.hyp_sstatus |= SSTATUS_FS_INITIAL;
 	hypctx->guest_regs.hyp_hstatus = HSTATUS_SPV | HSTATUS_VTW;
+
+	hyp->ctx[vcpuid] = hypctx;
+
+	aplic_cpuinit(hypctx);
 
 	return (hypctx);
 }
@@ -502,6 +488,16 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	hypctx->guest_regs.hyp_hstatus |= HSTATUS_SPV | HSTATUS_VTW;
 
 	csr_write(hgatp, pmap->pm_satp);
+
+	vmmops_delegate();
+
+	csr_write(henvcfg, HENVCFG_STCE);
+	csr_write(hie, HIE_VSEIE | HIE_SGEIE);
+
+	/*
+	 * TODO: should we trap rdcycle / rdtime ?
+	 */
+	csr_write(hcounteren, HCOUNTEREN_CY | HCOUNTEREN_TM);
 
 	vmmops_vcpu_restore_csrs(hypctx);
 
