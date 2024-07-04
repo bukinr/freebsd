@@ -73,9 +73,6 @@
 #define	PCIE_INTC	4
 #define	PCIE_INTD	5
 
-static uint64_t fdt_phys;
-static uint64_t bootrom_phys;
-
 void
 bhyve_init_config(void)
 {
@@ -194,24 +191,10 @@ bhyve_start_vcpu(struct vcpu *vcpu, bool bsp __unused)
 
 	/* Set hart ID. */
 	error = vm_set_register(vcpu, VM_REG_GUEST_A0, vcpu_id(vcpu));
-	assert(error == 0);
 
-	/* Set PC. */
-	error = vm_set_register(vcpu, VM_REG_GUEST_SEPC, bootrom_phys);
-	assert(error == 0);
-
-	/* Set FDT base address. */
-	error = vm_set_register(vcpu, VM_REG_GUEST_A1, fdt_phys);
 	assert(error == 0);
 
 	fbsdrun_addcpu(vcpu_id(vcpu));
-
-	/*
-	 * Throw everything to the entry point.
-	 * Note that booting hart is determined by the lottery in locore.S.
-	 */
-	if (bsp == false) /* This hart resumed in the main() later. */
-		vm_resume_cpu(vcpu);
 }
 
 /*
@@ -358,17 +341,23 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	pci_irq_init(pcie_intrs);
 	fdt_add_pcie(pcie_intrs);
 
-	fdt_phys = fdt_gpa(ctx);
-	bootrom_phys = elr;
-
 	return (0);
 }
 
 int
-bhyve_init_platform_late(struct vmctx *ctx __unused, struct vcpu *bsp __unused)
+bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp)
 {
+	int error;
 
 	fdt_finalize();
+
+	/* Set hart ID. */
+	error = vm_set_register(bsp, VM_REG_GUEST_A0, 0);
+	assert(error == 0);
+
+	/* Set FDT base address. */
+	error = vm_set_register(bsp, VM_REG_GUEST_A1, fdt_gpa(ctx));
+	assert(error == 0);
 
 	return (0);
 }
