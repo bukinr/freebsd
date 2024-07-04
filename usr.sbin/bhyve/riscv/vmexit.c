@@ -58,6 +58,8 @@
 
 #define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
 
+static cpuset_t running_cpumask;
+
 static int
 vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_run *vmrun)
@@ -139,6 +141,7 @@ vmm_sbi_probe_extension(int ext_id)
 {
 
 	switch (ext_id) {
+	case SBI_EXT_ID_HSM:
 	case SBI_EXT_ID_TIME:
 	case SBI_EXT_ID_IPI:
 	case SBI_EXT_ID_RFNC:
@@ -156,6 +159,66 @@ vmm_sbi_probe_extension(int ext_id)
 static int
 vmexit_ecall_time(struct vmctx *ctx __unused, struct vm_exit *vme __unused)
 {
+
+	return (0);
+}
+
+static int
+vmexit_ecall_hsm(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
+    struct vm_exit *vme)
+{
+	struct vcpu *newvcpu;
+	uint64_t hart_id;
+	int func_id;
+	int error;
+	int ret;
+
+	hart_id = vme->u.ecall.args[0];
+	func_id = vme->u.ecall.args[6];
+
+	ret = -1;
+
+	if (hart_id > (uint64_t)guest_ncpus)
+		return (ret);
+
+	newvcpu = fbsdrun_vcpu(hart_id);
+	assert(newvcpu != NULL);
+
+	switch (func_id) {
+	case SBI_HSM_HART_START:
+		if (CPU_ISSET(hart_id, &running_cpumask))
+			break;
+
+		/* Set hart ID. */
+		error = vm_set_register(newvcpu, VM_REG_GUEST_A0, hart_id);
+		assert(error == 0);
+
+		/* Set PC. */
+		error = vm_set_register(newvcpu, VM_REG_GUEST_SEPC,
+		    vme->u.ecall.args[1]);
+		assert(error == 0);
+
+		vm_resume_cpu(newvcpu);
+		CPU_SET_ATOMIC(hart_id, &running_cpumask);
+
+		ret = 0;
+		break;
+	case SBI_HSM_HART_STOP:
+		if (!CPU_ISSET(hart_id, &running_cpumask))
+			break;
+		CPU_CLR_ATOMIC(hart_id, &running_cpumask);
+		vm_suspend_cpu(newvcpu);
+		ret = 0;
+		break;
+	case SBI_HSM_HART_STATUS:
+		/* TODO. */
+		break;
+	default:
+		break;
+	}
+
+	error = vm_set_register(vcpu, VM_REG_GUEST_A0, ret);
+	assert(error == 0);
 
 	return (0);
 }
@@ -259,6 +322,9 @@ vmexit_ecall(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 		break;
 	case SBI_EXT_ID_TIME:
 		vmexit_ecall_time(ctx, vme);
+		break;
+	case SBI_EXT_ID_HSM:
+		vmexit_ecall_hsm(ctx, vcpu, vme);
 		break;
 	case SBI_CONSOLE_PUTCHAR:
 	case SBI_CONSOLE_GETCHAR:
