@@ -64,6 +64,28 @@
  * The same for the SBI TIME extension in case of no SSTC support in HW.
  */
 
+static int
+vmm_sbi_handle_ipi(struct vcpu *vcpu, struct hypctx *hypctx)
+{
+	uint64_t func_id;
+	uint64_t hart_mask;
+
+	func_id = hypctx->guest_regs.hyp_a[6];
+
+	printf("%s: func %ld\n", __func__, func_id);
+
+	switch (func_id) {
+	case SBI_IPI_SEND_IPI:
+		hart_mask = hypctx->guest_regs.hyp_a[0];
+		printf("hart_mask %lx\n", hart_mask);
+		break;
+	default:
+		break;
+	}
+
+	return (0);
+}
+
 int
 vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 {
@@ -86,11 +108,13 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 	switch (sbi_extension_id) {
 	case SBI_EXT_ID_TIME:
 		break;
+	case SBI_EXT_ID_IPI:
+		vmm_sbi_handle_ipi(vcpu, hypctx);
+		break;
 	default:
+		*retu = true;
 		break;
 	}
-
-	*retu = true;
 
 	return (0);
 }
