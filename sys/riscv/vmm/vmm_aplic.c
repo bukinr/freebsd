@@ -107,11 +107,13 @@ aplic_handle_sourcecfg(struct aplic *aplic, int i, bool write, uint64_t *val)
 {
 	struct aplic_irq *irq;
 
+	mtx_lock_spin(&aplic->mtx);
 	irq = &aplic->irqs[i];
 	if (write)
 		irq->sourcecfg = *val;
 	else
 		*val = irq->sourcecfg;
+	mtx_unlock_spin(&aplic->mtx);
 
 	return (0);
 }
@@ -133,10 +135,12 @@ aplic_set_enabled(struct aplic *aplic, bool write, uint64_t *val, bool enabled)
 
 	irq = &aplic->irqs[i];
 
+	mtx_lock_spin(&aplic->mtx);
 	if (enabled)
 		irq->state |= APLIC_IRQ_STATE_ENABLED;
 	else
 		irq->state &= ~APLIC_IRQ_STATE_ENABLED;
+	mtx_unlock_spin(&aplic->mtx);
 
 	return (0);
 }
@@ -160,11 +164,13 @@ aplic_handle_idc_claimi(struct aplic *aplic, int cpu, bool write, uint64_t *val)
 	if (write)
 		return (-1);
 
+	mtx_lock_spin(&aplic->mtx);
 	for (i = 0; i < aplic->nirqs; i++) {
 		irq = &aplic->irqs[i];
 		if (irq->state & APLIC_IRQ_STATE_PENDING) {
 			*val = (i << CLAIMI_IRQ_S) | (0 << CLAIMI_PRIO_S);
 			irq->state &= ~APLIC_IRQ_STATE_PENDING;
+			mtx_unlock_spin(&aplic->mtx);
 			return (0);
 		}
 	}
@@ -380,11 +386,15 @@ aplic_check_pending(struct hypctx *hypctx)
 	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
 		return (0);
 
+	mtx_lock_spin(&aplic->mtx);
 	for (i = 0; i < aplic->nirqs; i++) {
 		irq = &aplic->irqs[i];
-		if (irq->state & APLIC_IRQ_STATE_PENDING)
+		if (irq->state & APLIC_IRQ_STATE_PENDING) {
+			mtx_unlock_spin(&aplic->mtx);
 			return (1);
+		}
 	}
+	mtx_unlock_spin(&aplic->mtx);
 
 	return (0);
 }
@@ -399,9 +409,12 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
 		return (0);
 
+	mtx_lock_spin(&aplic->mtx);
 	irq = &aplic->irqs[irqid];
-	if (irq->sourcecfg & SOURCECFG_D)
+	if (irq->sourcecfg & SOURCECFG_D) {
+		mtx_unlock_spin(&aplic->mtx);
 		return (0);
+	}
 
 	switch (irq->sourcecfg & SOURCECFG_SM_M) {
 	case SOURCECFG_SM_EDGE1:
@@ -413,6 +426,7 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	default:
 		break;
 	}
+	mtx_unlock_spin(&aplic->mtx);
 
 	return (0);
 }
