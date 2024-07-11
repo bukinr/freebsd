@@ -74,6 +74,7 @@ struct hypctx {
 	struct hyp *hyp;
 	struct vcpu *vcpu;
 	bool has_exception;
+	int cpu_id;
 };
 
 struct hyp {
