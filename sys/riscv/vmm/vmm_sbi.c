@@ -56,32 +56,86 @@
 #include <machine/sbi.h>
 
 #include "riscv.h"
-
-/*
- * SBI is fully handled in userspace.
- *
- * TODO: We may need to handle the SBI IPI extension here in kernel.
- * The same for the SBI TIME extension in case of no SSTC support in HW.
- */
+#include "vmm_aplic.h"
 
 static int
-vmm_sbi_handle_ipi(struct vcpu *vcpu, struct hypctx *hypctx)
+vmm_sbi_handle_rfnc(struct vcpu *vcpu, struct hypctx *hypctx)
 {
+	uint64_t hart_mask __unused;
+	uint64_t start __unused;
+	uint64_t size __unused;
 	uint64_t func_id;
-	uint64_t hart_mask;
 
 	func_id = hypctx->guest_regs.hyp_a[6];
+	hart_mask = hypctx->guest_regs.hyp_a[0];
+	start = hypctx->guest_regs.hyp_a[2];
+	size = hypctx->guest_regs.hyp_a[3];
 
-	printf("%s: func %ld\n", __func__, func_id);
+	dprintf("%s: %ld hart_mask %lx start %lx size %lx\n", __func__,
+	    func_id, hart_mask, start, size);
+
+	/* TODO. */
 
 	switch (func_id) {
-	case SBI_IPI_SEND_IPI:
-		hart_mask = hypctx->guest_regs.hyp_a[0];
-		printf("hart_mask %lx\n", hart_mask);
+	case SBI_RFNC_REMOTE_FENCE_I:
+		break;
+	case SBI_RFNC_REMOTE_SFENCE_VMA:
+		break;
+	case SBI_RFNC_REMOTE_SFENCE_VMA_ASID:
 		break;
 	default:
 		break;
 	}
+
+	hypctx->guest_regs.hyp_a[0] = 0;
+
+	return (0);
+}
+
+static int
+vmm_sbi_handle_ipi(struct vcpu *vcpu, struct hypctx *hypctx)
+{
+	struct hypctx *target_hypctx;
+	struct vcpu *target_vcpu __unused;
+	cpuset_t active_cpus;
+	struct hyp *hyp;
+	uint64_t hart_mask;
+	uint64_t func_id;
+	int hart_id;
+	int bit;
+	int ret;
+
+	func_id = hypctx->guest_regs.hyp_a[6];
+	hart_mask = hypctx->guest_regs.hyp_a[0];
+
+	dprintf("%s: hart_mask %lx\n", __func__, hart_mask);
+
+	hyp = hypctx->hyp;
+
+	active_cpus = vm_active_cpus(hyp->vm);
+
+	switch (func_id) {
+	case SBI_IPI_SEND_IPI:
+		while ((bit = ffs(hart_mask))) {
+			hart_id = (bit - 1);
+			hart_mask &= ~(1u << hart_id);
+			if (CPU_ISSET(hart_id, &active_cpus)) {
+				/* TODO. */
+				target_vcpu = vm_vcpu(hyp->vm, hart_id);
+				target_hypctx = hypctx->hyp->ctx[hart_id];
+				aplic_arch_irq(target_hypctx, hart_id,
+				    HVIP_VSSIP);
+			}
+		}
+		ret = 0;
+		break;
+	default:
+		printf("%s: unknown func %ld\n", __func__, func_id);
+		ret = -1;
+		break;
+	}
+
+	hypctx->guest_regs.hyp_a[0] = ret;
 
 	return (0);
 }
@@ -106,6 +160,9 @@ vmm_sbi_ecall(struct vcpu *vcpu, bool *retu)
 	    hypctx->guest_regs.hyp_a[7]);
 
 	switch (sbi_extension_id) {
+	case SBI_EXT_ID_RFNC:
+		vmm_sbi_handle_rfnc(vcpu, hypctx);
+		break;
 	case SBI_EXT_ID_TIME:
 		break;
 	case SBI_EXT_ID_IPI:
