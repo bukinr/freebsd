@@ -360,7 +360,8 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 			else if (m_op(insn, MATCH_C_SD, MASK_C_SD))
 				vie->access_size = 8;
 			else
-				panic("unknown store instr at %lx", guest_addr);
+				panic("unknown compressed store instr at %lx",
+				    guest_addr);
 		} else  {
 			if (m_op(insn, MATCH_C_LW, MASK_C_LW))
 				vie->access_size = 4;
