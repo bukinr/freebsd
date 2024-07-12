@@ -473,7 +473,7 @@ riscv_check_ipi(struct hypctx *hypctx, bool clear)
 	if (clear)
 		val = atomic_swap_32(&hypctx->ipi_pending, 0);
 	else
-		val = hypctx->ipi_req;
+		val = hypctx->ipi_pending;
 
 	return (val);
 }
