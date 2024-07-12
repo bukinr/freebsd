@@ -1515,7 +1515,7 @@ restart:
 		case VM_EXITCODE_ECALL:
 			/* Handle in userland. */
 			vcpu->nextpc = vme->pc + vme->inst_length;
-			error = vmm_sbi_ecall(vcpu, &retu);
+			retu = true;
 			break;
 		case VM_EXITCODE_PAGING:
 			vcpu->nextpc = vme->pc;
