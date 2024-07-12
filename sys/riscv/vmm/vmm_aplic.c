@@ -91,6 +91,7 @@ struct aplic_irq {
 #define	APLIC_IRQ_STATE_PENDING	(1 << 0)
 #define	APLIC_IRQ_STATE_ENABLED	(1 << 1)
 	uint32_t target;
+	uint32_t target_cpu;
 };
 
 struct aplic {
@@ -148,14 +149,29 @@ aplic_set_enabled(struct aplic *aplic, bool write, uint64_t *val, bool enabled)
 static int
 aplic_handle_target(struct aplic *aplic, int i, bool write, uint64_t *val)
 {
+	struct aplic_irq *irq;
 
-	printf("%s: i %d\n", __func__, i);
+	mtx_lock_spin(&aplic->mtx);
+	irq = &aplic->irqs[i];
+	if (irq->state & APLIC_IRQ_STATE_PENDING) {
+		/* TODO. */
+		panic("pending");
+	}
+	if (write) {
+		irq->target = *val;
+		irq->target_cpu = irq->target >> 18;
+	} else
+		*val = irq->target;
+	if (write)
+		printf("new target_cpu %x irq %d\n", irq->target_cpu, i);
+	mtx_unlock_spin(&aplic->mtx);
 
 	return (0);
 }
 
 static int
-aplic_handle_idc_claimi(struct aplic *aplic, int cpu, bool write, uint64_t *val)
+aplic_handle_idc_claimi(struct hyp *hyp, struct aplic *aplic, int cpu_id,
+    bool write, uint64_t *val)
 {
 	struct aplic_irq *irq;
 	int i;
@@ -167,6 +183,8 @@ aplic_handle_idc_claimi(struct aplic *aplic, int cpu, bool write, uint64_t *val)
 	mtx_lock_spin(&aplic->mtx);
 	for (i = 0; i < aplic->nirqs; i++) {
 		irq = &aplic->irqs[i];
+		if (irq->target_cpu != cpu_id)
+			continue;
 		if (irq->state & APLIC_IRQ_STATE_PENDING) {
 			*val = (i << CLAIMI_IRQ_S) | (0 << CLAIMI_PRIO_S);
 			irq->state &= ~APLIC_IRQ_STATE_PENDING;
@@ -175,14 +193,14 @@ aplic_handle_idc_claimi(struct aplic *aplic, int cpu, bool write, uint64_t *val)
 		}
 	}
 
-	panic("claimi without pending");
+	panic("claimi without pending, cpu_id %d", cpu_id);
 
 	return (0);
 }
 
 static int
-aplic_handle_idc(struct aplic *aplic, int cpu, int reg, bool write,
-    uint64_t *val)
+aplic_handle_idc(struct hyp *hyp, struct aplic *aplic, int cpu, int reg,
+    bool write, uint64_t *val)
 {
 	int error;
 
@@ -194,7 +212,7 @@ aplic_handle_idc(struct aplic *aplic, int cpu, int reg, bool write,
 		error = 0;
 		break;
 	case IDC_CLAIMI(0):
-		error = aplic_handle_idc_claimi(aplic, cpu, write, val);
+		error = aplic_handle_idc_claimi(hyp, aplic, cpu, write, val);
 		break;
 	default:
 		panic("unknown reg");
@@ -204,7 +222,8 @@ aplic_handle_idc(struct aplic *aplic, int cpu, int reg, bool write,
 }
 
 static int
-aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
+aplic_mmio_access(struct hyp *hyp, struct aplic *aplic, uint64_t reg,
+    bool write, uint64_t *val)
 {
 	int error;
 	int cpu;
@@ -219,7 +238,7 @@ aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 	}
 
 	if ((reg >= APLIC_TARGET(1)) && (reg <= APLIC_TARGET(aplic->nirqs))) {
-		i = (reg - APLIC_TARGET(1)) >> 2;
+		i = ((reg - APLIC_TARGET(1)) >> 2) + 1;
 		error = aplic_handle_target(aplic, i, write, val);
 		return (error);
 	}
@@ -227,7 +246,7 @@ aplic_mmio_access(struct aplic *aplic, uint64_t reg, bool write, uint64_t *val)
 	if ((reg >= APLIC_IDC(0)) && (reg < APLIC_IDC(mp_ncpus))) {
 		cpu = (reg - APLIC_IDC(0)) >> 5;
 		r = (reg - APLIC_IDC(0)) % 32;
-		error = aplic_handle_idc(aplic, cpu, r, write, val);
+		error = aplic_handle_idc(hyp, aplic, cpu, r, write, val);
 		return (error);
 	}
 
@@ -271,7 +290,7 @@ mem_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval, int size,
 
 	reg = fault_ipa - aplic->mem_start;
 
-	error = aplic_mmio_access(aplic, reg, false, &val);
+	error = aplic_mmio_access(hyp, aplic, reg, false, &val);
 	if (error == 0)
 		*rval = val;
 
@@ -303,7 +322,7 @@ mem_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval, int size,
 
 	val = wval;
 
-	error = aplic_mmio_access(aplic, reg, true, &val);
+	error = aplic_mmio_access(hyp, aplic, reg, true, &val);
 
 	return (error);
 }
@@ -368,7 +387,6 @@ aplic_detach_from_vm(struct hyp *hyp)
 
 	if (hyp->aplic_attached) {
 		hyp->aplic_attached = false;
-
 		free(aplic->irqs, M_APLIC);
 	}
 }
@@ -383,14 +401,21 @@ aplic_check_pending(struct hypctx *hypctx)
 
 	hyp = hypctx->hyp;
 	aplic = hyp->aplic;
-	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
-		return (0);
 
 	mtx_lock_spin(&aplic->mtx);
+	if ((aplic->domaincfg & DOMAINCFG_IE) == 0) {
+		mtx_unlock_spin(&aplic->mtx);
+		return (0);
+	}
+
 	for (i = 0; i < aplic->nirqs; i++) {
 		irq = &aplic->irqs[i];
-		if (irq->state & APLIC_IRQ_STATE_PENDING) {
+		if (irq->target_cpu != hypctx->cpu_id)
+			continue;
+		if ((irq->state & APLIC_IRQ_STATE_ENABLED) &&
+		    (irq->state & APLIC_IRQ_STATE_PENDING)) {
 			mtx_unlock_spin(&aplic->mtx);
+			/* Found. */
 			return (1);
 		}
 	}
@@ -404,29 +429,42 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
 	struct aplic_irq *irq;
 	struct aplic *aplic;
+	bool notify;
 
 	aplic = hyp->aplic;
-	if ((aplic->domaincfg & DOMAINCFG_IE) == 0)
-		return (0);
 
 	mtx_lock_spin(&aplic->mtx);
+	if ((aplic->domaincfg & DOMAINCFG_IE) == 0) {
+		mtx_unlock_spin(&aplic->mtx);
+		return (0);
+	}
+
 	irq = &aplic->irqs[irqid];
 	if (irq->sourcecfg & SOURCECFG_D) {
 		mtx_unlock_spin(&aplic->mtx);
 		return (0);
 	}
 
+	notify = false;
 	switch (irq->sourcecfg & SOURCECFG_SM_M) {
 	case SOURCECFG_SM_EDGE1:
-		if (level)
-			irq->state |= APLIC_IRQ_STATE_PENDING;
-		else
-			irq->state &= ~APLIC_IRQ_STATE_PENDING;
+		if (level) {
+			if (irq->state & APLIC_IRQ_STATE_ENABLED) {
+				irq->state |= APLIC_IRQ_STATE_PENDING;
+				notify = true;
+			}
+		}
+		break;
+	case SOURCECFG_SM_DETACHED:
 		break;
 	default:
+		/* TODO. */
 		break;
 	}
 	mtx_unlock_spin(&aplic->mtx);
+
+	if (notify)
+		vcpu_notify_event(vm_vcpu(hyp->vm, irq->target_cpu));
 
 	return (0);
 }
