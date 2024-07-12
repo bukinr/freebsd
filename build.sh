@@ -20,3 +20,4 @@ echo bhyve -c 8 -m 2560 -o bootrom=/kernel.bin -o console=stdio -s 4,ahci-hd,/bi
 echo bhyve -c 8 -m 256 -o bootrom=/kernel.bin -o console=stdio test
 echo bhyve -c 2 -m 256 -o bootrom=/kernel.bin -o console=stdio test
 echo bhyve -m 256 -o bootrom=/kernel.bin -o console=stdio test
+echo "while true; do find /; done"
