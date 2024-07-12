@@ -385,6 +385,7 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 	uint64_t insn;
 	uint64_t gpa;
 	bool handled;
+	int i;
 
 	handled = false;
 
@@ -419,6 +420,8 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 		panic("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
 		    __func__, vme->sepc, vme->stval, vme->htval);
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
+		for (i = 0; i < nitems(vme->u.ecall.args); i++)
+			vme->u.ecall.args[i] = hypctx->guest_regs.hyp_a[i];
 		vme->exitcode = VM_EXITCODE_ECALL;
 		handled = false;
 		break;

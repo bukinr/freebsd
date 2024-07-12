@@ -1466,11 +1466,9 @@ vm_run(struct vcpu *vcpu)
 	struct vm_eventinfo evinfo;
 	struct vm_exit *vme;
 	struct vm *vm;
-	struct hypctx *hypctx;
 	pmap_t pmap;
 	int error;
 	int vcpuid;
-	int i;
 	bool retu;
 
 	vm = vcpu->vm;
@@ -1518,16 +1516,15 @@ restart:
 			/* Handle in userland. */
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vmm_sbi_ecall(vcpu, &retu);
-			if (retu == true) {
-				hypctx = vcpu_get_cookie(vcpu);
-				for (i = 0; i < nitems(vme->u.ecall.args); i++)
-					vme->u.ecall.args[i] =
-					    hypctx->guest_regs.hyp_a[i];
-			}
 			break;
 		case VM_EXITCODE_PAGING:
 			vcpu->nextpc = vme->pc;
 			error = vm_handle_paging(vcpu, &retu);
+			break;
+		case VM_EXITCODE_BOGUS:
+			vcpu->nextpc = vme->pc;
+			retu = false;
+			error = 0;
 			break;
 		default:
 			/* Handle in userland. */
