@@ -75,6 +75,7 @@ struct hypctx {
 	struct vcpu *vcpu;
 	bool has_exception;
 	int cpu_id;
+	int ipi_pending;
 };
 
 struct hyp {
@@ -113,5 +114,8 @@ DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 struct hypctx *riscv_get_active_vcpu(void);
 void vmm_switch(struct hypctx *);
 int vmm_sbi_ecall(struct vcpu *, bool *);
+
+void riscv_send_ipi(struct hypctx *hypctx, int hart_id);
+int riscv_check_ipi(struct hypctx *hypctx, bool clear);
 
 #endif /* !_VMM_RISCV_H_ */

@@ -217,6 +217,7 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
 	hypctx->guest_regs.hyp_sstatus |= SSTATUS_FS_INITIAL;
 	hypctx->guest_regs.hyp_hstatus = HSTATUS_SPV | HSTATUS_VTW;
+	hypctx->cpu_id = vcpuid;
 
 	hyp->ctx[vcpuid] = hypctx;
 
@@ -450,6 +451,33 @@ vmmops_gla2gpa(void *vcpui, struct vm_guest_paging *paging, uint64_t gla,
 	return (0);
 }
 
+void
+riscv_send_ipi(struct hypctx *hypctx, int hart_id)
+{
+	struct hyp *hyp;
+	struct vm *vm;
+
+	hyp = hypctx->hyp;
+	vm = hyp->vm;
+
+	atomic_set_32(&hypctx->ipi_pending, 1);
+
+	vcpu_notify_event(vm_vcpu(vm, hart_id));
+}
+
+int
+riscv_check_ipi(struct hypctx *hypctx, bool clear)
+{
+	int val;
+
+	if (clear)
+		val = atomic_swap_32(&hypctx->ipi_pending, 0);
+	else
+		val = hypctx->ipi_req;
+
+	return (val);
+}
+
 static void
 riscv_sync_interrupts(struct hypctx *hypctx)
 {
@@ -461,6 +489,17 @@ riscv_sync_interrupts(struct hypctx *hypctx)
 		hypctx->guest_csrs.hvip |= HVIP_VSEIP;
 	else
 		hypctx->guest_csrs.hvip &= ~HVIP_VSEIP;
+
+	csr_write(hvip, hypctx->guest_csrs.hvip);
+}
+
+static void
+riscv_sync_ipi(struct hypctx *hypctx)
+{
+
+	/* Guest clears VSSIP bit manually. */
+	if (riscv_check_ipi(hypctx, true))
+		hypctx->guest_csrs.hvip |= HVIP_VSSIP;
 
 	csr_write(hvip, hypctx->guest_csrs.hvip);
 }
@@ -492,7 +531,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	vmmops_delegate();
 
 	csr_write(henvcfg, HENVCFG_STCE);
-	csr_write(hie, HIE_VSEIE | HIE_SGEIE);
+	csr_write(hie, HIE_VSEIE | HIE_VSSIE | HIE_SGEIE);
 
 	/*
 	 * TODO: should we trap rdcycle / rdtime ?
@@ -534,6 +573,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		aplic_flush_hwstate(hypctx);
 
 		riscv_sync_interrupts(hypctx);
+		riscv_sync_ipi(hypctx);
 
 		dprintf("%s: Entering guest VM, vsatp %lx, ss %lx hs %lx\n",
 		    __func__, csr_read(vsatp), hypctx->guest_regs.hyp_sstatus,
@@ -544,6 +584,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		dprintf("%s: Leaving guest VM\n", __func__);
 
 		aplic_sync_hwstate(hypctx);
+		riscv_sync_interrupts(hypctx);
 
 		/*
 		 * TODO: deactivate stage 2 pmap here if needed.

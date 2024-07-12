@@ -1390,6 +1390,9 @@ vm_handle_wfi(struct vcpu *vcpu, struct vm_exit *vme, bool *retu)
 		if (aplic_check_pending(vcpu->cookie))
 			break;
 
+		if (riscv_check_ipi(vcpu->cookie, false))
+			break;
+
 		if (vcpu_should_yield(vcpu))
 			break;
 
