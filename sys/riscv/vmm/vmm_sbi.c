@@ -63,12 +63,14 @@ vmm_sbi_handle_rfnc(struct vcpu *vcpu, struct hypctx *hypctx)
 	uint64_t hart_mask __unused;
 	uint64_t start __unused;
 	uint64_t size __unused;
+	uint64_t asid __unused;
 	uint64_t func_id;
 
 	func_id = hypctx->guest_regs.hyp_a[6];
 	hart_mask = hypctx->guest_regs.hyp_a[0];
 	start = hypctx->guest_regs.hyp_a[2];
 	size = hypctx->guest_regs.hyp_a[3];
+	asid = hypctx->guest_regs.hyp_a[4];
 
 	dprintf("%s: %ld hart_mask %lx start %lx size %lx\n", __func__,
 	    func_id, hart_mask, start, size);
