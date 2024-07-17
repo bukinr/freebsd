@@ -74,6 +74,8 @@ MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 #define	APLIC_CLRIENUM		0x1fdc
 #define	APLIC_GENMSI		0x3000
 #define	APLIC_TARGET(x)		(0x3004 + ((x) - 1) * 4)
+#define	 TARGET_HART_S		18
+#define	 TARGET_HART_M		0x3fff
 #define	APLIC_IDC(x)		(0x4000 + (x) * 32)
 #define	 IDC_IDELIVERY(x)	(APLIC_IDC(x) + 0x0)
 #define	 IDC_IFORCE(x)		(APLIC_IDC(x) + 0x4)
@@ -91,7 +93,7 @@ struct aplic_irq {
 #define	APLIC_IRQ_STATE_PENDING	(1 << 0)
 #define	APLIC_IRQ_STATE_ENABLED	(1 << 1)
 	uint32_t target;
-	uint32_t target_cpu;
+	uint32_t target_hart;
 };
 
 struct aplic {
@@ -159,11 +161,11 @@ aplic_handle_target(struct aplic *aplic, int i, bool write, uint64_t *val)
 	}
 	if (write) {
 		irq->target = *val;
-		irq->target_cpu = irq->target >> 18;
+		irq->target_hart = (irq->target >> TARGET_HART_S);
 	} else
 		*val = irq->target;
 	if (write)
-		printf("new target_cpu %x irq %d\n", irq->target_cpu, i);
+		printf("new target_hart %x irq %d\n", irq->target_hart, i);
 	mtx_unlock_spin(&aplic->mtx);
 
 	return (0);
@@ -183,7 +185,7 @@ aplic_handle_idc_claimi(struct hyp *hyp, struct aplic *aplic, int cpu_id,
 	mtx_lock_spin(&aplic->mtx);
 	for (i = 0; i < aplic->nirqs; i++) {
 		irq = &aplic->irqs[i];
-		if (irq->target_cpu != cpu_id)
+		if (irq->target_hart != cpu_id)
 			continue;
 		if (irq->state & APLIC_IRQ_STATE_PENDING) {
 			*val = (i << CLAIMI_IRQ_S) | (0 << CLAIMI_PRIO_S);
@@ -410,7 +412,7 @@ aplic_check_pending(struct hypctx *hypctx)
 
 	for (i = 0; i < aplic->nirqs; i++) {
 		irq = &aplic->irqs[i];
-		if (irq->target_cpu != hypctx->cpu_id)
+		if (irq->target_hart != hypctx->cpu_id)
 			continue;
 		if ((irq->state & APLIC_IRQ_STATE_ENABLED) &&
 		    (irq->state & APLIC_IRQ_STATE_PENDING)) {
@@ -464,7 +466,7 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	mtx_unlock_spin(&aplic->mtx);
 
 	if (notify)
-		vcpu_notify_event(vm_vcpu(hyp->vm, irq->target_cpu));
+		vcpu_notify_event(vm_vcpu(hyp->vm, irq->target_hart));
 
 	return (0);
 }
