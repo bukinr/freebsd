@@ -94,7 +94,7 @@ add_cpu(void *fdt, int cpuid)
 	fdt_property_string(fdt, "device_type", "cpu");
 	fdt_property_string(fdt, "compatible", "riscv");
 	fdt_property_u32(fdt, "reg", cpuid);
-	fdt_property_string(fdt, "riscv,isa", "rv64imafdch_zicntr_zihpm_sstc");
+	fdt_property_string(fdt, "riscv,isa", "rv64imafdc_sstc");
 	fdt_property_string(fdt, "mmu-type", "riscv,sv39");
 	fdt_property_string(fdt, "clock-frequency", "1000000000");
 
