@@ -55,10 +55,18 @@
 #include "debug.h"
 #include "mem.h"
 #include "vmexit.h"
+#include "riscv.h"
 
 #define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
 
-static cpuset_t running_cpumask;
+static cpuset_t running_cpumask = CPUSET_T_INITIALIZER(0);
+
+void
+vmexit_set_bsp(int hart_id)
+{
+
+	CPU_SET_ATOMIC(hart_id, &running_cpumask);
+}
 
 static int
 vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,

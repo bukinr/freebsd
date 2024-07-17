@@ -55,6 +55,7 @@
 #include "pci_emul.h"
 #include "pci_irq.h"
 #include "uart_emul.h"
+#include "riscv.h"
 
 /* Start of mem + 32M */
 #define	FDT_BASE	0x2000000
@@ -340,6 +341,7 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 
 	pci_irq_init(pcie_intrs);
 	fdt_add_pcie(pcie_intrs);
+	vmexit_set_bsp(vcpu_id(bsp));
 
 	return (0);
 }
