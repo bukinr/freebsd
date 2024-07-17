@@ -59,13 +59,13 @@
 
 #define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
 
-static cpuset_t running_cpumask = CPUSET_T_INITIALIZER(0);
+static cpuset_t running_hartmask = CPUSET_T_INITIALIZER(0);
 
 void
 vmexit_set_bsp(int hart_id)
 {
 
-	CPU_SET_ATOMIC(hart_id, &running_cpumask);
+	CPU_SET_ATOMIC(hart_id, &running_hartmask);
 }
 
 static int
@@ -186,15 +186,15 @@ vmexit_ecall_hsm(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 
 	ret = -1;
 
-	if (hart_id > (uint64_t)guest_ncpus)
+	if (HART_TO_CPU(hart_id) >= (uint64_t)guest_ncpus)
 		return (ret);
 
-	newvcpu = fbsdrun_vcpu(hart_id);
+	newvcpu = fbsdrun_vcpu(HART_TO_CPU(hart_id));
 	assert(newvcpu != NULL);
 
 	switch (func_id) {
 	case SBI_HSM_HART_START:
-		if (CPU_ISSET(hart_id, &running_cpumask))
+		if (CPU_ISSET(hart_id, &running_hartmask))
 			break;
 
 		/* Set hart ID. */
@@ -207,14 +207,14 @@ vmexit_ecall_hsm(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 		assert(error == 0);
 
 		vm_resume_cpu(newvcpu);
-		CPU_SET_ATOMIC(hart_id, &running_cpumask);
+		CPU_SET_ATOMIC(hart_id, &running_hartmask);
 
 		ret = 0;
 		break;
 	case SBI_HSM_HART_STOP:
-		if (!CPU_ISSET(hart_id, &running_cpumask))
+		if (!CPU_ISSET(hart_id, &running_hartmask))
 			break;
-		CPU_CLR_ATOMIC(hart_id, &running_cpumask);
+		CPU_CLR_ATOMIC(hart_id, &running_hartmask);
 		vm_suspend_cpu(newvcpu);
 		ret = 0;
 		break;

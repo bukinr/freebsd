@@ -33,6 +33,9 @@
 #ifndef _RISCV_H_
 #define _RISCV_H_
 
+#define	CPU_TO_HART(x)	(x)
+#define	HART_TO_CPU(x)	(x)
+
 void vmexit_set_bsp(int hart_id);
 
 #endif /* !_RISCV_H_ */
