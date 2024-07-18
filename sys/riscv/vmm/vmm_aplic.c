@@ -155,17 +155,11 @@ aplic_handle_target(struct aplic *aplic, int i, bool write, uint64_t *val)
 
 	mtx_lock_spin(&aplic->mtx);
 	irq = &aplic->irqs[i];
-	if (irq->state & APLIC_IRQ_STATE_PENDING) {
-		/* TODO. */
-		panic("pending");
-	}
 	if (write) {
 		irq->target = *val;
 		irq->target_hart = (irq->target >> TARGET_HART_S);
 	} else
 		*val = irq->target;
-	if (write)
-		printf("new target_hart %x irq %d\n", irq->target_hart, i);
 	mtx_unlock_spin(&aplic->mtx);
 
 	return (0);
@@ -451,10 +445,9 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	switch (irq->sourcecfg & SOURCECFG_SM_M) {
 	case SOURCECFG_SM_EDGE1:
 		if (level) {
-			if (irq->state & APLIC_IRQ_STATE_ENABLED) {
-				irq->state |= APLIC_IRQ_STATE_PENDING;
+			irq->state |= APLIC_IRQ_STATE_PENDING;
+			if (irq->state & APLIC_IRQ_STATE_ENABLED)
 				notify = true;
-			}
 		}
 		break;
 	case SOURCECFG_SM_DETACHED:
