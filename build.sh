@@ -21,3 +21,17 @@ echo bhyve -c 8 -m 256 -o bootrom=/kernel.bin -o console=stdio test
 echo bhyve -c 2 -m 256 -o bootrom=/kernel.bin -o console=stdio test
 echo bhyve -m 256 -o bootrom=/kernel.bin -o console=stdio test
 echo "while true; do find /; done"
+echo bhyve -m 256 -o bootrom=/u-boot.bin -o console=stdio test
+
+echo bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 4,virtio-blk,/disk.img test
+
+echo bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 3:0,virtio-rnd -s 4,virtio-blk,/dev/da0 test
+
+echo fatload virtio 0 0x10a000000 kernel.bin
+
+# bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 4,virtio-blk,/dev/da0 test
+# bootefi bootmgr
+
+# fatload virtio  1 0x10a000000 loader.efi
+# bootefi 0x10a000000
+
