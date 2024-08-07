@@ -104,6 +104,7 @@ device		virtio_pci		# VirtIO PCI device
 device		vtnet			# VirtIO Ethernet device
 device		virtio_blk		# VirtIO Block device
 device		virtio_mmio		# VirtIO MMIO bus
+device		virtio_scsi
 
 # ATA/SCSI peripherals
 device		pass			# Passthrough device (direct ATA/SCSI access)
@@ -205,9 +206,7 @@ include		"std.starfive"
 
 # Uncomment for memory disk
 options 	MD_ROOT
-#options 	MD_ROOT_SIZE=32768	# 32MB ram disk
-#options 	MD_ROOT_SIZE=38912	# 38MB ram disk
-options 	MD_ROOT_SIZE=49152	# 48MB ram disk
+options 	MD_ROOT_SIZE=50176	# 49MB ram disk
 makeoptions 	MFS_IMAGE=/home/br/dev/freebsd/mdroot.img
 options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 
