@@ -1,4 +1,7 @@
 #mtree 2.0
 . type=dir uname=root gname=wheel mode=0755
 ./home type=dir uname=root gname=wheel mode=0755
-./kernel.bin type=file uname=root gname=wheel mode=0444
+#./kernel.bin type=file uname=root gname=wheel mode=0444
+./disk.img type=file uname=root gname=wheel mode=0444
+./u-boot.bin type=file uname=root gname=wheel mode=0444
+#./loader.efi type=file uname=root gname=wheel mode=0444
