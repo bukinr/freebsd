@@ -374,7 +374,8 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 		vme_ret->inst_length = 2;
 	}
 
-	dprintf("guest_addr %lx insn %lx, reg %d\n", guest_addr, insn, reg_num);
+	dprintf("guest_addr %lx insn %lx, reg %d, gpa %lx\n", guest_addr, insn,
+	    reg_num, vme_ret->u.inst_emul.gpa);
 
 	vie->reg = reg_num;
 }
@@ -767,6 +768,11 @@ vmmops_getreg(void *vcpui, int reg, uint64_t *retval)
 	if (running && hostcpu != curcpu)
 		panic("%s: %s%d is running", __func__, vm_name(hypctx->hyp->vm),
 		    vcpu_vcpuid(hypctx->vcpu));
+
+	if (reg == VM_REG_GUEST_ZERO) {
+		*retval = 0;
+		return (0);
+	}
 
 	regp = hypctx_regptr(hypctx, reg);
 	if (regp == NULL)
