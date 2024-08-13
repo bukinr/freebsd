@@ -1,6 +1,8 @@
 A=CONF
 if [ "$1" = "fast" ]; then
         A=FAST
+else
+    make -j24 TARGET=riscv KERN${A}=GENERIC cleankernel
 fi
 
 make -j24 TARGET=riscv KERN${A}=GENERIC buildkernel || exit 1
@@ -29,8 +31,9 @@ echo bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 3:0,virtio-rnd
 
 echo fatload virtio 0 0x10a000000 kernel.bin
 
-# bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 4,virtio-blk,/dev/da0 test
-# bootefi bootmgr
+echo Startup cmd
+echo bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 4,virtio-blk,/dev/da0 test
+echo bootefi bootmgr
 
 # fatload virtio  1 0x10a000000 loader.efi
 # bootefi 0x10a000000
