@@ -2060,7 +2060,9 @@ stop_lld(struct adapter *sc)
 			}
 #if defined(TCP_OFFLOAD) || defined(RATELIMIT)
 			for_each_ofld_txq(vi, k, ofld_txq) {
+				TXQ_LOCK(&ofld_txq->wrq);
 				ofld_txq->wrq.eq.flags &= ~EQ_HW_ALLOCATED;
+				TXQ_UNLOCK(&ofld_txq->wrq);
 			}
 #endif
 			for_each_rxq(vi, k, rxq) {
@@ -2078,7 +2080,9 @@ stop_lld(struct adapter *sc)
 		if (sc->flags & FULL_INIT_DONE) {
 			/* Control queue */
 			wrq = &sc->sge.ctrlq[i];
+			TXQ_LOCK(wrq);
 			wrq->eq.flags &= ~EQ_HW_ALLOCATED;
+			TXQ_UNLOCK(wrq);
 			quiesce_wrq(wrq);
 		}
 	}
@@ -2530,6 +2534,15 @@ reset_adapter_with_pl_rst(struct adapter *sc)
 	return (0);
 }
 
+static inline int
+reset_adapter(struct adapter *sc)
+{
+	if (vm_guest == 0)
+		return (reset_adapter_with_pci_bus_reset(sc));
+	else
+		return (reset_adapter_with_pl_rst(sc));
+}
+
 static void
 reset_adapter_task(void *arg, int pending)
 {
@@ -2540,10 +2553,7 @@ reset_adapter_task(void *arg, int pending)
 
 	if (pending > 1)
 		CH_ALERT(sc, "%s: pending %d\n", __func__, pending);
-	if (vm_guest == 0)
-		rc = reset_adapter_with_pci_bus_reset(sc);
-	else
-		rc = reset_adapter_with_pl_rst(sc);
+	rc = reset_adapter(sc);
 	if (rc != 0) {
 		CH_ERR(sc, "adapter did not reset properly, rc = %d, "
 		       "flags 0x%08x -> 0x%08x, err_flags 0x%08x -> 0x%08x.\n",
@@ -3646,7 +3656,7 @@ fatal_error_task(void *arg, int pending)
 
 	if (t4_reset_on_fatal_err) {
 		CH_ALERT(sc, "resetting adapter after fatal error.\n");
-		rc = reset_adapter_with_pci_bus_reset(sc);
+		rc = reset_adapter(sc);
 		if (rc == 0 && t4_panic_on_fatal_err) {
 			CH_ALERT(sc, "reset was successful, "
 			    "system will NOT panic.\n");
@@ -7047,8 +7057,22 @@ quiesce_txq(struct sge_txq *txq)
 static void
 quiesce_wrq(struct sge_wrq *wrq)
 {
+	struct wrqe *wr;
 
-	/* XXXTX */
+	TXQ_LOCK(wrq);
+	while ((wr = STAILQ_FIRST(&wrq->wr_list)) != NULL) {
+		STAILQ_REMOVE_HEAD(&wrq->wr_list, link);
+#ifdef INVARIANTS
+		wrq->nwr_pending--;
+		wrq->ndesc_needed -= howmany(wr->wr_len, EQ_ESIZE);
+#endif
+		free(wr, M_CXGBE);
+	}
+	MPASS(wrq->nwr_pending == 0);
+	MPASS(wrq->ndesc_needed == 0);
+	wrq->nwr_pending = 0;
+	wrq->ndesc_needed = 0;
+	TXQ_UNLOCK(wrq);
 }
 
 static void

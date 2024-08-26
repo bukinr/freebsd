@@ -83,5 +83,6 @@ __ElfType(Auxinfo);
 #define	HWCAP_ISA_H		HWCAP_ISA_BIT('h')
 #define	HWCAP_ISA_G		\
     (HWCAP_ISA_I | HWCAP_ISA_M | HWCAP_ISA_A | HWCAP_ISA_F | HWCAP_ISA_D)
+#define	HWCAP_ISA_B		HWCAP_ISA_BIT('b')
 
 #endif /* !_MACHINE_ELF_H_ */
