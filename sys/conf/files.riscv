@@ -12,6 +12,7 @@ dev/pci/pci_host_generic.c	optional	pci
 dev/pci/pci_host_generic_fdt.c	optional	pci fdt
 dev/uart/uart_cpu_fdt.c		optional	uart fdt
 dev/uart/uart_dev_lowrisc.c	optional	uart_lowrisc
+dev/vmm/vmm_dev.c		optional	vmm
 dev/vmm/vmm_stat.c		optional	vmm
 dev/xilinx/axi_quad_spi.c	optional	xilinx_spi
 dev/xilinx/axidma.c		optional	axidma xdma
@@ -76,7 +77,7 @@ riscv/riscv/unwind.c		optional	ddb | kdtrace_hooks | stack
 riscv/riscv/vm_machdep.c	standard
 riscv/vmm/vmm.c					optional	vmm
 riscv/vmm/vmm_aplic.c				optional	vmm
-riscv/vmm/vmm_dev.c				optional	vmm
+riscv/vmm/vmm_dev_machdep.c			optional	vmm
 riscv/vmm/vmm_instruction_emul.c		optional	vmm
 riscv/vmm/vmm_riscv.c				optional	vmm
 riscv/vmm/vmm_sbi.c				optional	vmm
