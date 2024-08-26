@@ -68,7 +68,8 @@
 
 #include <dev/pci/pcireg.h>
 
-#include "vmm_ktr.h"
+#include <dev/vmm/vmm_ktr.h>
+
 #include "vmm_stat.h"
 #include "riscv.h"
 
