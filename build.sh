@@ -35,6 +35,9 @@ echo Startup cmd
 echo bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 4,virtio-blk,/dev/da0 test
 echo bootefi bootmgr
 
+echo Bogus
+echo bhyve -c 8 -m 256 -o bootrom=/bin/ls -o console=stdio -s 4,virtio-blk,/dev/da0 test
+
 # fatload virtio  1 0x10a000000 loader.efi
 # bootefi 0x10a000000
 
