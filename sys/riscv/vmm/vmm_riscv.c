@@ -253,98 +253,123 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 }
 
 static void
-riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data)
+riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
+    struct hyptrap *trap)
 {
+	register uintptr_t htrap asm("a0");
+	register uint64_t htmp asm("a1");
 	uint64_t old_hstatus;
+	uint64_t old_stvec;
+	uintptr_t entry;
 	uint64_t val;
 	uint64_t tmp;
+	int intr;
+
+	entry = (uintptr_t)&vmm_unpriv_trap;
+	htrap = (uintptr_t)trap;
+
+	intr = intr_disable();
 
 	old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
-
-	/*
-	 * TODO: handle exceptions during unprivilege read.
-	 */
+	old_stvec = csr_swap(stvec, entry);
 
 	__asm __volatile(".option push\n"
 			 ".option norvc\n"
+			"add %[htmp], %[htrap], 0\n"
 			"hlvx.hu %[val], (%[addr])\n"
 			".option pop\n"
-	    : [val] "=&r" (val), [addr] "+&r" (guest_addr)
+	    : [val] "=&r" (val), [addr] "+&r" (guest_addr),
+	      [htrap] "+&r" (htrap), [htmp] "+&r" (htmp)
 	    :: "memory");
 
 	if ((val & 0x3) == 0x3) {
 		guest_addr += 2;
 		__asm __volatile(".option push\n"
 				 ".option norvc\n"
+				"add %[htmp], %[htrap], 0\n"
 				"hlvx.hu %[tmp], (%[addr])\n"
 				".option pop\n"
-		    : [tmp] "=&r" (tmp), [addr] "+&r" (guest_addr)
+		    : [tmp] "=&r" (tmp), [addr] "+&r" (guest_addr),
+		      [htrap] "+&r" (htrap), [htmp] "+&r" (htmp)
 		    :: "memory");
 		val |= (tmp << 16);
 	}
 
 	csr_write(hstatus, old_hstatus);
+	csr_write(stvec, old_stvec);
+
+	intr_restore(intr);
 
 	*data = val;
 }
 
-static void
-riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
+static int
+riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret,
+    struct hyptrap *trap)
 {
 	uint64_t guest_addr;
 	struct vie *vie;
 	uint64_t insn;
 	int reg_num;
 	int rs2, rd;
-
-	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2) |
-	    (vme_ret->stval & 0x3);
+	int direction;
+	int sign_extend;
+	int access_size;
 
 	guest_addr = vme_ret->sepc;
 
-	vie = &vme_ret->u.inst_emul.vie;
-	vie->dir = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
+	direction = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
 	    VM_DIR_WRITE : VM_DIR_READ;
-	vie->sign_extend = 1;
 
-	riscv_unpriv_read(hypctx, guest_addr, &insn);
+	sign_extend = 1;
+
+	bzero(trap, sizeof(struct hyptrap));
+	riscv_unpriv_read(hypctx, guest_addr, &insn, trap);
+	if (trap->scause)
+		return (-1);
 
 	if ((insn & 0x3) == 0x3) {
 		rs2 = (insn & RS2_MASK) >> RS2_SHIFT;
 		rd = (insn & RD_MASK) >> RD_SHIFT;
 
-		if (vie->dir == VM_DIR_WRITE) {
+		if (direction == VM_DIR_WRITE) {
 			if (m_op(insn, MATCH_SB, MASK_SB))
-				vie->access_size = 1;
+				access_size = 1;
 			else if (m_op(insn, MATCH_SH, MASK_SH))
-				vie->access_size = 2;
+				access_size = 2;
 			else if (m_op(insn, MATCH_SW, MASK_SW))
-				vie->access_size = 4;
+				access_size = 4;
 			else if (m_op(insn, MATCH_SD, MASK_SD))
-				vie->access_size = 8;
-			else
-				panic("unknown store instr at %lx", guest_addr);
+				access_size = 8;
+			else {
+				printf("unknown store instr at %lx",
+				    guest_addr);
+				return (-2);
+			}
 			reg_num = rs2;
 		} else {
 			if (m_op(insn, MATCH_LB, MASK_LB))
-				vie->access_size = 1;
+				access_size = 1;
 			else if (m_op(insn, MATCH_LH, MASK_LH))
-				vie->access_size = 2;
+				access_size = 2;
 			else if (m_op(insn, MATCH_LW, MASK_LW))
-				vie->access_size = 4;
+				access_size = 4;
 			else if (m_op(insn, MATCH_LD, MASK_LD))
-				vie->access_size = 8;
+				access_size = 8;
 			else if (m_op(insn, MATCH_LBU, MASK_LBU)) {
-				vie->access_size = 1;
-				vie->sign_extend = 0;
+				access_size = 1;
+				sign_extend = 0;
 			} else if (m_op(insn, MATCH_LHU, MASK_LHU)) {
-				vie->access_size = 2;
-				vie->sign_extend = 0;
+				access_size = 2;
+				sign_extend = 0;
 			} else if (m_op(insn, MATCH_LWU, MASK_LWU)) {
-				vie->access_size = 4;
-				vie->sign_extend = 0;
-			} else
-				panic("unknown load instr at %lx", guest_addr);
+				access_size = 4;
+				sign_extend = 0;
+			} else {
+				printf("unknown load instr at %lx",
+				    guest_addr);
+				return (-3);
+			}
 			reg_num = rd;
 		}
 		vme_ret->inst_length = 4;
@@ -354,40 +379,55 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret)
 		rd = (insn >> 2) & 0x7;
 		rd += 0x8;
 
-		if (vie->dir == VM_DIR_WRITE) {
+		if (direction == VM_DIR_WRITE) {
 			if (m_op(insn, MATCH_C_SW, MASK_C_SW))
-				vie->access_size = 4;
+				access_size = 4;
 			else if (m_op(insn, MATCH_C_SD, MASK_C_SD))
-				vie->access_size = 8;
-			else
-				panic("unknown compressed store instr at %lx",
+				access_size = 8;
+			else {
+				printf("unknown compressed store instr at %lx",
 				    guest_addr);
+				return (-4);
+			}
 		} else  {
 			if (m_op(insn, MATCH_C_LW, MASK_C_LW))
-				vie->access_size = 4;
+				access_size = 4;
 			else if (m_op(insn, MATCH_C_LD, MASK_C_LD))
-				vie->access_size = 8;
-			else
-				panic("unknown load instr at %lx", guest_addr);
+				access_size = 8;
+			else {
+				printf("unknown load instr at %lx", guest_addr);
+				return (-5);
+			}
 		}
 		reg_num = rd;
 		vme_ret->inst_length = 2;
 	}
 
+	vme_ret->u.inst_emul.gpa = (vme_ret->htval << 2) |
+	    (vme_ret->stval & 0x3);
+
 	dprintf("guest_addr %lx insn %lx, reg %d, gpa %lx\n", guest_addr, insn,
 	    reg_num, vme_ret->u.inst_emul.gpa);
 
+	vie = &vme_ret->u.inst_emul.vie;
+	vie->dir = direction;
 	vie->reg = reg_num;
+	vie->sign_extend = sign_extend;
+	vie->access_size = access_size;
+
+	return (0);
 }
 
 static bool
 riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
     pmap_t pmap)
 {
+	struct hyptrap trap;
 	uint64_t insn;
 	uint64_t gpa;
 	bool handled;
 	bool retu;
+	int ret;
 	int i;
 
 	handled = false;
@@ -412,7 +452,12 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 			vme->inst_length = 0;
 			vme->u.paging.gpa = gpa;
 		} else {
-			riscv_gen_inst_emul_data(hypctx, vme);
+			ret = riscv_gen_inst_emul_data(hypctx, vme, &trap);
+			if (ret != 0) {
+				vme->exitcode = VM_EXITCODE_HYP;
+				vme->u.hyp.scause = trap.scause;
+				break;
+			}
 			vme->exitcode = VM_EXITCODE_INST_EMUL;
 		}
 		break;

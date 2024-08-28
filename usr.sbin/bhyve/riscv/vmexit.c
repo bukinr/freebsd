@@ -344,8 +344,23 @@ vmexit_ecall(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 	return (VMEXIT_CONTINUE);
 }
 
+
+static int
+vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
+    struct vm_run *vmrun)
+{
+	struct vm_exit *vme;
+
+	vme = vmrun->vm_exit;
+
+	printf("unhandled exception: scause %#lx\n", vme->u.hyp.scause);
+
+	return (VMEXIT_ABORT);
+}
+
 const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_BOGUS]  = vmexit_bogus,
+	[VM_EXITCODE_HYP] = vmexit_hyp,
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,

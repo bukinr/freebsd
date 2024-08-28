@@ -86,6 +86,14 @@ struct hyp {
 	struct hypctx	*ctx[];
 };
 
+struct hyptrap {
+	uint64_t sepc;
+	uint64_t scause;
+	uint64_t stval;
+	uint64_t htval;
+	uint64_t htinst;
+};
+
 #define	DEFINE_VMMOPS_IFUNC(ret_type, opname, args)	\
     ret_type vmmops_##opname args;
 
@@ -113,6 +121,7 @@ DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 
 struct hypctx *riscv_get_active_vcpu(void);
 void vmm_switch(struct hypctx *);
+void vmm_unpriv_trap(struct hyptrap *, uint64_t tmp);
 int vmm_sbi_ecall(struct vcpu *, bool *);
 
 void riscv_send_ipi(struct hypctx *hypctx, int hart_id);

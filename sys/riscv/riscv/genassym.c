@@ -126,6 +126,12 @@ ASSYM(HYP_G_SSTATUS, offsetof(struct hypctx, guest_regs.hyp_sstatus));
 ASSYM(HYP_G_HSTATUS, offsetof(struct hypctx, guest_regs.hyp_hstatus));
 ASSYM(HYP_G_SCOUNTEREN, offsetof(struct hypctx, guest_scounteren));
 
+ASSYM(HYP_TRAP_SEPC, offsetof(struct hyptrap, sepc));
+ASSYM(HYP_TRAP_SCAUSE, offsetof(struct hyptrap, scause));
+ASSYM(HYP_TRAP_STVAL, offsetof(struct hyptrap, stval));
+ASSYM(HYP_TRAP_HTVAL, offsetof(struct hyptrap, htval));
+ASSYM(HYP_TRAP_HTINST, offsetof(struct hyptrap, htinst));
+
 ASSYM(RISCV_BOOTPARAMS_SIZE, sizeof(struct riscv_bootparams));
 ASSYM(RISCV_BOOTPARAMS_KERN_PHYS, offsetof(struct riscv_bootparams, kern_phys));
 ASSYM(RISCV_BOOTPARAMS_KERN_STACK, offsetof(struct riscv_bootparams,

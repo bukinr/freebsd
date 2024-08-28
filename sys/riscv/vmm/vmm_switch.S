@@ -200,3 +200,19 @@ ENTRY(vmm_switch)
 	ret
 
 END(vmm_switch)
+
+ENTRY(vmm_unpriv_trap)
+	csrr	a1, sepc
+	sd	a1, HYP_TRAP_SEPC(a0)
+	addi	a1, a1, 4	/* Next instruction. */
+	csrw	sepc, a1
+	csrr	a1, scause
+	sd	a1, HYP_TRAP_SCAUSE(a0)
+	csrr	a1, stval
+	sd	a1, HYP_TRAP_STVAL(a0)
+	csrr	a1, htval
+	sd	a1, HYP_TRAP_HTVAL(a0)
+	csrr	a1, htinst
+	sd	a1, HYP_TRAP_HTINST(a0)
+	sret
+END(vmm_unpriv_trap)

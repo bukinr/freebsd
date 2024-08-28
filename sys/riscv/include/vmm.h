@@ -283,6 +283,7 @@ enum vm_cap_type {
 enum vm_exitcode {
 	VM_EXITCODE_BOGUS,
 	VM_EXITCODE_ECALL,
+	VM_EXITCODE_HYP,
 	VM_EXITCODE_PAGING,
 	VM_EXITCODE_SUSPENDED,
 	VM_EXITCODE_DEBUG,
@@ -318,6 +319,10 @@ struct vm_exit {
 		struct {
 			enum vm_suspend_how how;
 		} suspended;
+
+		struct {
+			uint64_t scause;
+		} hyp;
 	} u;
 };
 
