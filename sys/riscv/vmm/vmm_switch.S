@@ -204,7 +204,7 @@ END(vmm_switch)
 ENTRY(vmm_unpriv_trap)
 	csrr	a1, sepc
 	sd	a1, HYP_TRAP_SEPC(a0)
-	addi	a1, a1, 4	/* Next instruction. */
+	addi	a1, a1, 4	/* Next instruction after hlvx.hu */
 	csrw	sepc, a1
 	csrr	a1, scause
 	sd	a1, HYP_TRAP_SCAUSE(a0)
