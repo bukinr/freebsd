@@ -278,7 +278,7 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
 			".option pop\n"
 	    : [val] "=r" (val)
 	    : [addr] "r" (guest_addr), "r" (htrap)
-	    : "memory");
+	    : "a1", "memory");
 
 	if (trap->scause == 0 && (val & 0x3) == 0x3) {
 		guest_addr += 2;
@@ -288,7 +288,7 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
 				".option pop\n"
 		    : [tmp] "=r" (tmp)
 		    : [addr] "r" (guest_addr), "r" (htrap)
-		    : "memory");
+		    : "a1", "memory");
 		val |= (tmp << 16);
 	}
 
