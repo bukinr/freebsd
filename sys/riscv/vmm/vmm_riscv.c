@@ -257,7 +257,6 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
     struct hyptrap *trap)
 {
 	register struct hyptrap * htrap asm("a0");
-	register uint64_t htmp asm("a1");
 	uintptr_t old_hstatus;
 	uintptr_t old_stvec;
 	uintptr_t entry;
@@ -277,7 +276,7 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
 			 ".option norvc\n"
 			"hlvx.hu %[val], (%[addr])\n"
 			".option pop\n"
-	    : [val] "=r" (val), "=r" (htmp)
+	    : [val] "=r" (val)
 	    : [addr] "r" (guest_addr), "r" (htrap)
 	    : "memory");
 
@@ -287,7 +286,7 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
 				 ".option norvc\n"
 				"hlvx.hu %[tmp], (%[addr])\n"
 				".option pop\n"
-		    : [tmp] "=r" (tmp), "=r" (htmp)
+		    : [tmp] "=r" (tmp)
 		    : [addr] "r" (guest_addr), "r" (htrap)
 		    : "memory");
 		val |= (tmp << 16);
