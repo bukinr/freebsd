@@ -256,17 +256,17 @@ static void
 riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
     struct hyptrap *trap)
 {
-	register uintptr_t htrap asm("a0");
+	register struct hyptrap * htrap asm("a0");
 	register uint64_t htmp asm("a1");
-	uint64_t old_hstatus;
-	uint64_t old_stvec;
+	uintptr_t old_hstatus;
+	uintptr_t old_stvec;
 	uintptr_t entry;
 	uint64_t val;
 	uint64_t tmp;
 	int intr;
 
 	entry = (uintptr_t)&vmm_unpriv_trap;
-	htrap = (uintptr_t)trap;
+	htrap = trap;
 
 	intr = intr_disable();
 
@@ -275,23 +275,21 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
 
 	__asm __volatile(".option push\n"
 			 ".option norvc\n"
-			"add %[htmp], %[htrap], 0\n"
 			"hlvx.hu %[val], (%[addr])\n"
 			".option pop\n"
-	    : [val] "=&r" (val), [addr] "+&r" (guest_addr),
-	      [htrap] "+&r" (htrap), [htmp] "+&r" (htmp)
-	    :: "memory");
+	    : [val] "=r" (val), "=r" (htmp)
+	    : [addr] "r" (guest_addr), "r" (htrap)
+	    : "memory");
 
-	if ((val & 0x3) == 0x3) {
+	if (trap->scause == 0 && (val & 0x3) == 0x3) {
 		guest_addr += 2;
 		__asm __volatile(".option push\n"
 				 ".option norvc\n"
-				"add %[htmp], %[htrap], 0\n"
 				"hlvx.hu %[tmp], (%[addr])\n"
 				".option pop\n"
-		    : [tmp] "=&r" (tmp), [addr] "+&r" (guest_addr),
-		      [htrap] "+&r" (htrap), [htmp] "+&r" (htmp)
-		    :: "memory");
+		    : [tmp] "=r" (tmp), "=r" (htmp)
+		    : [addr] "r" (guest_addr), "r" (htrap)
+		    : "memory");
 		val |= (tmp << 16);
 	}
 
