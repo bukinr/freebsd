@@ -231,13 +231,14 @@
 	(__builtin_constant_p(val) && ((u_long)(val) < 32))
 
 #define	csr_swap(csr, val)						\
-({	if (CSR_ZIMM(val))  						\
+({	u_long ret;							\
+	if (CSR_ZIMM(val))  						\
 		__asm __volatile("csrrwi %0, " #csr ", %1"		\
-				: "=r" (val) : "i" (val));		\
+				: "=r" (ret) : "i" (val));		\
 	else 								\
 		__asm __volatile("csrrw %0, " #csr ", %1"		\
-				: "=r" (val) : "r" (val));		\
-	val;								\
+				: "=r" (ret) : "r" (val));		\
+	ret;								\
 })
 
 #define	csr_write(csr, val)						\
