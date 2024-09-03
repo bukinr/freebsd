@@ -32,6 +32,7 @@ echo bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 3:0,virtio-rnd
 echo fatload virtio 0 0x10a000000 kernel.bin
 
 echo Startup cmd
+echo bhyve -c 1 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 4,virtio-blk,/dev/da0 test
 echo bhyve -c 8 -m 256 -o bootrom=/u-boot.bin -o console=stdio -s 4,virtio-blk,/dev/da0 test
 echo bootefi bootmgr
 
