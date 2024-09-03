@@ -214,11 +214,16 @@ vmmops_vcpu_init(void *vmi, struct vcpu *vcpu1, int vcpuid)
 	hypctx->hyp = hyp;
 	hypctx->vcpu = vcpu1;
 	hypctx->guest_scounteren = HCOUNTEREN_CY | HCOUNTEREN_TM;
+
+	/* sstatus */
 	hypctx->guest_regs.hyp_sstatus = SSTATUS_SPP | SSTATUS_SPIE;
 	hypctx->guest_regs.hyp_sstatus |= SSTATUS_FS_INITIAL;
-	hypctx->guest_regs.hyp_hstatus = HSTATUS_SPV | HSTATUS_VTW;
-	hypctx->cpu_id = vcpuid;
 
+	/* hstatus */
+	hypctx->guest_regs.hyp_hstatus = HSTATUS_SPV | HSTATUS_VTW;
+	hypctx->guest_regs.hyp_hstatus |= HSTATUS_SPVP;
+
+	hypctx->cpu_id = vcpuid;
 	hyp->ctx[vcpuid] = hypctx;
 
 	aplic_cpuinit(hypctx);
@@ -573,23 +578,12 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	hypctx->guest_regs.hyp_sepc = (uint64_t)pc;
 
-	if (hypctx->guest_regs.hyp_sstatus & SSTATUS_SPP)
-		hypctx->guest_regs.hyp_hstatus |= HSTATUS_SPVP;
-	else
-		hypctx->guest_regs.hyp_hstatus &= HSTATUS_SPVP;
-
-	hypctx->guest_regs.hyp_hstatus |= HSTATUS_SPV | HSTATUS_VTW;
-
-	csr_write(hgatp, pmap->pm_satp);
-
 	vmmops_delegate();
 
+	csr_write(hgatp, pmap->pm_satp);
 	csr_write(henvcfg, HENVCFG_STCE);
 	csr_write(hie, HIE_VSEIE | HIE_VSSIE | HIE_SGEIE);
-
-	/*
-	 * TODO: should we trap rdcycle / rdtime ?
-	 */
+	/* TODO: should we trap rdcycle / rdtime? */
 	csr_write(hcounteren, HCOUNTEREN_CY | HCOUNTEREN_TM);
 
 	vmmops_vcpu_restore_csrs(hypctx);
@@ -635,7 +629,8 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 		vmm_switch(hypctx);
 
-		dprintf("%s: Leaving guest VM\n", __func__);
+		dprintf("%s: Leaving guest VM, hstatus %lx\n", __func__,
+		    hypctx->guest_regs.hyp_hstatus);
 
 		aplic_sync_hwstate(hypctx);
 		riscv_sync_interrupts(hypctx);
