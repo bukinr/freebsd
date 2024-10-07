@@ -448,11 +448,13 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 			irq->state |= APLIC_IRQ_STATE_PENDING;
 			if (irq->state & APLIC_IRQ_STATE_ENABLED)
 				notify = true;
-		}
+		} else
+			irq->state &= ~APLIC_IRQ_STATE_PENDING;
 		break;
 	case SOURCECFG_SM_DETACHED:
 		break;
 	default:
+		panic("sourcecfg %d\n", irq->sourcecfg & SOURCECFG_SM_M);
 		/* TODO. */
 		break;
 	}
