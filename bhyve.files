@@ -93,7 +93,7 @@ lib/libjail.so.1
 lib/libkiconv.so.4
 lib/libkvm.so.7
 lib/libm.so.5
-lib/libmd.so.6
+lib/libmd.so.7
 lib/libsys.so.7
 lib/libncursesw.so.9
 lib/libpcap.so.8
