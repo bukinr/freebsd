@@ -800,9 +800,11 @@ int
 vm_gla2gpa_nofault(struct vcpu *vcpu, struct vm_guest_paging *paging,
     uint64_t gla, int prot, uint64_t *gpa, int *is_fault)
 {
+	int error;
 
-	vmmops_gla2gpa(vcpu->cookie, paging, gla, prot, gpa, is_fault);
-	return (0);
+	error = vmmops_gla2gpa(vcpu->cookie, paging, gla, prot, gpa, is_fault);
+
+	return (error);
 }
 
 void
