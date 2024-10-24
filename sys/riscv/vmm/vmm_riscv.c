@@ -275,8 +275,16 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
 	intr = intr_disable();
 
 	old_hstatus = csr_swap(hstatus, hypctx->guest_regs.hyp_hstatus);
+	/*
+	 * Setup a temporary exception vector, so that if hlvx.hu raises
+	 * an exception we catch it in the vmm_unpriv_trap().
+	 */
 	old_stvec = csr_swap(stvec, entry);
 
+	/*
+	 * Read first two bytes of instruction assuming it could be a
+	 * compressed one.
+	 */
 	__asm __volatile(".option push\n"
 			 ".option norvc\n"
 			"hlvx.hu %[val], (%[addr])\n"
@@ -285,7 +293,11 @@ riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
 	    : [addr] "r" (guest_addr), "r" (htrap)
 	    : "a1", "memory");
 
-	if (trap->scause == 0 && (val & 0x3) == 0x3) {
+	/*
+	 * Check if previous hlvx.hu did not raise an exception, and then
+	 * read the rest of instruction if it is a full-length one.
+	 */
+	if (trap->scause == -1 && (val & 0x3) == 0x3) {
 		guest_addr += 2;
 		__asm __volatile(".option push\n"
 				 ".option norvc\n"
@@ -331,8 +343,9 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret,
 	sign_extend = 1;
 
 	bzero(trap, sizeof(struct hyptrap));
+	trap->scause = -1;
 	riscv_unpriv_read(hypctx, guest_addr, &insn, trap);
-	if (trap->scause)
+	if (trap->scause != -1)
 		return (-1);
 
 	if ((insn & 0x3) == 0x3) {
