@@ -38,6 +38,7 @@
 
 #include <sys/param.h>
 #include <sys/bus.h>
+#include <sys/domainset.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -325,12 +326,34 @@ dmar_print_caps(device_t dev, struct dmar_unit *unit,
 	    DMAR_ECAP_IRO(unit->hw_ecap));
 }
 
+/* Remapping Hardware Static Affinity Structure lookup */
+struct rhsa_iter_arg {
+	uint64_t base;
+	u_int proxim_dom;
+};
+
+static int
+dmar_rhsa_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
+{
+	struct rhsa_iter_arg *ria;
+	ACPI_DMAR_RHSA *adr;
+
+	if (dmarh->Type == ACPI_DMAR_TYPE_HARDWARE_AFFINITY) {
+		ria = arg;
+		adr = (ACPI_DMAR_RHSA *)dmarh;
+		if (adr->BaseAddress == ria->base)
+			ria->proxim_dom = adr->ProximityDomain;
+	}
+	return (1);
+}
+
 static int
 dmar_attach(device_t dev)
 {
 	struct dmar_unit *unit;
 	ACPI_DMAR_HARDWARE_UNIT *dmaru;
 	struct iommu_msi_data *dmd;
+	struct rhsa_iter_arg ria;
 	uint64_t timeout;
 	int disable_pmr;
 	int i, error;
@@ -358,6 +381,12 @@ dmar_attach(device_t dev)
 	if (bootverbose)
 		dmar_print_caps(dev, unit, dmaru);
 	dmar_quirks_post_ident(unit);
+	unit->memdomain = -1;
+	ria.base = unit->base;
+	ria.proxim_dom = -1;
+	dmar_iterate_tbl(dmar_rhsa_iter, &ria);
+	if (ria.proxim_dom != -1)
+		unit->memdomain = acpi_map_pxm_to_vm_domainid(ria.proxim_dom);
 
 	timeout = dmar_get_timeout();
 	TUNABLE_UINT64_FETCH("hw.iommu.dmar.timeout", &timeout);
@@ -424,6 +453,10 @@ dmar_attach(device_t dev)
 
 	unit->ctx_obj = vm_pager_allocate(OBJT_PHYS, NULL, IDX_TO_OFF(1 +
 	    DMAR_CTX_CNT), 0, 0, NULL);
+	if (unit->memdomain != -1) {
+		unit->ctx_obj->domain.dr_policy = DOMAINSET_PREF(
+		    unit->memdomain);
+	}
 
 	/*
 	 * Allocate and load the root entry table pointer.  Enable the
@@ -757,6 +790,7 @@ dmar_find(device_t dev, bool verbose)
 		dmar_print_path(dev_busno, dev_path_len, dev_path);
 		printf("\n");
 	}
+	iommu_device_set_iommu_prop(dev, unit->iommu.dev);
 	return (unit);
 }
 
@@ -826,16 +860,28 @@ dmar_find_nonpci(u_int id, u_int entry_type, uint16_t *rid)
 struct dmar_unit *
 dmar_find_hpet(device_t dev, uint16_t *rid)
 {
+	struct dmar_unit *unit;
 
-	return (dmar_find_nonpci(hpet_get_uid(dev), ACPI_DMAR_SCOPE_TYPE_HPET,
-	    rid));
+	unit = dmar_find_nonpci(hpet_get_uid(dev), ACPI_DMAR_SCOPE_TYPE_HPET,
+	    rid);
+	if (unit != NULL)
+		iommu_device_set_iommu_prop(dev, unit->iommu.dev);
+	return (unit);
 }
 
 struct dmar_unit *
 dmar_find_ioapic(u_int apic_id, uint16_t *rid)
 {
+	struct dmar_unit *unit;
+	device_t apic_dev;
 
-	return (dmar_find_nonpci(apic_id, ACPI_DMAR_SCOPE_TYPE_IOAPIC, rid));
+	unit = dmar_find_nonpci(apic_id, ACPI_DMAR_SCOPE_TYPE_IOAPIC, rid);
+	if (unit != NULL) {
+		apic_dev = ioapic_get_dev(apic_id);
+		if (apic_dev != NULL)
+			iommu_device_set_iommu_prop(apic_dev, unit->iommu.dev);
+	}
+	return (unit);
 }
 
 struct rmrr_iter_args {

@@ -11,7 +11,7 @@ DIRDEPS = \
 	lib/libcxxrt \
 	lib/libjail \
 	lib/liblua \
-	lib/liblutok.amd64 \
+	lib/liblutok \
 	lib/libsqlite3 \
 	lib/msun \
 
