@@ -75,7 +75,7 @@ vmm_sbi_handle_rfnc(struct vcpu *vcpu, struct hypctx *hypctx)
 	dprintf("%s: %ld hart_mask %lx start %lx size %lx\n", __func__,
 	    func_id, hart_mask, start, size);
 
-	/* TODO. */
+	/* TODO: implement remote sfence. */
 
 	switch (func_id) {
 	case SBI_RFNC_REMOTE_FENCE_I:
