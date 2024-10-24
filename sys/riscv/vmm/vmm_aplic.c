@@ -355,7 +355,7 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 
 	vm = hyp->vm;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	vm_register_inst_handler(vm, descr->mem_start, descr->mem_size,
 	    mem_read, mem_write);
