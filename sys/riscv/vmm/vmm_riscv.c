@@ -467,8 +467,12 @@ riscv_handle_world_switch(struct hypctx *hypctx, struct vm_exit *vme,
 		/*
 		 * TODO: handle illegal instruction properly.
 		 */
-		panic("%s: Illegal instr at %lx stval 0x%lx htval 0x%lx\n",
-		    __func__, vme->sepc, vme->stval, vme->htval);
+		printf("%s: Illegal instruction at %lx stval 0x%lx htval "
+		    "0x%lx\n", __func__, vme->sepc, vme->stval, vme->htval);
+		vmm_stat_incr(hypctx->vcpu, VMEXIT_UNHANDLED, 1);
+		vme->exitcode = VM_EXITCODE_BOGUS;
+		handled = false;
+		break;
 	case SCAUSE_VIRTUAL_SUPERVISOR_ECALL:
 		retu = false;
 		vmm_sbi_ecall(hypctx->vcpu, &retu);
