@@ -379,7 +379,7 @@ aplic_detach_from_vm(struct hyp *hyp)
 
 	aplic = hyp->aplic;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	if (hyp->aplic_attached) {
 		hyp->aplic_attached = false;
