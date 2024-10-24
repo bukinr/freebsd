@@ -87,8 +87,6 @@ vmmdev_machdep_ioctl(struct vm *vm, struct vcpu *vcpu, u_long cmd, caddr_t data,
 			break;
 
 		error = copyout(vme, vmrun->vm_exit, sizeof(*vme));
-		if (error != 0)
-			break;
 		break;
 	}
 	case VM_INJECT_EXCEPTION:
