@@ -507,7 +507,7 @@ vmmops_gla2gpa(void *vcpui, struct vm_guest_paging *paging, uint64_t gla,
 
 	/* Implement me. */
 
-	return (0);
+	return (ENOSYS);
 }
 
 void
@@ -823,9 +823,9 @@ vmmops_getreg(void *vcpui, int reg, uint64_t *retval)
 int
 vmmops_setreg(void *vcpui, int reg, uint64_t val)
 {
-	uint64_t *regp;
 	struct hypctx *hypctx;
 	int running, hostcpu;
+	uint64_t *regp;
 
 	hypctx = vcpui;
 
@@ -846,19 +846,19 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 int
 vmmops_exception(void *vcpui, uint64_t scause)
 {
-	struct hypctx *hypctx = vcpui;
+	struct hypctx *hypctx;
 	int running, hostcpu;
+
+	hypctx = vcpui;
 
 	running = vcpu_is_running(hypctx->vcpu, &hostcpu);
 	if (running && hostcpu != curcpu)
 		panic("%s: %s%d is running", __func__, vm_name(hypctx->hyp->vm),
 		    vcpu_vcpuid(hypctx->vcpu));
 
-	/* TODO: set registers. */
+	/* TODO: implement me. */
 
-	hypctx->has_exception = true;
-
-	return (0);
+	return (ENOSYS);
 }
 
 int
