@@ -320,6 +320,11 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret,
 
 	guest_addr = vme_ret->sepc;
 
+	KASSERT(vme_ret->scause == SCAUSE_FETCH_GUEST_PAGE_FAULT ||
+	    vme_ret->scause == SCAUSE_LOAD_GUEST_PAGE_FAULT ||
+	    vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT,
+	    ("Invalid scause"));
+
 	direction = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
 	    VM_DIR_WRITE : VM_DIR_READ;
 
