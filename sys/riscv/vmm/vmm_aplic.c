@@ -87,6 +87,8 @@ MALLOC_DEFINE(M_APLIC, "RISC-V VMM APLIC", "RISC-V AIA APLIC");
 #define	   CLAIMI_PRIO_S	(0)
 #define	   CLAIMI_PRIO_M	(0xff << CLAIMI_PRIO_S)
 
+#define	APLIC_NIRQS	63
+
 struct aplic_irq {
 	uint32_t sourcecfg;
 	uint32_t state;
@@ -109,6 +111,9 @@ static int
 aplic_handle_sourcecfg(struct aplic *aplic, int i, bool write, uint64_t *val)
 {
 	struct aplic_irq *irq;
+
+	if (i <= 0 || i > aplic->nirqs)
+		return (ENOENT);
 
 	mtx_lock_spin(&aplic->mtx);
 	irq = &aplic->irqs[i];
@@ -189,7 +194,7 @@ aplic_handle_idc_claimi(struct hyp *hyp, struct aplic *aplic, int cpu_id,
 		}
 	}
 
-	panic("claimi without pending, cpu_id %d", cpu_id);
+	dprintf("%s: claimi without pending, cpu_id %d", __func__, cpu_id);
 
 	return (0);
 }
@@ -211,7 +216,7 @@ aplic_handle_idc(struct hyp *hyp, struct aplic *aplic, int cpu, int reg,
 		error = aplic_handle_idc_claimi(hyp, aplic, cpu, write, val);
 		break;
 	default:
-		panic("unknown reg");
+		error = ENOENT;
 	}
 
 	return (error);
@@ -249,19 +254,21 @@ aplic_mmio_access(struct hyp *hyp, struct aplic *aplic, uint64_t reg,
 	switch (reg) {
 	case APLIC_DOMAINCFG:
 		aplic->domaincfg = *val & DOMAINCFG_IE;
+		error = 0;
 		break;
 	case APLIC_SETIENUM:
-		aplic_set_enabled(aplic, write, val, true);
+		error = aplic_set_enabled(aplic, write, val, true);
 		break;
 	case APLIC_CLRIENUM:
-		aplic_set_enabled(aplic, write, val, false);
+		error = aplic_set_enabled(aplic, write, val, false);
 		break;
 	default:
-		panic("unknown reg %lx", reg);
+		dprintf("%s: unknown reg %lx", __func__, reg);
+		error = ENOENT;
 		break;
 	};
 
-	return (0);
+	return (error);
 }
 
 static int
@@ -361,7 +368,7 @@ aplic_attach_to_vm(struct hyp *hyp, struct vm_aplic_descr *descr)
 	    mem_read, mem_write);
 
 	aplic = hyp->aplic;
-	aplic->nirqs = 63;
+	aplic->nirqs = APLIC_NIRQS;
 	aplic->mem_start = descr->mem_start;
 	aplic->mem_end = descr->mem_start + descr->mem_size;
 	aplic->irqs = malloc(sizeof(struct aplic_irq) * aplic->nirqs, M_APLIC,
@@ -426,19 +433,22 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	struct aplic_irq *irq;
 	struct aplic *aplic;
 	bool notify;
+	int error;
 
 	aplic = hyp->aplic;
+
+	error = 0;
 
 	mtx_lock_spin(&aplic->mtx);
 	if ((aplic->domaincfg & DOMAINCFG_IE) == 0) {
 		mtx_unlock_spin(&aplic->mtx);
-		return (0);
+		return (error);
 	}
 
 	irq = &aplic->irqs[irqid];
 	if (irq->sourcecfg & SOURCECFG_D) {
 		mtx_unlock_spin(&aplic->mtx);
-		return (0);
+		return (error);
 	}
 
 	notify = false;
@@ -454,8 +464,9 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	case SOURCECFG_SM_DETACHED:
 		break;
 	default:
-		panic("sourcecfg %d\n", irq->sourcecfg & SOURCECFG_SM_M);
 		/* TODO. */
+		dprintf("sourcecfg %d\n", irq->sourcecfg & SOURCECFG_SM_M);
+		error = ENXIO;
 		break;
 	}
 	mtx_unlock_spin(&aplic->mtx);
@@ -463,7 +474,7 @@ aplic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	if (notify)
 		vcpu_notify_event(vm_vcpu(hyp->vm, irq->target_hart));
 
-	return (0);
+	return (error);
 }
 
 int
