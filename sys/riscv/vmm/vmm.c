@@ -1456,10 +1456,8 @@ vm_handle_paging(struct vcpu *vcpu, bool *retu)
 	}
 
 	/* The page exists, but the page table needs to be updated. */
-	if (pmap_fault(pmap, addr, ftype) != KERN_SUCCESS) {
-		//printf("%s: pmap_fault failed\n", __func__);
+	if (pmap_fault(pmap, addr, ftype))
 		return (0);
-	}
 
 	map = &vm->vmspace->vm_map;
 	rv = vm_fault(map, addr, ftype, VM_FAULT_NORMAL, NULL);
