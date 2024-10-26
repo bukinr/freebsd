@@ -260,7 +260,7 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 }
 
 static void
-riscv_unpriv_read(struct hypctx *hypctx, uint64_t guest_addr, uint64_t *data,
+riscv_unpriv_read(struct hypctx *hypctx, uintptr_t guest_addr, uint64_t *data,
     struct hyptrap *trap)
 {
 	register struct hyptrap * htrap asm("a0");
@@ -323,7 +323,7 @@ static int
 riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret,
     struct hyptrap *trap)
 {
-	uint64_t guest_addr;
+	uintptr_t guest_addr;
 	struct vie *vie;
 	uint64_t insn;
 	int reg_num;
