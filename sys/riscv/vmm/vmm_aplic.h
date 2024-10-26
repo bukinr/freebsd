@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2024 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by the University of Cambridge Computer
