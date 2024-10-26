@@ -275,9 +275,6 @@ struct vre {
  * Identifiers for optional vmm capabilities
  */
 enum vm_cap_type {
-	VM_CAP_HALT_EXIT,
-	VM_CAP_MTRAP_EXIT,
-	VM_CAP_PAUSE_EXIT,
 	VM_CAP_UNRESTRICTED_GUEST,
 	VM_CAP_MAX
 };
