@@ -339,7 +339,7 @@ riscv_gen_inst_emul_data(struct hypctx *hypctx, struct vm_exit *vme_ret,
 	    vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT,
 	    ("Invalid scause"));
 
-	direction = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ? \
+	direction = vme_ret->scause == SCAUSE_STORE_GUEST_PAGE_FAULT ?
 	    VM_DIR_WRITE : VM_DIR_READ;
 
 	sign_extend = 1;
@@ -594,7 +594,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	struct vm_exit *vme;
 	struct vcpu *vcpu;
 	register_t val;
-	int handled;
+	bool handled;
 
 	hypctx = (struct hypctx *)vcpui;
 	vcpu = hypctx->vcpu;
