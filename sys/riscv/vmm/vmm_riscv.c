@@ -604,6 +604,16 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	vmmops_delegate();
 
+	/*
+	 * From The RISC-V Instruction Set Manual
+	 * Volume II: RISC-V Privileged Architectures
+	 *
+	 * If the new virtual machine's guest physical page tables
+	 * have been modified, it may be necessary to execute an HFENCE.GVMA
+	 * instruction (see Section 5.3.2) before or after writing hgatp.
+	 */
+	__asm __volatile("hfence.gvma" ::: "memory");
+
 	csr_write(hgatp, pmap->pm_satp);
 	csr_write(henvcfg, HENVCFG_STCE);
 	csr_write(hie, HIE_VSEIE | HIE_VSSIE | HIE_SGEIE);
