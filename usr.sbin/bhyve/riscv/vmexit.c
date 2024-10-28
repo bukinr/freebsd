@@ -164,14 +164,13 @@ vmm_sbi_probe_extension(int ext_id)
 	return (1);
 }
 
-static int
+static void
 vmexit_ecall_time(struct vmctx *ctx __unused, struct vm_exit *vme __unused)
 {
 
-	return (0);
 }
 
-static int
+static void
 vmexit_ecall_hsm(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
     struct vm_exit *vme)
 {
@@ -187,7 +186,7 @@ vmexit_ecall_hsm(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 	ret = -1;
 
 	if (HART_TO_CPU(hart_id) >= (uint64_t)guest_ncpus)
-		return (ret);
+		goto done;
 
 	newvcpu = fbsdrun_vcpu(HART_TO_CPU(hart_id));
 	assert(newvcpu != NULL);
@@ -225,13 +224,12 @@ vmexit_ecall_hsm(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 		break;
 	}
 
+done:
 	error = vm_set_register(vcpu, VM_REG_GUEST_A0, ret);
 	assert(error == 0);
-
-	return (0);
 }
 
-static int
+static void
 vmexit_ecall_base(struct vmctx *ctx __unused, struct vcpu *vcpu,
     struct vm_exit *vme)
 {
@@ -281,8 +279,6 @@ vmexit_ecall_base(struct vmctx *ctx __unused, struct vcpu *vcpu,
 		error = vm_set_register(vcpu, VM_REG_GUEST_A1, val);
 		assert(error == 0);
 	}
-
-	return (0);
 }
 
 static void
