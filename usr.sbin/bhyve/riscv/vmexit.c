@@ -58,6 +58,8 @@
 #include "riscv.h"
 
 #define	BHYVE_VERSION	((uint64_t)__FreeBSD_version)
+#define	SBI_VERS_MAJOR	2
+#define	SBI_VERS_MINOR	0
 
 static cpuset_t running_hartmask = CPUSET_T_INITIALIZER(0);
 
@@ -245,8 +247,8 @@ vmexit_ecall_base(struct vmctx *ctx __unused, struct vcpu *vcpu,
 
 	switch (sbi_function_id) {
 	case SBI_BASE_GET_SPEC_VERSION:
-		val = 2 << SBI_SPEC_VERS_MAJOR_OFFSET;
-		val |= 0 << SBI_SPEC_VERS_MINOR_OFFSET;
+		val = SBI_VERS_MAJOR << SBI_SPEC_VERS_MAJOR_OFFSET;
+		val |= SBI_VERS_MINOR << SBI_SPEC_VERS_MINOR_OFFSET;
 		break;
 	case SBI_BASE_GET_IMPL_ID:
 		val = SBI_IMPL_ID_BHYVE;
