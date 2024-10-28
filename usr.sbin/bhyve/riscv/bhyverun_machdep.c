@@ -57,9 +57,8 @@
 #include "uart_emul.h"
 #include "riscv.h"
 
-/* Start of mem + 32M */
-#define	FDT_BASE	0x2000000
 #define	FDT_SIZE	(64 * 1024)
+#define	FDT_DTB_ALIGN	8
 
 /* Start of lowmem + 64K */
 #define	UART_MMIO_BASE	0x10000
@@ -192,7 +191,6 @@ bhyve_start_vcpu(struct vcpu *vcpu, bool bsp __unused)
 
 	/* Set hart ID. */
 	error = vm_set_register(vcpu, VM_REG_GUEST_A0, vcpu_id(vcpu));
-
 	assert(error == 0);
 
 	fbsdrun_addcpu(vcpu_id(vcpu));
@@ -202,7 +200,8 @@ bhyve_start_vcpu(struct vcpu *vcpu, bool bsp __unused)
  * Load the specified boot code at the beginning of high memory.
  */
 static void
-load_bootrom(struct vmctx *ctx, const char *path, uint64_t *elrp)
+load_bootrom(struct vmctx *ctx, const char *path, uint64_t *elrp,
+    uint64_t *lenp)
 {
 	struct stat sb;
 	void *data, *gptr;
@@ -231,6 +230,7 @@ load_bootrom(struct vmctx *ctx, const char *path, uint64_t *elrp)
 		err(1, "munmap(%s)", path);
 
 	*elrp = loadaddr;
+	*lenp = size;
 }
 
 static void
@@ -299,35 +299,36 @@ init_mmio_uart(struct vmctx *ctx)
 	return (true);
 }
 
-static vm_paddr_t
-fdt_gpa(struct vmctx *ctx)
-{
-	return (vm_get_highmem_base(ctx) + FDT_BASE);
-}
-
 int
 bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 {
 	const char *bootrom;
 	uint64_t elr;
+	uint64_t len;
 	int error;
 	int pcie_intrs[4] = {PCIE_INTA, PCIE_INTB, PCIE_INTC, PCIE_INTD};
+	vm_paddr_t fdt_gpa;
 
 	bootrom = get_config_value("bootrom");
 	if (bootrom == NULL) {
 		warnx("no bootrom specified");
 		return (ENOENT);
 	}
-	load_bootrom(ctx, bootrom, &elr);
+	load_bootrom(ctx, bootrom, &elr, &len);
 	error = vm_set_register(bsp, VM_REG_GUEST_SEPC, elr);
 	if (error != 0) {
 		warn("vm_set_register(GUEST_SEPC)");
 		return (error);
 	}
 
-	error = fdt_init(ctx, guest_ncpus, fdt_gpa(ctx), FDT_SIZE);
+	fdt_gpa = vm_get_highmem_base(ctx) + roundup2(len, FDT_DTB_ALIGN);
+	error = fdt_init(ctx, guest_ncpus, fdt_gpa, FDT_SIZE);
 	if (error != 0)
 		return (error);
+
+	/* Set FDT base address to the bootable hart. */
+	error = vm_set_register(bsp, VM_REG_GUEST_A1, fdt_gpa);
+	assert(error == 0);
 
 	fdt_add_aplic(APLIC_MEM_BASE, APLIC_MEM_SIZE);
 	error = vm_attach_aplic(ctx, APLIC_MEM_BASE, APLIC_MEM_SIZE);
@@ -347,19 +348,10 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 }
 
 int
-bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp)
+bhyve_init_platform_late(struct vmctx *ctx __unused, struct vcpu *bsp __unused)
 {
-	int error;
 
 	fdt_finalize();
-
-	/* Set hart ID. */
-	error = vm_set_register(bsp, VM_REG_GUEST_A0, 0);
-	assert(error == 0);
-
-	/* Set FDT base address. */
-	error = vm_set_register(bsp, VM_REG_GUEST_A1, fdt_gpa(ctx));
-	assert(error == 0);
 
 	return (0);
 }
