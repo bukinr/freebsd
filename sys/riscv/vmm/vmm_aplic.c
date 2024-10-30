@@ -177,11 +177,14 @@ aplic_handle_idc_claimi(struct hyp *hyp, struct aplic *aplic, int cpu_id,
     bool write, uint64_t *val)
 {
 	struct aplic_irq *irq;
+	bool found;
 	int i;
 
 	/* Writes to claimi are ignored. */
 	if (write)
 		return (-1);
+
+	found = false;
 
 	mtx_lock_spin(&aplic->mtx);
 	for (i = 0; i < aplic->nirqs; i++) {
@@ -191,12 +194,14 @@ aplic_handle_idc_claimi(struct hyp *hyp, struct aplic *aplic, int cpu_id,
 		if (irq->state & APLIC_IRQ_STATE_PENDING) {
 			*val = (i << CLAIMI_IRQ_S) | (0 << CLAIMI_PRIO_S);
 			irq->state &= ~APLIC_IRQ_STATE_PENDING;
-			mtx_unlock_spin(&aplic->mtx);
-			return (0);
+			found = true;
+			break;
 		}
 	}
+	mtx_unlock_spin(&aplic->mtx);
 
-	dprintf("%s: claimi without pending, cpu_id %d", __func__, cpu_id);
+	if (found == false)
+		*val = 0;
 
 	return (0);
 }
