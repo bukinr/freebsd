@@ -1,9 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2000 Michael Smith <msmith@freebsd.org>
- * Copyright (c) 2000 BSDi
- * All rights reserved.
+ * Copyright (c) 2024 Colin Percival
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,51 +25,25 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-/*
- * 'Ignore' driver - eats devices that show up errnoeously on PCI
- * but shouldn't ever be listed or handled by a driver.
- */
+#ifndef	__ACPI_GPIOBUS_H__
+#define	__ACPI_GPIOBUS_H__
 
-#include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/module.h>
 #include <sys/bus.h>
 
-#include <dev/pci/pcivar.h>
+#include <contrib/dev/acpica/include/acpi.h>
 
-static int	ignore_pci_probe(device_t dev);
-static int	ignore_pci_attach(device_t dev);
-
-static device_method_t ignore_pci_methods[] = {
-    /* Device interface */
-    DEVMETHOD(device_probe,		ignore_pci_probe),
-    DEVMETHOD(device_attach,		ignore_pci_attach),
-    { 0, 0 }
+enum acpi_gpiobus_ivars {
+	ACPI_GPIOBUS_IVAR_HANDLE	= 10600,
 };
 
-static driver_t ignore_pci_driver = {
-    "ignore_pci",
-    ignore_pci_methods,
-    0,
-};
+#define ACPI_GPIOBUS_ACCESSOR(var, ivar, type)			\
+	__BUS_ACCESSOR(acpi_gpiobus, var, ACPI_GPIOBUS, ivar, type)
 
-DRIVER_MODULE(ignore_pci, pci, ignore_pci_driver, 0, 0);
+ACPI_GPIOBUS_ACCESSOR(handle,	HANDLE,		ACPI_HANDLE)
 
-static int
-ignore_pci_probe(device_t dev)
-{
-    switch (pci_get_devid(dev)) {
-    case 0x10001042ul:	/* SMC 37C665 */
-	device_set_desc(dev, "ignored");
-	device_quiet(dev);
-	return(-10000);
-    }
-    return(ENXIO);
-}
+#undef ACPI_GPIOBUS_ACCESSOR
 
-static int
-ignore_pci_attach(device_t dev)
-{
-	return (0);
-}
+int gpio_pin_get_by_acpi_index(device_t consumer, uint32_t idx,
+    gpio_pin_t *out_pin);
+
+#endif	/* __ACPI_GPIOBUS_H__ */
