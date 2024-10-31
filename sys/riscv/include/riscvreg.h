@@ -175,13 +175,9 @@
 
 #define	HENVCFG_STCE	(1UL << 63)
 #define	HENVCFG_PBMTE	(1UL << 62)
-#define	HENVCFG_ADUE	(1UL << 61)
-#define	HENVCFG_CDE	(1UL << 60)
-#define	HENVCFG_PMM_S	(1UL << 31)
-#define	HENVCFG_PMM_M	(0x3 << HENVCFG_PMM_S)
 #define	HENVCFG_CBZE	(1UL << 7)
 #define	HENVCFG_CBCFE	(1UL << 6)
-#define	HENVCFG_CBIE_S	(1UL << 4)
+#define	HENVCFG_CBIE_S	4
 #define	HENVCFG_CBIE_M	(0x3 << HENVCFG_CBIE_S)
 #define	HENVCFG_FIOM	(1UL << 0)
 
