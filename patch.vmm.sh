@@ -1,1 +1,1 @@
-git diff -U9999999 origin/main sys share > patch.vmm.txt
+git diff -U9999999 origin/main sys > patch.vmm.txt
