@@ -48,6 +48,8 @@
 #include <machine/riscvreg.h>
 #include <machine/sbi.h>
 
+#define	VM_EARLY_UART_ADDRESS	(VM_MAX_KERNEL_ADDRESS - (2 * L2_SIZE))
+
 	.globl	kernbase
 	.set	kernbase, KERNBASE
 
@@ -63,6 +65,9 @@
  */
 	.globl _alt_start
 _alt_start:
+	li	a0, 0
+	li	a1, 0x88000000
+
 	/* Set the global pointer */
 .option push
 .option norelax
@@ -198,6 +203,46 @@ pagetables:
 	addi	t4, t4, 1
 	bltu	t4, t3, 1b
 
+#if 0
+	/* Create an L1 table entry for early devmap */
+	lla	s1, bootstrap_pt_l1
+	lla	s2, pagetable_l2_devmap /* Link to next level PN */
+	srli	s2, s2, PAGE_SHIFT
+
+	li	a5, (VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE)
+	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
+	andi	a5, a5, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
+	li	t4, PTE_V
+	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
+	or	t6, t4, t5
+
+        /* Store the L1 table entry */
+	li	a6, PTE_SIZE
+	mulw	a5, a5, a6
+	add	t0, s1, a5
+	sd	t6, (t0)
+#endif
+
+#if 0
+	/* Early UART */
+	li	a3, 0x60100000
+	lla	s1, pagetable_l2_devmap
+	mv	s2, a3
+	srli	s2, s2, PAGE_SHIFT
+	li	t0, (PTE_KERN)
+	slli	t2, s2, PTE_PPN0_S
+	or	t0, t0, t2
+
+	/* Store the L2 table entry for the UART */
+	li	a6, PTE_SIZE
+	li	a5, VM_EARLY_UART_ADDRESS
+	srli	a5, a5, L2_SHIFT
+	andi	a5, a5, Ln_ADDR_MASK
+	mulw	a5, a5, a6
+	add	t1, s1, a5
+	sd	t0, (t1)
+#endif
+
 	/* Page tables END */
 
 	/*
@@ -315,6 +360,8 @@ bootstrap_pt_l1:
 	.space	PAGE_SIZE
 bootstrap_pt_l2:
 	.space	PAGE_SIZE
+pagetable_l2_devmap:
+	.space  PAGE_SIZE
 
 	.align 3
 virt_map:
