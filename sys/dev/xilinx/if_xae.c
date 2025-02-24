@@ -43,6 +43,9 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 
+#include <vm/vm.h>
+#include <vm/vm_page.h>
+
 #include <net/bpf.h>
 #include <net/if.h>
 #include <net/ethernet.h>
@@ -886,10 +889,22 @@ setup_xdma(struct xae_softc *sc)
 
 	/* Setup bounce buffer */
 	vmem = xdma_get_memory(dev);
-	if (vmem) {
-		xchan_set_memory(sc->xchan_tx, vmem);
-		xchan_set_memory(sc->xchan_rx, vmem);
+	if (!vmem) {
+		vm_page_t m;
+		vm_paddr_t phys;
+
+		m = vm_page_alloc_noobj_contig(VM_ALLOC_WIRED | VM_ALLOC_ZERO,
+		    512, 0, BUS_SPACE_MAXADDR_32BIT, PAGE_SIZE, 0,
+		    VM_MEMATTR_DEFAULT);
+		phys = VM_PAGE_TO_PHYS(m);
+
+		vmem = vmem_create("xDMA vmem", 0, 0, PAGE_SIZE, PAGE_SIZE,
+		    M_BESTFIT | M_WAITOK);
+		vmem_add(vmem, phys, 512 * PAGE_SIZE, 0);
 	}
+
+	xchan_set_memory(sc->xchan_tx, vmem);
+	xchan_set_memory(sc->xchan_rx, vmem);
 
 	xdma_prep_sg(sc->xchan_tx,
 	    TX_QUEUE_SIZE,	/* xchan requests queue size */
