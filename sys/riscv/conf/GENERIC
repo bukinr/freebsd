@@ -207,3 +207,17 @@ include		"std.allwinner"
 include		"std.eswin"
 include		"std.sifive"
 include		"std.starfive"
+
+# options 	BOOTVERBOSE=1
+# options 	VERBOSE_SYSINIT=1
+
+# Uncomment for memory disk
+options 	MD_ROOT
+options 	MD_ROOT_SIZE=8192
+makeoptions	MFS_IMAGE=/home/br/dev/freebsd/mdroot-small.img
+options 	ROOTDEVNAME=\"ufs:/dev/md0\"
+
+options 	FDT
+options 	FDT_DTB_STATIC
+makeoptions	FDT_DTS_FILE=x730-mp1-hobgoblin-vcu118.dts
+makeoptions	MODULES_OVERRIDE=""
