@@ -156,7 +156,7 @@
 			xlnx,txcsum = <0x2>;
 			phy-handle = <0x5>;
 			axistream-connected = <0x6>;
-			//local-mac-address = [00 0a 35 00 00 02];
+			local-mac-address = [00 0a 35 00 00 02];
 			mdio {
 
 				#address-cells = <0x1>;
@@ -173,6 +173,7 @@
 			};
 		};
 		axistream_dma@600a0000 {
+			compatible = "xlnx,eth-dma";
 
 			reg = <0x600a0000 0x10000>;
 			interrupts-extended = <0x2 0x10 0x2 0x11>;
@@ -191,7 +192,7 @@
 			xlnx,txcsum = <0x2>;
 			phy-handle = <0x7>;
 			axistream-connected = <0x8>;
-			//local-mac-address = [00 0a 35 00 00 03];
+			local-mac-address = [00 0a 35 00 00 03];
 			status = "disabled";
 			mdio {
 
@@ -208,6 +209,7 @@
 			};
 		};
 		axistream_dma@60030000 {
+			compatible = "xlnx,eth-dma";
 
 			reg = <0x60030000 0x10000>;
 			interrupts-extended = <0x2 0xb 0x2 0xc>;
