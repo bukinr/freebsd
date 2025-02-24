@@ -133,6 +133,20 @@ axidma_next_desc(struct axidma_channel *chan, uint32_t curidx)
 	return ((curidx + 1) % chan->descs_num);
 }
 
+#define	CONFIG_SYS_CACHELINE_SIZE	64
+
+static void
+flush_dcache_range(unsigned long start, unsigned long len)
+{
+	unsigned long addr;
+
+	start &= ~(CONFIG_SYS_CACHELINE_SIZE - 1);
+
+	for (addr = start; addr < start + len;
+	    addr += CONFIG_SYS_CACHELINE_SIZE)
+		__asm __volatile("cbo.flush 0(%[addr])\n" :: [addr] "r"(addr));
+}
+
 static void
 axidma_intr(struct axidma_softc *sc,
     struct axidma_channel *chan)
@@ -169,6 +183,8 @@ axidma_intr(struct axidma_softc *sc,
 
 	while (chan->idx_tail != chan->idx_head) {
 		desc = chan->descs[chan->idx_tail];
+		flush_dcache_range((uint64_t)desc, sizeof(struct axidma_desc));
+
 		if ((desc->status & BD_STATUS_CMPLT) == 0)
 			break;
 
@@ -357,7 +373,8 @@ axidma_desc_alloc(struct axidma_softc *sc, struct xdma_channel *xchan,
 		return (-1);
 	}
 	chan->mem_vaddr = kva_alloc(chan->mem_size);
-	pmap_kenter_device(chan->mem_vaddr, chan->mem_size, chan->mem_paddr);
+	pmap_kenter(chan->mem_vaddr, chan->mem_size, chan->mem_paddr,
+	    VM_MEMATTR_DEFAULT);
 
 	device_printf(sc->dev, "Allocated chunk %lx %lu\n",
 	    chan->mem_paddr, chan->mem_size);
@@ -492,6 +509,8 @@ axidma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 			desc->control |= BD_CONTROL_TXSOF;
 		if (sg[i].last == 1)
 			desc->control |= BD_CONTROL_TXEOF;
+
+		flush_dcache_range((uint64_t)desc, sizeof(struct axidma_desc));
 
 		tmp = chan->idx_head;
 
