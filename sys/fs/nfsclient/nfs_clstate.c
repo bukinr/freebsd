@@ -3955,6 +3955,59 @@ nfscl_docb(struct nfsrv_descript *nd, NFSPROC_T *p)
 			}
 			NFSUNLOCKCLSTATE();
 			break;
+		case NFSV4OP_CBRECALLANY:
+			NFSM_DISSECT(tl, uint32_t *, 2 * NFSX_UNSIGNED);
+			i = fxdr_unsigned(int, *tl++);
+			j = fxdr_unsigned(int, *tl);
+			if (i < 0 || j != 1)
+				error = NFSERR_BADXDR;
+			if (error == 0) {
+				NFSM_DISSECT(tl, uint32_t *, NFSX_UNSIGNED);
+				j = fxdr_unsigned(int, *tl);
+				if (i < 100)
+					i = 100;
+				else if (i > 100000)
+					i = 100000;
+				NFSLOCKCLSTATE();
+				clp = nfscl_getclntsess(sessionid);
+				if (clp == NULL)
+					error = NFSERR_SERVERFAULT;
+				if (((j & NFSRCA4_RDATA_DLG) != 0 ||
+				    (j & NFSRCA4_WDATA_DLG) != 0) &&
+				    error == 0 && i <
+				    clp->nfsc_deleghighwater)
+					clp->nfsc_deleghighwater = i;
+				if (error == 0 &&
+				    ((!NFSHASFLEXFILE(clp->nfsc_nmp) &&
+				     (j & NFSRCA4_FILE_LAYOUT) != 0 &&
+				     i < clp->nfsc_layouthighwater) ||
+				     (NFSHASFLEXFILE(clp->nfsc_nmp) &&
+				     (j & (NFSRCA4_FF_LAYOUT_READ |
+				     NFSRCA4_FF_LAYOUT_RW)) != 0 &&
+				     i < clp->nfsc_layouthighwater)))
+					clp->nfsc_layouthighwater = i;
+				NFSUNLOCKCLSTATE();
+			}
+			break;
+		case NFSV4OP_CBNOTIFY:
+		case NFSV4OP_CBRECALLOBJAVAIL:
+		case NFSV4OP_CBNOTIFYLOCK:
+			/*
+			 * These callbacks are not necessarily optional,
+			 * so I think it is better to reply NFS_OK than
+			 * NFSERR_NOTSUPP.
+			 * All provide information for which the FreeBSD client
+			 * does not currently have a use.
+			 * I am not sure if any of these could be generated
+			 * by a NFSv4.1/4.2 server for this client?
+			 */
+			error = 0;
+			NFSCL_DEBUG(1, "unsupp callback %d\n", op);
+			break;
+		case NFSV4OP_CBPUSHDELEG:
+			error = NFSERR_REJECTDELEG;
+			NFSCL_DEBUG(1, "unsupp callback %d\n", op);
+			break;
 		default:
 			if (i == 0 && minorvers != NFSV4_MINORVERSION)
 				error = NFSERR_OPNOTINSESS;
