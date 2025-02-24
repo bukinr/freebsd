@@ -89,6 +89,8 @@ static inline void
 set_timecmp(uint64_t timecmp)
 {
 
+	csr_set(sie, SIE_STIE);
+
 	if (has_sstc)
 		csr_write(stimecmp, timecmp);
 	else
@@ -255,6 +257,8 @@ riscv_timer_attach(device_t dev)
 	et_register(&sc->et);
 
 	set_cputicker(get_timecount, sc->clkfreq, false);
+
+	csr_clear(sie, SIE_STIE);
 
 	return (0);
 }
