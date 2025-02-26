@@ -48,7 +48,7 @@
 #include <machine/riscvreg.h>
 #include <machine/sbi.h>
 
-#define	VM_EARLY_UART_ADDRESS	(VM_MAX_KERNEL_ADDRESS - (2 * L2_SIZE))
+#define	VM_EARLY_UART_ADDRESS	(VM_MAX_KERNEL_ADDRESS - (4 * L2_SIZE))
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -229,7 +229,7 @@ pagetables:
 	lla	s1, pagetable_l2_devmap
 	mv	s2, a3
 	srli	s2, s2, PAGE_SHIFT
-	li	t0, (PTE_KERN)
+	li	t0, (PTE_KERN | (1 << 61))
 	slli	t2, s2, PTE_PPN0_S
 	or	t0, t0, t2
 
@@ -271,6 +271,12 @@ va:
 .option norelax
 	lla	gp, __global_pointer$
 .option pop
+
+#if 0
+	li	t0, VM_EARLY_UART_ADDRESS
+	li	t1, 0x61
+	sb	t1, 0(t0)
+#endif
 
 	/* Set the trap vector to the real handler. */
 	la	t0, cpu_exception_handler
