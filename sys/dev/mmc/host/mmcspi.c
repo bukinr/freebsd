@@ -135,6 +135,15 @@ mmcspi_attach(device_t dev)
 	sc->mmcspi_host.host_ocr = MMC_OCR_320_330 | MMC_OCR_330_340;
 	sc->mmcspi_host.caps |= MMC_CAP_HSPEED | MMC_CAP_SIGNALING_330;
 
+	MMCSPI_LOCK(sc);
+	sc->child = device_add_child(sc->dev, "mmc", DEVICE_UNIT_ANY);
+	MMCSPI_UNLOCK(sc);
+
+	if (sc->child) {
+		device_set_ivars(sc->child, sc);
+		(void) device_probe_and_attach(sc->child);
+	}
+
 	return (0);
 }
 
@@ -163,8 +172,19 @@ mmcspi_intr(void *arg)
 static int
 mmcspi_request(device_t bus, device_t child, struct mmc_request *req)
 {
+	struct mmc_command *mmc_cmd;
+	uint32_t opcode;
 
-	printf("%s\n", __func__);
+	mmc_cmd = req->cmd;
+
+	opcode = mmc_cmd->opcode;
+	switch (opcode) {
+	case MMC_GO_IDLE_STATE:
+	default:
+		break;
+	}
+
+	printf("%s: opcode %x\n", __func__, opcode);
 
 	return (0);
 }
