@@ -1708,10 +1708,9 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 	uint8_t *ldata = cmd->ldata.data;
 
 	TRACE(dev, ACTION, "translating SPI rsp %u to SD rsp %u\n",
-	      cmd->rsp_type, mmc_rsp_type);
+	    cmd->rsp_type, mmc_rsp_type);
 
-	if ((MMC_RSP_R1 == mmc_rsp_type) ||
-	    (MMC_RSP_R1B == mmc_rsp_type)) {
+	if ((MMC_RSP_R1 == mmc_rsp_type) || (MMC_RSP_R1B == mmc_rsp_type)) {
 
 		TRACE(dev, ACTION, "translating SPI-R1/2 to SD-R1\n");
 
@@ -1781,9 +1780,11 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 					mmc_cmd->resp[0] |= R1_CARD_IS_LOCKED;
 
 			}
-	
+		} else if (MMCSPI_RSP_R7 == cmd->rsp_type) {
+			mmc_cmd->resp[0] =
+			    (uint32_t)(rspbuf[3] & 0xf) << 8 |
+			    (uint32_t)rspbuf[4];
 		} else {
-	return (0);
 			return (MMC_ERR_INVALID);
 		}
 
