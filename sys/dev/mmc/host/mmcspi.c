@@ -322,7 +322,7 @@ mmcspi_switch_vccq(device_t bus, device_t child)
 	case vccq_330:
 		break;
 	default:
-		return EINVAL;
+		return (EINVAL);
 	}
 
 	return (0);
