@@ -352,7 +352,6 @@ static void
 mmcspi_slot_init(device_t brdev, struct mmcspi_slot *slot)
 {
 	struct mmcspi_softc *sc;
-	struct spi_config cfg;
 
 	TRACE_ENTER(brdev);
 
@@ -364,20 +363,6 @@ mmcspi_slot_init(device_t brdev, struct mmcspi_slot *slot)
 	slot->host.f_min = 100000; /* this should be as low as we need to go
 				      for any card */
 	slot->host.caps = 0;
-
-	//SPIBUS_ACQUIRE_BUS(sc->busdev, sc->dev);
-
-	cfg.clock_hz = 0;
-	//SPIBUS_SET_CONFIG(sc->busdev, &cfg);
-
-	//SPIBUS_GET_CONFIG(sc->busdev, &cfg);
-	slot->host.f_max = cfg.clock_hz;
-
-	if (slot->host.f_max > 25000000)
-		slot->host.caps |= MMC_CAP_HSPEED;
-
-	//SPIBUS_RELEASE_BUS(sc->busdev, sc->dev);
-
 	/* SPI mode requires 3.3V operation */
 	slot->host.host_ocr = MMC_OCR_320_330 | MMC_OCR_330_340;  
 
@@ -659,8 +644,6 @@ mmcspi_do_spi_read(device_t dev, uint8_t *data, unsigned int len)
 
 	sc = device_get_softc(dev);
 
-//printf("%s: len %d\n", __func__, len);
-
 	spi_cmd.tx_cmd = onesbuf;
 	spi_cmd.rx_cmd = data;
 	spi_cmd.tx_cmd_sz = len;
@@ -669,9 +652,6 @@ mmcspi_do_spi_read(device_t dev, uint8_t *data, unsigned int len)
 	spi_cmd.rx_data = NULL;
 	spi_cmd.tx_data_sz = 0;
 	spi_cmd.rx_data_sz = 0;
-
-	//spi_cmd.flags = SPI_SKIP_CHIP_SELECT;
-	spi_cmd.flags = SPI_FLAG_KEEP_CS;
 
 	err = SPIBUS_TRANSFER(sc->busdev, sc->dev, &spi_cmd);
 
@@ -702,8 +682,6 @@ mmcspi_do_spi_write(device_t dev, uint8_t *cmd, unsigned int cmdlen,
 
 	sc = device_get_softc(dev);
 
-//printf("%s: len %d\n", __func__, datalen);
-
 	spi_cmd.tx_cmd = cmd;
 	spi_cmd.rx_cmd = junkbuf;
 	spi_cmd.tx_cmd_sz = cmdlen;
@@ -712,9 +690,6 @@ mmcspi_do_spi_write(device_t dev, uint8_t *cmd, unsigned int cmdlen,
 	spi_cmd.rx_data = junkbuf;
 	spi_cmd.tx_data_sz = datalen;
 	spi_cmd.rx_data_sz = datalen;
-
-	//spi_cmd.flags = SPI_SKIP_CHIP_SELECT;
-	spi_cmd.flags = SPI_FLAG_KEEP_CS;
 
 	err = SPIBUS_TRANSFER(sc->busdev, sc->dev, &spi_cmd);
 
@@ -776,7 +751,6 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 {
 	struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
-	struct spi_config cfg;
 	struct spi_command spi_cmd;
 
 	TRACE_ENTER(brdev);
@@ -813,12 +787,6 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 		 * spec requires after card power stabilizes.
 		 */
 
-		/* Use 100 kHz for maximum compatibility. */
-		cfg.clock_hz = 100000;
-		//SPIBUS_SET_CONFIG(sc->busdev, &cfg);
-		//SPIBUS_GET_CONFIG(sc->busdev, &cfg);
-		slot->host.ios.clock = cfg.clock_hz;
-
 		spi_cmd.tx_cmd = onesbuf;
 		spi_cmd.tx_cmd_sz = 10;
 		spi_cmd.rx_cmd = junkbuf;
@@ -827,9 +795,6 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 		spi_cmd.rx_data = NULL;
 		spi_cmd.tx_data_sz = 0;
 		spi_cmd.rx_data_sz = 0;
-
-		//spi_cmd.flags = SPI_SKIP_CHIP_SELECT | SPI_CHIP_SELECT_HIGH;
-		spi_cmd.flags = SPI_FLAG_KEEP_CS;
 
 		SPIBUS_TRANSFER(sc->busdev, sc->dev, &spi_cmd);
 
@@ -846,20 +811,6 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 		slot->crc_init_done = 0;
 	}
 	
-
-	/* 
-	 * A clock value of zero means set the clock line low, which is the
-	 * normal spi idle state.
-	 */
-	if (slot->host.ios.clock > 0) {
-		cfg.clock_hz = slot->host.ios.clock;
-		//SPIBUS_SET_CONFIG(sc->busdev, &cfg);
-			
-		/* retrieve the possibly adjusteed downward setting */
-		//SPIBUS_GET_CONFIG(sc->busdev, &cfg);
-		slot->host.ios.clock = cfg.clock_hz;
-	}
-
 	if (power_off == slot->host.ios.power_mode) {
 		/*
 		 * XXX Power-off portion of implementation of card power
@@ -2223,7 +2174,6 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	slot->last_flags = mmc_cmd->flags;
 
 	mmc_cmd->error = err;
-//printf("%s: error %d\n", __func__, err);
 
 	if (req->done)
 		req->done(req);
@@ -2247,15 +2197,12 @@ mmcspi_get_ro(device_t brdev, device_t reqdev)
 static int
 mmcspi_acquire_host(device_t brdev, device_t reqdev)
 {
-	//struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
-	struct spi_config cfg;
 	int err;
 
 	TRACE_ENTER(brdev);
 	err = 0;
 
-	//sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
 
 	MMCSPI_LOCK_SLOT(slot);
@@ -2263,13 +2210,6 @@ mmcspi_acquire_host(device_t brdev, device_t reqdev)
 		mtx_sleep(slot, &slot->mtx, 0, "mmcspiah", 0);
 	slot->bus_busy++;
 	MMCSPI_UNLOCK_SLOT(slot);
-
-	//SPIBUS_ACQUIRE_BUS(sc->busdev, sc->dev);
-
-	/* Restore the clock to the last setting, as it may have been
-	   changed by another spibus device. */
-	cfg.clock_hz = slot->host.ios.clock;
-	//SPIBUS_SET_CONFIG(slot->sc->busdev, &cfg);
 
 	TRACE_EXIT(brdev);
 
@@ -2279,15 +2219,11 @@ mmcspi_acquire_host(device_t brdev, device_t reqdev)
 static int
 mmcspi_release_host(device_t brdev, device_t reqdev)
 {
-	//struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
 
 	TRACE_ENTER(brdev);
 
-	//sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
-
-	//SPIBUS_RELEASE_BUS(sc->busdev, sc->dev);
 
 	MMCSPI_LOCK_SLOT(slot);
 	slot->bus_busy--;
