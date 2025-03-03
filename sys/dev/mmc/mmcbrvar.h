@@ -60,6 +60,7 @@
 #include "mmcbr_if.h"
 
 enum mmcbr_device_ivars {
+    MMCBR_IVAR_BUS_TYPE,
     MMCBR_IVAR_BUS_MODE,
     MMCBR_IVAR_BUS_WIDTH,
     MMCBR_IVAR_CHIP_SELECT,
@@ -85,6 +86,7 @@ enum mmcbr_device_ivars {
 #define	MMCBR_ACCESSOR(var, ivar, type)					\
 	__BUS_ACCESSOR(mmcbr, var, MMCBR, ivar, type)
 
+MMCBR_ACCESSOR(bus_type, BUS_TYPE, int)
 MMCBR_ACCESSOR(bus_mode, BUS_MODE, int)
 MMCBR_ACCESSOR(bus_width, BUS_WIDTH, int)
 MMCBR_ACCESSOR(chip_select, CHIP_SELECT, int)
