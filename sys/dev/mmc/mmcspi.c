@@ -2007,7 +2007,7 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	if (power_on != slot->host.ios.power_mode)
 		return (MMC_ERR_INVALID);
 
-	/* 
+	/*
 	 * Sample use_crc sysctl and adjust card setting if required and
 	 * appropriate.
 	 */
@@ -2140,7 +2140,7 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 			}
 
 			for (j = 0; j <= cmd.retries; j++) {
-				/* 
+				/*
 				 * Note that in this case, we pass on the R1
 				 * from READ_OCR.
 				 */
