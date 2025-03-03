@@ -304,25 +304,21 @@ static void mmcspi_dump_spi_bus(device_t dev, unsigned int len);
 		device_printf(dev, __VA_ARGS__);	\
 	}
 
-
 #define TRACE_ZONE_ENTER   (1ul << 0)  /* function entrance */
 #define TRACE_ZONE_EXIT    (1ul << 1)  /* function exit */
 #define TRACE_ZONE_ACTION  (1ul << 2)  /* for narrating major actions taken */
 #define TRACE_ZONE_RESULT  (1ul << 3)  /* for narrating results of actions */
 #define TRACE_ZONE_ERROR   (1ul << 4)  /* for reporting errors */
 #define TRACE_ZONE_DATA    (1ul << 5)  /* for dumping bus data */
-#define TRACE_ZONE_DETAILS (1ul << 6)  /* for narrating minor actions and results */
+#define TRACE_ZONE_DETAILS (1ul << 6)  /* for narrating minor actions/results */
 
 #define TRACE_ZONE_NONE    0
 #define TRACE_ZONE_ALL     0xffffffff
 
-
 #define CRC7_INITIAL 0x00
 #define CRC16_INITIAL 0x0000
 
-
 SYSCTL_NODE(_hw, OID_AUTO, mmcspi, CTLFLAG_RD, 0, "mmcspi driver");
-
 
 static unsigned int trace_zone_mask = TRACE_ZONE_ERROR;
 
@@ -371,9 +367,8 @@ mmcspi_slot_init(device_t brdev, struct mmcspi_slot *slot)
 	//SPIBUS_GET_CONFIG(sc->busdev, &cfg);
 	slot->host.f_max = cfg.clock_hz;
 
-	if (slot->host.f_max > 25000000) {
+	if (slot->host.f_max > 25000000)
 		slot->host.caps |= MMC_CAP_HSPEED;
-	}
 
 	//SPIBUS_RELEASE_BUS(sc->busdev, sc->dev);
 
@@ -451,14 +446,12 @@ mmcspi_attach(device_t dev)
 	init_crc16tab();
 	memset(onesbuf, 0xff, sizeof(onesbuf));
 
-	SYSCTL_ADD_UINT(ctx, child, OID_AUTO,
-			"use_crc", CTLFLAG_RW, &sc->use_crc, sizeof(sc->use_crc),
-			"Enable/disable crc checking");
+	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "use_crc", CTLFLAG_RW,
+	    &sc->use_crc, sizeof(sc->use_crc), "Enable/disable crc checking");
 
-	SYSCTL_ADD_UINT(ctx, child, OID_AUTO,
-			"trace_mask", CTLFLAG_RW, &trace_zone_mask,
-			sizeof(trace_zone_mask),
-			"Bitmask for adjusting trace messages");
+	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "trace_mask", CTLFLAG_RW,
+	    &trace_zone_mask, sizeof(trace_zone_mask),
+	    "Bitmask for adjusting trace messages");
 
 	mmcspi_slot_init(dev, &sc->slot);
 	
@@ -492,15 +485,15 @@ static int
 mmcspi_suspend(device_t dev)
 {
 	int err;
-	TRACE_ENTER(dev);
 
+	TRACE_ENTER(dev);
 	err = bus_generic_suspend(dev);
 	if (err) {
 		TRACE_EXIT(dev);
 		return (err);
 	}
-
 	TRACE_EXIT(dev);
+
 	return (0);
 }
 
@@ -509,15 +502,15 @@ static int
 mmcspi_resume(device_t dev)
 {
 	int err;
-	TRACE_ENTER(dev);
 
+	TRACE_ENTER(dev);
 	err = bus_generic_resume(dev);
 	if (err) {
 		TRACE_EXIT(dev);
 		return (err);
 	}
-
 	TRACE_EXIT(dev);
+
 	return (0);
 }
 
@@ -525,9 +518,11 @@ mmcspi_resume(device_t dev)
 static int
 mmcspi_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
 {
+	struct mmcspi_slot *slot;
+
 	TRACE_ENTER(bus);
 
-	struct mmcspi_slot *slot = device_get_ivars(child);
+	slot = device_get_ivars(child);
 
 	switch (which) {
 	case MMCBR_IVAR_BUS_TYPE:
@@ -591,9 +586,11 @@ mmcspi_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
 static int
 mmcspi_write_ivar(device_t bus, device_t child, int which, uintptr_t value)
 {
+	struct mmcspi_slot *slot;
+
 	TRACE_ENTER(bus);
 
-	struct mmcspi_slot *slot = device_get_ivars(child);
+	slot = device_get_ivars(child);
 
 	switch (which) {
 	default:
@@ -645,11 +642,12 @@ mmcspi_write_ivar(device_t bus, device_t child, int which, uintptr_t value)
 static int
 mmcspi_update_ios(device_t brdev, device_t reqdev)
 {
-	TRACE_ENTER(brdev);
 	struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
 	struct spi_config cfg;
 	struct spi_command spi_cmd;
+
+	TRACE_ENTER(brdev);
 
 	sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
@@ -746,11 +744,11 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 static unsigned int
 mmcspi_do_spi_read(device_t dev, uint8_t *data, unsigned int len)
 {
-	TRACE_ENTER(dev);
-	
 	struct spi_command spi_cmd;
 	struct mmcspi_softc *sc;
 	int err;
+
+	TRACE_ENTER(dev);
 
 	sc = device_get_softc(dev);
 
@@ -781,6 +779,7 @@ mmcspi_do_spi_read(device_t dev, uint8_t *data, unsigned int len)
 #endif
 
 	TRACE_EXIT(dev);
+
 	return (err ? MMC_ERR_FAILED : MMC_ERR_NONE);
 }
 
@@ -789,11 +788,13 @@ static unsigned int
 mmcspi_do_spi_write(device_t dev, uint8_t *cmd, unsigned int cmdlen,
     uint8_t *data, unsigned int datalen)
 {
-	TRACE_ENTER(dev);
-	
-	struct mmcspi_softc *sc = device_get_softc(dev);
+	struct mmcspi_softc *sc;
 	struct spi_command spi_cmd;
 	int err;
+
+	TRACE_ENTER(dev);
+
+	sc = device_get_softc(dev);
 
 //printf("%s: len %d\n", __func__, datalen);
 
@@ -812,6 +813,7 @@ mmcspi_do_spi_write(device_t dev, uint8_t *cmd, unsigned int cmdlen,
 	err = SPIBUS_TRANSFER(sc->busdev, sc->dev, &spi_cmd);
 
 	TRACE_EXIT(dev);
+
 	return (err ? MMC_ERR_FAILED : MMC_ERR_NONE);
 }
 
@@ -819,14 +821,15 @@ mmcspi_do_spi_write(device_t dev, uint8_t *cmd, unsigned int cmdlen,
 static unsigned int
 mmcspi_wait_for_not_busy(device_t dev)
 {
-	TRACE_ENTER(dev);
-	
-	int i;
-	unsigned int err;
-	unsigned int busy_length = 0;
+	unsigned int busy_length;
 	uint8_t pollbuf[MMCSPI_POLL_LEN];
 	struct bintime start, elapsed;
+	unsigned int err;
+	int i;
 
+	busy_length = 0;
+
+	TRACE_ENTER(dev);
 	TRACE(dev, ACTION, "waiting for not busy\n");
 
 	getbintime(&start);
@@ -842,7 +845,7 @@ mmcspi_wait_for_not_busy(device_t dev)
 		for (i = 0; i < MMCSPI_POLL_LEN; i++) {
 			if (pollbuf[i] != 0x00) {
 				TRACE(dev, DETAILS,
-				      "end of busy found at %d\n", i);
+				    "end of busy found at %d\n", i);
 				break;
 			}
 			busy_length++;
@@ -852,27 +855,26 @@ mmcspi_wait_for_not_busy(device_t dev)
 		bintime_sub(&elapsed, &start);
 
 		if (elapsed.sec > MMCSPI_TIMEOUT_SEC) {
-			TRACE(dev, ERROR, "card busy for longer than timeout\n");
+			TRACE(dev, ERROR, "card busy timeout\n");
 			return (MMC_ERR_TIMEOUT);
 		}
 	} while (MMCSPI_POLL_LEN == i);
 
 	TRACE(dev, RESULT, "busy for %u byte slots\n", busy_length);
-
 	TRACE_EXIT(dev);
+
 	return (MMC_ERR_NONE);
 }
 
-
 static unsigned int
 mmcspi_shift_copy(uint8_t *dest, uint8_t *src, unsigned int dest_len,
-		  unsigned int shift)
+    unsigned int shift)
 {
 	unsigned int i;
 
-	if (0 == shift) {
+	if (0 == shift)
 		memcpy(dest, src, dest_len);
-	} else {
+	else {
 		for (i = 0; i < dest_len; i++) {
 			dest[i] =
 			    (src[i] << shift) | 
@@ -883,20 +885,21 @@ mmcspi_shift_copy(uint8_t *dest, uint8_t *src, unsigned int dest_len,
 	return (dest_len);
 }
 
-
 static unsigned int
 mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
-			  unsigned int len, unsigned int has_busy,
-			  uint8_t *rspbuf)
+    unsigned int len, unsigned int has_busy, uint8_t *rspbuf)
 {
-	int i;
+	uint8_t pollbuf[2 * MMCSPI_MAX_RSP_LEN];
+	struct bintime start, elapsed;
+	boolean_t found;
 	unsigned int err;
 	unsigned int offset;
 	unsigned int shift = 0;
 	unsigned int remaining;
-	boolean_t found;
-	uint8_t pollbuf[2 * MMCSPI_MAX_RSP_LEN];
-	struct bintime start, elapsed;
+	uint16_t search_space;
+	uint16_t search_mask;
+	uint16_t search_value;
+	int i;
 
 	TRACE_ENTER(dev);
 
@@ -916,16 +919,14 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 	found = false;
 	getbintime(&start);
 	do {
-		TRACE(dev, DETAILS,
-		      "looking for response token with mask 0x%02x, value 0x%02x\n",
-		      mask, value);
+		TRACE(dev, DETAILS, "looking for response token with "
+		    "mask 0x%02x, value 0x%02x\n", mask, value);
 		err = mmcspi_do_spi_read(dev, &pollbuf[offset], len);
 		if (MMC_ERR_NONE != err) {
-			TRACE(dev, ERROR, "spi read of response token failed\n");
+			TRACE(dev, ERROR, "spi read of resp token failed\n");
 			TRACE_EXIT(dev);
 			return (err);
 		}
-
 
 		for (i = 0; i < len + offset; i++) {
 			if ((pollbuf[i] & mask) == value) {
@@ -940,23 +941,22 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 				 * Not the last byte in the buffer, so check
 				 * for a non-aligned response.
 				 */
-				uint16_t search_space =
-				    ((uint16_t)pollbuf[i] << 8) | pollbuf[i + 1];
-				uint16_t search_mask = (uint16_t)mask << 8;
-				uint16_t search_value = (uint16_t)value << 8;
+				search_space = ((uint16_t)pollbuf[i] << 8) |
+				    pollbuf[i + 1];
+				search_mask  = (uint16_t)mask << 8;
+				search_value = (uint16_t)value << 8;
 
-				TRACE(dev, DETAILS,
-				      "search: space=0x%04x mask=0x%04x val=0x%04x\n", 
-				      search_space, search_mask, search_value);
+				TRACE(dev, DETAILS, "search: space=0x%04x "
+				    " mask=0x%04x val=0x%04x\n", search_space,
+				    search_mask, search_value);
 
 				for (shift = 1; shift < 8; shift++) {
 					search_space <<= 1;
 					if ((search_space & search_mask) ==
 					    search_value) {
 						found = true;
-						TRACE(dev, DETAILS,
-						      "Found match at shift %u\n",
-						      shift);
+						TRACE(dev, DETAILS, "Found mat"
+						    "ch at shift %u\n", shift);
 						break;
 					}
 				}
@@ -980,8 +980,8 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 			bintime_sub(&elapsed, &start);
 
 			if (elapsed.sec > MMCSPI_TIMEOUT_SEC) {
-				TRACE(dev, ERROR,
-				      "timeout while looking for response token\n");
+				TRACE(dev, ERROR, "timeout while looking for "
+				    "response token\n");
 				return (MMC_ERR_TIMEOUT);
 			}
 		}
@@ -997,10 +997,11 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 	      len, i, remaining, shift);
 
 	if (remaining) {
-		err = mmcspi_do_spi_read(dev, &pollbuf[len + offset], remaining);
+		err = mmcspi_do_spi_read(dev, &pollbuf[len + offset],
+		    remaining);
 		if (MMC_ERR_NONE != err) {
-			TRACE(dev, ERROR,
-			      "spi read of remainder of response token failed\n");
+			TRACE(dev, ERROR, "spi read of remainder of response "
+			    "token failed\n");
 			TRACE_EXIT(dev);
 			return (err);
 		}
@@ -1032,18 +1033,27 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 
 static unsigned int
 mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
-		      struct mmc_command *mmc_cmd)
+    struct mmc_command *mmc_cmd)
 {
-	struct mmcspi_softc *sc = device_get_softc(dev);
-	struct mmcspi_slot *slot = &sc->slot;
-	uint32_t opcode = mmc_cmd->opcode;
-	uint32_t arg = mmc_cmd->arg;
-	uint32_t flags = mmc_cmd->flags;
-	uint32_t retries = mmc_cmd->retries;
+	struct mmcspi_softc *sc;
+	struct mmcspi_slot *slot;
+	uint32_t opcode;
+	uint32_t arg;
+	uint32_t flags;
+	uint32_t retries;
 	unsigned char rsp_type;
 	unsigned char rsp_len;
 	unsigned int ldata_len = 0;
-	unsigned int use_crc = slot->crc_enabled;
+	unsigned int use_crc;
+
+	sc = device_get_softc(dev);
+	slot  = &sc->slot;
+	use_crc = slot->crc_enabled;
+
+	opcode = mmc_cmd->opcode;
+	arg = mmc_cmd->arg;
+	flags = mmc_cmd->flags;
+	retries = mmc_cmd->retries;
 
 	if (flags & MMC_CMD_IS_APP) {
 		switch (opcode) {
@@ -1141,9 +1151,9 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 			break;
 
 		default:
-			TRACE(dev, ERROR, "Invalid command opcode %u\n", opcode);
+			TRACE(dev, ERROR, "Invalid cmd opcode %u\n", opcode);
 			return (MMC_ERR_INVALID);
-		}		
+		}
 	}
 
 	switch (rsp_type) {
@@ -1253,8 +1263,7 @@ mmcspi_send_cmd(device_t dev, struct mmcspi_command *cmd, uint8_t *rspbuf)
 	TRACE(dev, DETAILS, "skipped response byte is 0x%02x\n", junkbuf[6]);
 
 	err = mmcspi_get_response_token(dev, MMCSPI_R1_MASK, MMCSPI_R1_VALUE,
-					cmd->rsp_len,
-					MMCSPI_RSP_R1B == cmd->rsp_type, rspbuf);
+	    cmd->rsp_len, MMCSPI_RSP_R1B == cmd->rsp_type, rspbuf);
 
 	if (MMC_ERR_NONE == err) {
 		if (rspbuf[0] & cmd->error_mask & MMCSPI_R1_CRC_ERR) {
@@ -1265,30 +1274,31 @@ mmcspi_send_cmd(device_t dev, struct mmcspi_command *cmd, uint8_t *rspbuf)
 	}
 
 	TRACE_EXIT(dev);
+
 	return (err);
 }
 
-
 static unsigned int
 mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
-		  unsigned int check_crc16, unsigned int check_crc7)
+    unsigned int check_crc16, unsigned int check_crc7)
 {
-	TRACE_ENTER(dev);
-	
-	int i;
-	unsigned int err;
+	struct bintime start;
+	struct bintime elapsed;
 	unsigned int non_token_bytes;
 	unsigned int data_captured;
 	unsigned int crc_captured;
 	unsigned int pollbufpos;
-	unsigned int crc16_mismatch = 0;
+	unsigned int crc16_mismatch;
+	unsigned int err;
 	uint16_t crc16, computed_crc16;
 	uint8_t crc7, computed_crc7;
 	uint8_t pollbuf[MMCSPI_POLL_LEN];
 	uint8_t crcbuf[MMCSPI_DATA_CRC_LEN];
-	struct bintime start;
-	struct bintime elapsed;
+	int i;
 
+	crc16_mismatch = 0;
+
+	TRACE_ENTER(dev);
 	TRACE(dev, ACTION, "read block(%u)\n", len);
 
 	/* 
@@ -1336,7 +1346,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 	pollbufpos = i + 1;
 
 	TRACE(dev, DETAILS, "data bytes captured in pollbuf = %u\n",
-	      data_captured);
+	    data_captured);
 
 	memcpy(data, &pollbuf[pollbufpos], data_captured);
 	pollbufpos += data_captured;
@@ -1347,7 +1357,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 	/* get any remaining data from the spi bus */
 	if (data_captured < len) {
 		err = mmcspi_do_spi_read(dev, &data[data_captured],
-					 len - data_captured);
+		    len - data_captured);
 		if (MMC_ERR_NONE != err) {
 			TRACE(dev, ERROR,
 			      "spi read of remainder of block failed\n");
@@ -1385,7 +1395,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 		crc16 = ((uint16_t)crcbuf[0] << 8) | crcbuf[1];
 		computed_crc16 = update_crc16(CRC16_INITIAL, data, len);
 		TRACE(dev, RESULT, "sent_crc16=0x%04x computed_crc16=0x%04x\n",
-		      crc16, computed_crc16);
+		    crc16, computed_crc16);
 
 		if (computed_crc16 != crc16) {
 			crc16_mismatch = 1;
@@ -1419,7 +1429,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 			TRACE(dev, ERROR,
 			      "crc7 mismatch, should be 0x%02x, is 0x%02x\n",
 			      crc7, computed_crc7);
-			
+
 			TRACE_EXIT(dev);
 			return (MMC_ERR_BADCRC);
 		}
@@ -1434,12 +1444,13 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 static unsigned int
 mmcspi_send_stop(device_t dev, unsigned int retries)
 {
-	TRACE_ENTER(dev);
-	int i;
-	unsigned int err;
 	struct mmcspi_command stop;
 	struct mmc_command mmc_stop;
 	uint8_t stop_response;
+	unsigned int err;
+	int i;
+
+	TRACE_ENTER(dev);
 
 	memset(&mmc_stop, 0, sizeof(mmc_stop));
 	mmc_stop.opcode = MMC_STOP_TRANSMISSION;
@@ -1494,16 +1505,17 @@ mmcspi_send_stop(device_t dev, unsigned int retries)
 static unsigned int
 mmcspi_read_phase(device_t dev, struct mmcspi_command *cmd)
 {
-	TRACE_ENTER(dev);
-
-	struct mmc_data *data = cmd->data;
-	uint8_t *data8;
+	struct mmc_data *data;
 	unsigned int data_offset;
 	unsigned int num_blocks;
 	unsigned int len;
 	unsigned int err;
+	uint8_t *data8;
 	int i;
 
+	TRACE_ENTER(dev);
+
+	data = cmd->data;
 	data8 = (uint8_t *)data->data;
 	data_offset = 0;
 
@@ -1516,7 +1528,6 @@ mmcspi_read_phase(device_t dev, struct mmcspi_command *cmd)
 	}
 
 	for (i = 0; i < num_blocks; i++) {
-		
 		/*
 		 * The CID and CSD data blocks contain both a trailing crc-7
 		 * inside the data block and the standard crc-16 following
@@ -1533,10 +1544,8 @@ mmcspi_read_phase(device_t dev, struct mmcspi_command *cmd)
 		 * mid=0x1b oid=0x534d pnm="00000" prv=1.0 mdt=02.2010
 		 */
 		err = mmcspi_read_block(dev, &data8[data_offset], len,
-					cmd->use_crc,
-					cmd->use_crc &&
-					((MMC_SEND_CID == cmd->opcode) ||
-					 (MMC_SEND_CSD == cmd->opcode)));
+		    cmd->use_crc, cmd->use_crc && ((MMC_SEND_CID == cmd->opcode)
+		    || (MMC_SEND_CSD == cmd->opcode)));
 
 		if (MMC_ERR_NONE != err) {
 			TRACE_EXIT(dev);
@@ -1563,20 +1572,19 @@ mmcspi_read_phase(device_t dev, struct mmcspi_command *cmd)
 
 static unsigned int
 mmcspi_write_block(device_t dev, uint8_t *data, unsigned int is_multi,
-		   unsigned char use_crc, uint8_t *status)
+    unsigned char use_crc, uint8_t *status)
 {
-	TRACE_ENTER(dev);
-	
+	uint8_t txbuf[max(MMCSPI_POLL_LEN, 2)];
+	uint8_t response_token;
 	unsigned int err;
 	uint16_t crc;
-	uint8_t response_token;
-	uint8_t txbuf[max(MMCSPI_POLL_LEN, 2)];
 
-	if (use_crc) {
+	TRACE_ENTER(dev);
+
+	if (use_crc)
 		crc = update_crc16(CRC16_INITIAL, data, MMCSPI_DATA_BLOCK_LEN);
-	} else {
+	else
 		crc = 0;
-	}
 
 	TRACE(dev, ACTION, "write block(512) crc=0x%04x\n", crc);
 
@@ -1596,7 +1604,7 @@ mmcspi_write_block(device_t dev, uint8_t *data, unsigned int is_multi,
 	}
 
 	err = mmcspi_get_response_token(dev, MMCSPI_DR_MASK, MMCSPI_DR_VALUE, 
-					1, 1, &response_token);
+	    1, 1, &response_token);
 	if (MMC_ERR_NONE != err) {
 		TRACE_EXIT(dev);
 		return (err);
@@ -1613,16 +1621,19 @@ mmcspi_write_block(device_t dev, uint8_t *data, unsigned int is_multi,
 static unsigned int
 mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd)
 {
-	TRACE_ENTER(dev);
 
-	struct mmc_data *data = cmd->data;
-	uint8_t *data8;
+	struct mmc_data *data;
 	unsigned int data_offset;
 	unsigned int num_blocks;
 	unsigned int err;
-	int i;
+	uint8_t *data8;
 	uint8_t token[2];
 	uint8_t status;
+	int i;
+
+	TRACE_ENTER(dev);
+
+	data = cmd->data;
 
 	data8 = (uint8_t *)data->data;
 	data_offset = 0;
@@ -1699,7 +1710,7 @@ mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd)
 
 static unsigned int
 mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd, 
-			  uint8_t *rspbuf)
+    uint8_t *rspbuf)
 {
 	TRACE_ENTER(dev);
 
@@ -1737,18 +1748,18 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 			if (rspbuf[0] & MMCSPI_R1_ERASE_RST)
 				mmc_cmd->resp[0] |= R1_ERASE_RESET;
 
-			if (rspbuf[0] & MMCSPI_R1_IDLE) {
-				mmc_cmd->resp[0] |= (uint32_t)R1_STATE_IDLE << 9;
-			} else {
-				mmc_cmd->resp[0] |= (uint32_t)R1_STATE_READY << 9;
-			}
+			if (rspbuf[0] & MMCSPI_R1_IDLE)
+				mmc_cmd->resp[0] |=
+				    (uint32_t)R1_STATE_IDLE << 9;
+			else
+				mmc_cmd->resp[0] |=
+				    (uint32_t)R1_STATE_READY << 9;
 
 			/* When MMC_CMD_IS_APP is sent, emulate R1_APP_CMD
 			   SD-bus status bit. */
 			if (!(cmd->flags & MMC_CMD_IS_APP) &&
-			    (MMC_APP_CMD == cmd->opcode)) {
+			    (MMC_APP_CMD == cmd->opcode))
 				mmc_cmd->resp[0] |= R1_APP_CMD;
-			}
 
 			if (MMCSPI_RSP_R2 == cmd->rsp_type) {
 				if (rspbuf[1] & MMCSPI_R2_OOR_CSD_OW)
@@ -1792,7 +1803,8 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 
 		if (16 == cmd->ldata.len) {
 
-			TRACE(dev, ACTION, "translating SPI-R1/ldata(16) to SD-R2\n");
+			TRACE(dev, ACTION, "translating SPI-R1/ldata(16) "
+			    "to SD-R2\n");
 
 			/* ldata contains bits 127:0 of the spi response */
 
@@ -1874,14 +1886,14 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 			if (rspbuf[1] & MMCSPI_R2_ERR)
 				mmc_cmd->resp[0] |= 0x2000;
 
-			if (rspbuf[0] & MMCSPI_R1_IDLE) {
-				mmc_cmd->resp[0] |= (uint32_t)R1_STATE_IDLE << 9;
-			} else {
-				mmc_cmd->resp[0] |= (uint32_t)R1_STATE_READY << 9;
-			}
+			if (rspbuf[0] & MMCSPI_R1_IDLE)
+				mmc_cmd->resp[0] |=
+				    (uint32_t)R1_STATE_IDLE << 9;
+			else
+				mmc_cmd->resp[0] |=
+				    (uint32_t)R1_STATE_READY << 9;
 
 		} else if (MMCSPI_RSP_R7 == cmd->rsp_type) {
-
 			TRACE(dev, ACTION, "translating SPI-R7 to SD-R7\n");
 
 			/* rsp buf contains a 40-bit spi-R7, of which bits
@@ -1892,14 +1904,11 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 			mmc_cmd->resp[0] =
 			    (uint32_t)(rspbuf[3] & 0xf) << 8 |
 			    (uint32_t)rspbuf[4];
-
-		} else {
+		} else
 			return (MMC_ERR_INVALID);
-		}
 
-	} else if (MMC_RSP_NONE != mmc_rsp_type) {
+	} else if (MMC_RSP_NONE != mmc_rsp_type)
 		return (MMC_ERR_INVALID);
-	}
 
 	TRACE_EXIT(dev);
 
@@ -1936,12 +1945,11 @@ mmcspi_get_ocr(device_t dev, uint8_t *ocrbuf)
 		
 	r1_status = rspbuf[0] & cmd.error_mask;
 	if (r1_status) {
-		if (r1_status & MMCSPI_R1_CRC_ERR) {
+		if (r1_status & MMCSPI_R1_CRC_ERR)
 			err = MMC_ERR_BADCRC;
-		} else {
+		else
 			err = MMC_ERR_INVALID;
-		}
-		
+
 		TRACE_EXIT(dev);
 		return (err);
 	}
@@ -1984,12 +1992,11 @@ mmcspi_set_crc_on_off(device_t dev, unsigned int crc_on)
 		
 	r1_status = rspbuf[0] & cmd.error_mask;
 	if (r1_status) {
-		if (r1_status & MMCSPI_R1_CRC_ERR) {
+		if (r1_status & MMCSPI_R1_CRC_ERR)
 			err = MMC_ERR_BADCRC;
-		} else {
+		else
 			err = MMC_ERR_INVALID;
-		}
-		
+
 		TRACE_EXIT(dev);
 		return (err);
 	}
@@ -2002,17 +2009,20 @@ mmcspi_set_crc_on_off(device_t dev, unsigned int crc_on)
 static unsigned int
 mmcspi_update_crc_setting(device_t dev, unsigned int crc_on)
 {
-	TRACE_ENTER(dev);
-	struct mmcspi_softc *sc = device_get_softc(dev);
-	struct mmcspi_slot *slot = &sc->slot;
+	struct mmcspi_softc *sc;
+	struct mmcspi_slot *slot;
 	unsigned int err;
 	int i;
 
+	TRACE_ENTER(dev);
+
+	sc = device_get_softc(dev);
+	slot = &sc->slot;
+
 	for (i = 0; i <= MMCSPI_RETRIES; i++) {
 		err = mmcspi_set_crc_on_off(dev, crc_on);
-		if (MMC_ERR_BADCRC != err) {
+		if (MMC_ERR_BADCRC != err)
 			break;
-		}
 	}
 	
 	if (MMC_ERR_NONE != err) {
@@ -2020,13 +2030,13 @@ mmcspi_update_crc_setting(device_t dev, unsigned int crc_on)
 		return (err);
 	}
 	
-	if (crc_on) {
+	if (crc_on)
 		slot->crc_enabled = 1;
-	} else {
+	else
 		slot->crc_enabled = 0;
-	}
 
 	TRACE_EXIT(dev);
+
 	return (MMC_ERR_NONE);
 }
 
@@ -2050,14 +2060,13 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	uint32_t last_flags;
 	uint8_t rspbuf[MMCSPI_MAX_RSP_LEN];
 
-#define IS_CMD(code, cmd, flags) (!((flags) & MMC_CMD_IS_APP) && ((code) == (cmd)))
-#define IS_ACMD(code, cmd, flags) (((flags) & MMC_CMD_IS_APP) && ((code) == (cmd)))
+#define IS_CMD(code, cmd, flags)	\
+	(!((flags) & MMC_CMD_IS_APP) && ((code) == (cmd)))
+#define IS_ACMD(code, cmd, flags)	\
+	(((flags) & MMC_CMD_IS_APP) && ((code) == (cmd)))
 
-	//printf("%s, app %ld opcode %d\n", __func__, mmc_cmd->flags & MMC_CMD_IS_APP, mmc_cmd->opcode);
-
-	if (power_on != slot->host.ios.power_mode) {
+	if (power_on != slot->host.ios.power_mode)
 		return (MMC_ERR_INVALID);
-	}
 
 	/* 
 	 * Sample use_crc sysctl and adjust card setting if required and
@@ -2067,16 +2076,14 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	if (slot->crc_init_done &&
 	    (use_crc_sample != slot->crc_enabled)) {
 		err = mmcspi_update_crc_setting(brdev, use_crc_sample);
-		if (MMC_ERR_NONE != err) {
+		if (MMC_ERR_NONE != err)
 			goto out;
-		}
 		slot->crc_init_done = 1;
 	}
 
 	err = mmcspi_set_up_command(brdev, &cmd, mmc_cmd);
-	if (MMC_ERR_NONE != err) {
+	if (MMC_ERR_NONE != err)
 		goto out;
-	}
 
 	opcode = cmd.opcode;
 	flags = cmd.flags;
@@ -2087,7 +2094,6 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 
 	/* enforce restrictions on request parameters */
 	if (data) {
-
 		/* 
 		 * All writes must be a multiple of the block length. All
 		 * reads greater than the block length must be a multiple of
@@ -2141,11 +2147,10 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 		}
 
 		if (data) {
-			if (data->flags & MMC_DATA_READ) {
+			if (data->flags & MMC_DATA_READ)
 				err = mmcspi_read_phase(brdev, &cmd);
-			} else {  /* MMC_DATA_WRITE */
+			else /* MMC_DATA_WRITE */
 				err = mmcspi_write_phase(brdev, &cmd);
-			}
 
 			if (MMC_ERR_NONE != err) {
 				if (MMC_ERR_BADCRC == err) {
@@ -2158,9 +2163,8 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 		break;
 	}
 
-	if (MMC_ERR_NONE != err) {
+	if (MMC_ERR_NONE != err)
 		goto out;
-	}
 
 
 	/* 
@@ -2179,9 +2183,9 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	if (IS_ACMD(ACMD_SD_SEND_OP_COND, opcode, flags) ||
 	    IS_CMD(MMC_SEND_OP_COND, opcode, flags)) {
 
-		if (rspbuf[0] & MMCSPI_R1_IDLE) {
+		if (rspbuf[0] & MMCSPI_R1_IDLE)
 			memcpy(&rspbuf[1], slot->last_ocr, MMCSPI_OCR_LEN);
-		} else {
+		else {
 
 			/*
 			 * Some cards won't accept the MMCSPI_CRC_ON_OFF
@@ -2195,9 +2199,8 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 			if (!slot->crc_init_done) {
 				err = mmcspi_update_crc_setting(brdev,
 								sc->use_crc);
-				if (MMC_ERR_NONE != err) {
+				if (MMC_ERR_NONE != err)
 					goto out;
-				}
 				slot->crc_init_done = 1;
 			}
 
@@ -2208,18 +2211,16 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 				 */
 				err = mmcspi_get_ocr(brdev, rspbuf);
 				if (MMC_ERR_NONE != err) {
-					if (MMC_ERR_BADCRC == err) {
+					if (MMC_ERR_BADCRC == err)
 						continue;
-					}
-					
+
 					goto out;
 				}
 
 			}
 
-			if (MMC_ERR_NONE != err) {
+			if (MMC_ERR_NONE != err)
 				goto out;
-			}
 
 		}
 
@@ -2228,9 +2229,8 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	}
 
 	err = mmcspi_translate_response(brdev, &cmd, rspbuf);
-	if (MMC_ERR_NONE != err) {
+	if (MMC_ERR_NONE != err)
 		goto out;
-	}
 
  out:
 	slot->last_opcode = mmc_cmd->opcode;
@@ -2239,10 +2239,9 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	mmc_cmd->error = err;
 //printf("%s: error %d\n", __func__, err);
 
-	if (req->done) {
+	if (req->done)
 		req->done(req);
-	}
-	
+
 	TRACE_EXIT(brdev);
 
 	return (err);
@@ -2263,22 +2262,20 @@ mmcspi_get_ro(device_t brdev, device_t reqdev)
 static int
 mmcspi_acquire_host(device_t brdev, device_t reqdev)
 {
-	TRACE_ENTER(brdev);
-
 	struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
 	struct spi_config cfg;
-	int err = 0;
+	int err;
 
-//printf("%s\n", __func__);
+	TRACE_ENTER(brdev);
+	err = 0;
 
 	sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
 
 	MMCSPI_LOCK_SLOT(slot);
-	while (slot->bus_busy) {
+	while (slot->bus_busy)
 		mtx_sleep(slot, &slot->mtx, 0, "mmcspiah", 0);
-	}
 	slot->bus_busy++;
 	MMCSPI_UNLOCK_SLOT(slot);
 
@@ -2298,12 +2295,10 @@ mmcspi_acquire_host(device_t brdev, device_t reqdev)
 static int
 mmcspi_release_host(device_t brdev, device_t reqdev)
 {
-	TRACE_ENTER(brdev);
-
 	struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
 
-//printf("%s\n", __func__);
+	TRACE_ENTER(brdev);
 
 	sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
@@ -2321,7 +2316,6 @@ mmcspi_release_host(device_t brdev, device_t reqdev)
 	return (0);
 }
 
-
 static uint8_t
 update_crc7(uint8_t crc, uint8_t *buf, unsigned int len)
 {
@@ -2335,7 +2329,6 @@ update_crc7(uint8_t crc, uint8_t *buf, unsigned int len)
 	
 	return crc;
 }
-
 
 static uint16_t
 update_crc16(uint16_t crc, uint8_t *buf, unsigned int len)
@@ -2354,7 +2347,6 @@ update_crc16(uint16_t crc, uint8_t *buf, unsigned int len)
 	return crc;
 }
 
-
 static void
 init_crc7tab(void)
 {
@@ -2371,15 +2363,13 @@ init_crc7tab(void)
 		for (j=1; j<8; j++) {
 			crc = crc << 1;
 
-			if (crc & 0x80) {
+			if (crc & 0x80)
 				crc = crc ^ P_CRC7;
-			}
 		}
 
 		crc7tab[i] = crc;
 	}
 }
-
 
 static void
 init_crc16tab(void)
@@ -2471,13 +2461,11 @@ static device_method_t mmcspi_methods[] = {
 	{0, 0},
 };
 
-
 static driver_t mmcspi_driver = {
 	"mmcspi",
 	mmcspi_methods,
 	sizeof(struct mmcspi_softc),
 };
-//static devclass_t mmcspi_devclass;
 
 
 //DRIVER_MODULE(mmcspi, spibus, mmcspi_driver, mmcspi_devclass, mmcspi_modevent_handler, 0);
@@ -2489,18 +2477,16 @@ MMC_DECLARE_BRIDGE(mmcspi);
 SPIBUS_FDT_PNP_INFO(compat_data);
 #endif
 
-
-
 #if defined(MMCSPI_ENABLE_DEBUG_FUNCS)
 static void
 mmcspi_dump_data(device_t dev, const char *label, uint8_t *data,
-		 unsigned int len)
+    unsigned int len)
 {
-	TRACE_ENTER(dev);
-
 	unsigned int i, j;
 	unsigned int num_lines;
 	unsigned int residual;
+
+	TRACE_ENTER(dev);
 
 	num_lines = len / 16;
 	residual = len - 16 * num_lines;
@@ -2524,15 +2510,17 @@ mmcspi_dump_data(device_t dev, const char *label, uint8_t *data,
 	TRACE_EXIT(dev);
 }
 
-
 static void
 mmcspi_dump_spi_bus(device_t dev, unsigned int len)
 {
+	unsigned int num_blocks;
+	unsigned int residual;
+	unsigned int i;
+
 	TRACE_ENTER(dev);
 
-	unsigned int num_blocks = len / MMCSPI_DATA_BLOCK_LEN;
-	unsigned int residual = len - num_blocks * MMCSPI_DATA_BLOCK_LEN;
-	unsigned int i;
+	num_blocks = len / MMCSPI_DATA_BLOCK_LEN;
+	residual = len - num_blocks * MMCSPI_DATA_BLOCK_LEN;
 
 	for(i = 0; i < num_blocks; i++) {
 		if (MMC_ERR_NONE !=
@@ -2554,12 +2542,10 @@ mmcspi_dump_spi_bus(device_t dev, unsigned int len)
 
 		mmcspi_dump_data(dev, "bus_data", junkbuf, residual);
 	}
-	
 
 	TRACE_EXIT(dev);
 }
 #endif
-
 
 /*
  * These are the cards this code was tested with (initialization,
