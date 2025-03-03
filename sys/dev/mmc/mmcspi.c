@@ -96,58 +96,58 @@
 #include "mmcbr_if.h"
 #include "spibus_if.h"
 
-#define MMCSPI_RETRIES		3
-#define MMCSPI_TIMEOUT_SEC	3
+#define	MMCSPI_RETRIES		3
+#define	MMCSPI_TIMEOUT_SEC	3
 
-#define MMCSPI_MAX_RSP_LEN	5  /* max length of an Rn response */
-#define MMCSPI_OCR_LEN		4
+#define	MMCSPI_MAX_RSP_LEN	5  /* max length of an Rn response */
+#define	MMCSPI_OCR_LEN		4
 
-#define MMCSPI_DATA_BLOCK_LEN	512
-#define MMCSPI_DATA_CRC_LEN	2
+#define	MMCSPI_DATA_BLOCK_LEN	512
+#define	MMCSPI_DATA_CRC_LEN	2
 
 #define	MMCSPI_POLL_LEN		8  /* amount to read when searching */
 
 #define	MMCSPI_R1_MASK	0x80  /* mask used to search for R1 tokens */
-#define MMCSPI_R1_VALUE	0x00  /* value used to search for R1 tokens */
-#define MMCSPI_DR_MASK	0x11  /* mask used to search for data resp tokens */
-#define MMCSPI_DR_VALUE	0x01  /* value used to search for data resp tokens */
+#define	MMCSPI_R1_VALUE	0x00  /* value used to search for R1 tokens */
+#define	MMCSPI_DR_MASK	0x11  /* mask used to search for data resp tokens */
+#define	MMCSPI_DR_VALUE	0x01  /* value used to search for data resp tokens */
 
-#define MMCSPI_DR_ERR_MASK  0x0e
-#define MMCSPI_DR_ERR_NONE  0x04
-#define MMCSPI_DR_ERR_CRC   0x0a
-#define MMCSPI_DR_ERR_WRITE 0x0c
+#define	MMCSPI_DR_ERR_MASK	0x0e
+#define	MMCSPI_DR_ERR_NONE	0x04
+#define	MMCSPI_DR_ERR_CRC	0x0a
+#define	MMCSPI_DR_ERR_WRITE	0x0c
 
-#define MMCSPI_TOKEN_SB      0xfe  /* start block token for read single,
+#define	MMCSPI_TOKEN_SB		0xfe  /* start block token for read single,
 				      read multi, and write single */
-#define MMCSPI_TOKEN_SB_WM   0xfc  /* start block token for write multi */
-#define MMCSPI_TOKEN_ST      0xfd  /* stop transmission token */
-#define MMCSPI_IS_DE_TOKEN(x)	(0 == ((x) & 0xf0))	/* detector for data
+#define	MMCSPI_TOKEN_SB_WM	0xfc  /* start block token for write multi */
+#define	MMCSPI_TOKEN_ST		0xfd  /* stop transmission token */
+#define	MMCSPI_IS_DE_TOKEN(x)	(0 == ((x) & 0xf0))	/* detector for data
 							   error token */
 
-#define MMCSPI_R1_IDLE      0x01
-#define MMCSPI_R1_ERASE_RST 0x02
-#define MMCSPI_R1_ILL_CMD   0x04
-#define MMCSPI_R1_CRC_ERR   0x08
-#define MMCSPI_R1_ERASE_ERR 0x10
-#define MMCSPI_R1_ADDR_ERR  0x20
-#define MMCSPI_R1_PARAM_ERR 0x40
+#define	MMCSPI_R1_IDLE      0x01
+#define	MMCSPI_R1_ERASE_RST 0x02
+#define	MMCSPI_R1_ILL_CMD   0x04
+#define	MMCSPI_R1_CRC_ERR   0x08
+#define	MMCSPI_R1_ERASE_ERR 0x10
+#define	MMCSPI_R1_ADDR_ERR  0x20
+#define	MMCSPI_R1_PARAM_ERR 0x40
 
-#define MMCSPI_R1_ERR_MASK (MMCSPI_R1_PARAM_ERR | MMCSPI_R1_ADDR_ERR |	\
+#define	MMCSPI_R1_ERR_MASK (MMCSPI_R1_PARAM_ERR | MMCSPI_R1_ADDR_ERR |	\
 			    MMCSPI_R1_ERASE_ERR | MMCSPI_R1_CRC_ERR |	\
 			    MMCSPI_R1_ILL_CMD)
 
-#define MMCSPI_R2_LOCKED      0x01
-#define MMCSPI_R2_WP_ER_LCK   0x02
-#define MMCSPI_R2_ERR         0x04
-#define MMCSPI_R2_CC_ERR      0x08
-#define MMCSPI_R2_ECC_FAIL    0x10
-#define MMCSPI_R2_WP_VIOLATE  0x20
-#define MMCSPI_R2_ERASE_PARAM 0x40
-#define MMCSPI_R2_OOR_CSD_OW  0x80
+#define	MMCSPI_R2_LOCKED      0x01
+#define	MMCSPI_R2_WP_ER_LCK   0x02
+#define	MMCSPI_R2_ERR         0x04
+#define	MMCSPI_R2_CC_ERR      0x08
+#define	MMCSPI_R2_ECC_FAIL    0x10
+#define	MMCSPI_R2_WP_VIOLATE  0x20
+#define	MMCSPI_R2_ERASE_PARAM 0x40
+#define	MMCSPI_R2_OOR_CSD_OW  0x80
 
 /* commands that only apply to the SPI interface */
-#define MMCSPI_READ_OCR   58
-#define MMCSPI_CRC_ON_OFF 59
+#define	MMCSPI_READ_OCR   58
+#define	MMCSPI_CRC_ON_OFF 59
 
 static struct ofw_compat_data compat_data[] = {
 	{ "mmc-spi-slot",	1 },
@@ -185,7 +185,7 @@ struct mmcspi_slot {
 	unsigned int	crc_enabled;	/* crc checking is enabled */
 	unsigned int	crc_init_done;  /* whether the initial crc setting has
 					   been sent to the card */
-#define MMCSPI_MAX_LDATA_LEN 16
+#define	MMCSPI_MAX_LDATA_LEN 16
 	uint8_t	ldata_buf[MMCSPI_MAX_LDATA_LEN];
 };
 
@@ -202,46 +202,46 @@ static void mmcspi_dump_data(device_t dev, const char *label, uint8_t *data,
 static void mmcspi_dump_spi_bus(device_t dev, unsigned int len);
 #endif
 
-#define MMCSPI_LOCK_SLOT(_slot)			mtx_lock(&(_slot)->mtx)
+#define	MMCSPI_LOCK_SLOT(_slot)			mtx_lock(&(_slot)->mtx)
 #define	MMCSPI_UNLOCK_SLOT(_slot)		mtx_unlock(&(_slot)->mtx)
-#define MMCSPI_SLOT_LOCK_INIT(_slot)		mtx_init(&(_slot)->mtx, \
+#define	MMCSPI_SLOT_LOCK_INIT(_slot)		mtx_init(&(_slot)->mtx, \
     "SD slot mtx", "mmcspi", MTX_DEF)
-#define MMCSPI_SLOT_LOCK_DESTROY(_slot)		mtx_destroy(&(_slot)->mtx);
-#define MMCSPI_ASSERT_SLOT_LOCKED(_slot)	mtx_assert(&(_slot)->mtx, \
+#define	MMCSPI_SLOT_LOCK_DESTROY(_slot)		mtx_destroy(&(_slot)->mtx);
+#define	MMCSPI_ASSERT_SLOT_LOCKED(_slot)	mtx_assert(&(_slot)->mtx, \
     MA_OWNED);
-#define MMCSPI_ASSERT_SLOT_UNLOCKED(_slot)	mtx_assert(&(_slot)->mtx, \
+#define	MMCSPI_ASSERT_SLOT_UNLOCKED(_slot)	mtx_assert(&(_slot)->mtx, \
     MA_NOTOWNED);
 
-#define TRACE_ZONE_ENABLED(zone) (trace_zone_mask & TRACE_ZONE_##zone)
+#define	TRACE_ZONE_ENABLED(zone) (trace_zone_mask & TRACE_ZONE_##zone)
 
-#define TRACE_ENTER(dev)					\
+#define	TRACE_ENTER(dev)					\
 	if (TRACE_ZONE_ENABLED(ENTER)) {			\
 		device_printf(dev, "%s: enter\n", __func__);	\
 	}
 
-#define TRACE_EXIT(dev)						\
+#define	TRACE_EXIT(dev)						\
 	if (TRACE_ZONE_ENABLED(EXIT)) {				\
 		device_printf(dev, "%s: exit\n", __func__);	\
 	}
 
-#define TRACE(dev, zone, ...)				\
+#define	TRACE(dev, zone, ...)				\
 	if (TRACE_ZONE_ENABLED(zone)) {			\
 		device_printf(dev, __VA_ARGS__);	\
 	}
 
-#define TRACE_ZONE_ENTER   (1ul << 0)  /* function entrance */
-#define TRACE_ZONE_EXIT    (1ul << 1)  /* function exit */
-#define TRACE_ZONE_ACTION  (1ul << 2)  /* for narrating major actions taken */
-#define TRACE_ZONE_RESULT  (1ul << 3)  /* for narrating results of actions */
-#define TRACE_ZONE_ERROR   (1ul << 4)  /* for reporting errors */
-#define TRACE_ZONE_DATA    (1ul << 5)  /* for dumping bus data */
-#define TRACE_ZONE_DETAILS (1ul << 6)  /* for narrating minor actions/results */
+#define	TRACE_ZONE_ENTER   (1ul << 0)  /* function entrance */
+#define	TRACE_ZONE_EXIT    (1ul << 1)  /* function exit */
+#define	TRACE_ZONE_ACTION  (1ul << 2)  /* for narrating major actions taken */
+#define	TRACE_ZONE_RESULT  (1ul << 3)  /* for narrating results of actions */
+#define	TRACE_ZONE_ERROR   (1ul << 4)  /* for reporting errors */
+#define	TRACE_ZONE_DATA    (1ul << 5)  /* for dumping bus data */
+#define	TRACE_ZONE_DETAILS (1ul << 6)  /* for narrating minor actions/results */
 
-#define TRACE_ZONE_NONE    0
-#define TRACE_ZONE_ALL     0xffffffff
+#define	TRACE_ZONE_NONE    0
+#define	TRACE_ZONE_ALL     0xffffffff
 
-#define CRC7_INITIAL 0x00
-#define CRC16_INITIAL 0x0000
+#define	CRC7_INITIAL 0x00
+#define	CRC16_INITIAL 0x0000
 
 SYSCTL_NODE(_hw, OID_AUTO, mmcspi, CTLFLAG_RD, 0, "mmcspi driver");
 
@@ -287,7 +287,7 @@ update_crc16(uint16_t crc, uint8_t *buf, unsigned int len)
 static void
 init_crc7tab(void)
 {
-#define P_CRC7 0x89
+#define	P_CRC7 0x89
 
 	int i, j;
 	uint8_t crc, c;
@@ -311,7 +311,7 @@ init_crc7tab(void)
 static void
 init_crc16tab(void)
 {
-#define P_CCITT 0x1021
+#define	P_CCITT 0x1021
 
 	int i, j;
 	uint16_t crc, c;
@@ -1363,7 +1363,6 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 			TRACE_EXIT(dev);
 			return (err);
 		}
-
 	}
 
 	/* copy any crc captured in the poll buf to the crc buf */
@@ -2050,9 +2049,9 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	uint32_t last_flags;
 	uint8_t rspbuf[MMCSPI_MAX_RSP_LEN];
 
-#define IS_CMD(code, cmd, flags)	\
+#define	IS_CMD(code, cmd, flags)	\
 	(!((flags) & MMC_CMD_IS_APP) && ((code) == (cmd)))
-#define IS_ACMD(code, cmd, flags)	\
+#define	IS_ACMD(code, cmd, flags)	\
 	(((flags) & MMC_CMD_IS_APP) && ((code) == (cmd)))
 
 	if (power_on != slot->host.ios.power_mode)
