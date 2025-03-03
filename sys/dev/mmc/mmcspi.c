@@ -2263,7 +2263,7 @@ mmcspi_get_ro(device_t brdev, device_t reqdev)
 static int
 mmcspi_acquire_host(device_t brdev, device_t reqdev)
 {
-	struct mmcspi_softc *sc;
+	//struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
 	struct spi_config cfg;
 	int err;
@@ -2271,7 +2271,7 @@ mmcspi_acquire_host(device_t brdev, device_t reqdev)
 	TRACE_ENTER(brdev);
 	err = 0;
 
-	sc = device_get_softc(brdev);
+	//sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
 
 	MMCSPI_LOCK_SLOT(slot);
@@ -2280,7 +2280,7 @@ mmcspi_acquire_host(device_t brdev, device_t reqdev)
 	slot->bus_busy++;
 	MMCSPI_UNLOCK_SLOT(slot);
 
-	SPIBUS_ACQUIRE_BUS(sc->busdev, sc->dev);
+	//SPIBUS_ACQUIRE_BUS(sc->busdev, sc->dev);
 
 	/* Restore the clock to the last setting, as it may have been
 	   changed by another spibus device. */
@@ -2296,15 +2296,15 @@ mmcspi_acquire_host(device_t brdev, device_t reqdev)
 static int
 mmcspi_release_host(device_t brdev, device_t reqdev)
 {
-	struct mmcspi_softc *sc;
+	//struct mmcspi_softc *sc;
 	struct mmcspi_slot *slot;
 
 	TRACE_ENTER(brdev);
 
-	sc = device_get_softc(brdev);
+	//sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
 
-	SPIBUS_RELEASE_BUS(sc->busdev, sc->dev);
+	//SPIBUS_RELEASE_BUS(sc->busdev, sc->dev);
 
 	MMCSPI_LOCK_SLOT(slot);
 	slot->bus_busy--;
