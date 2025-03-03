@@ -227,7 +227,22 @@ spibus_get_resource_list(device_t bus __unused, device_t child)
 static int
 spibus_transfer_impl(device_t dev, device_t child, struct spi_command *cmd)
 {
+
 	return (SPIBUS_TRANSFER(device_get_parent(dev), child, cmd));
+}
+
+static void
+spibus_acquire_impl(device_t dev, device_t child)
+{
+
+	SPIBUS_ACQUIRE_BUS(device_get_parent(dev), child);
+}
+
+static void
+spibus_release_impl(device_t dev, device_t child)
+{
+
+	SPIBUS_RELEASE_BUS(device_get_parent(dev), child);
 }
 
 static device_method_t spibus_methods[] = {
@@ -262,6 +277,8 @@ static device_method_t spibus_methods[] = {
 
 	/* spibus interface */
 	DEVMETHOD(spibus_transfer,	spibus_transfer_impl),
+	DEVMETHOD(spibus_acquire_bus,	spibus_acquire_impl),
+	DEVMETHOD(spibus_release_bus,	spibus_release_impl),
 
 	DEVMETHOD_END
 };

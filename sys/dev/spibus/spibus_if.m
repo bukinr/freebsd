@@ -30,6 +30,21 @@
 INTERFACE spibus;
 
 #
+# Acquire bus and select the device
+#
+METHOD void acquire_bus {
+	device_t dev;
+	device_t child;
+};
+
+# Release bus and deselect the device
+#
+METHOD void release_bus {
+	device_t dev;
+	device_t child;
+};
+
+#
 # Do a spi command
 #
 METHOD int transfer {
