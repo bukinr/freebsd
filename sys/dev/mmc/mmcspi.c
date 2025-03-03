@@ -52,7 +52,7 @@
  *
  * CRC routines adapted from public domain code written by Lammert Bies.
  *
- * 
+ *
  * This is an implementation of mmcbr that communicates with SD/MMC cards in
  * SPI mode via spibus_if.  In order to minimize changes to the existing
  * MMC/SD stack (and allow for maximal reuse of the same), the behavior of
@@ -364,7 +364,7 @@ mmcspi_slot_init(device_t brdev, struct mmcspi_slot *slot)
 				      for any card */
 	slot->host.caps = 0;
 	/* SPI mode requires 3.3V operation */
-	slot->host.host_ocr = MMC_OCR_320_330 | MMC_OCR_330_340;  
+	slot->host.host_ocr = MMC_OCR_320_330 | MMC_OCR_330_340;
 
 	MMCSPI_SLOT_LOCK_INIT(slot);
 
@@ -450,10 +450,10 @@ mmcspi_attach(device_t dev)
 	    "trace messages");
 
 	mmcspi_slot_init(dev, &sc->slot);
-	
+
 	/* XXX trigger this from card insert detection */
 	mmcspi_card_add(&sc->slot);
-	
+
 	TRACE_EXIT(dev);
 
 	return (0);
@@ -798,7 +798,7 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 
 		SPIBUS_TRANSFER(sc->busdev, sc->dev, &spi_cmd);
 
-		/* 
+		/*
 		 * Perhaps this was a warm reset and the card is in the
 		 * middle of a long operation.
 		 */
@@ -810,13 +810,13 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 		slot->crc_enabled = 0;
 		slot->crc_init_done = 0;
 	}
-	
+
 	if (power_off == slot->host.ios.power_mode) {
 		/*
 		 * XXX Power-off portion of implementation of card power
 		 * control should go here.
 		 */
-	}	
+	}
 
 	TRACE_EXIT(brdev);
 
@@ -834,7 +834,7 @@ mmcspi_shift_copy(uint8_t *dest, uint8_t *src, unsigned int dest_len,
 	else {
 		for (i = 0; i < dest_len; i++) {
 			dest[i] =
-			    (src[i] << shift) | 
+			    (src[i] << shift) |
 			    (src[i + 1] >> (8 - shift));
 		}
 	}
@@ -893,7 +893,7 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 				found = true;
 				break;
 			} else if (i < len + offset - 1) {
-				/* 
+				/*
 				 * Not the last byte in the buffer, so check
 				 * for a non-aligned response.
 				 */
@@ -920,7 +920,7 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 				if (shift < 8)
 					break;
 			} else {
-				/* 
+				/*
 				 * Move the last byte to the first position
 				 * and go 'round again.
 				 */
@@ -942,7 +942,7 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 		}
 	} while (!found);
 
-	/* 
+	/*
 	 * Note that if i == 0 and offset == 1, shift is always greater than
 	 * zero.
 	 */
@@ -978,7 +978,7 @@ mmcspi_get_response_token(device_t dev, uint8_t mask, uint8_t value,
 			return (err);
 		}
 	}
-	
+
 	TRACE_EXIT(dev);
 
 	return (MMC_ERR_NONE);
@@ -1090,7 +1090,7 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 			break;
 
 		case SD_SEND_RELATIVE_ADDR:
-			/* 
+			/*
 			 * Handle SD_SEND_RELATIVE_ADDR as MMC_SEND_STATUS -
 			 * the rca returned to the caller will always be 0.
 			 */
@@ -1113,10 +1113,10 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 	case MMCSPI_RSP_R1:
 	case MMCSPI_RSP_R1B:
 		rsp_len = 1;
-		break; 
+		break;
 	case MMCSPI_RSP_R2:
 		rsp_len = 2;
-		break; 
+		break;
 	case MMCSPI_RSP_R3:
 	case MMCSPI_RSP_R7:
 		rsp_len = 5;
@@ -1143,7 +1143,7 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 	if (ldata_len) {
 		mmcspi_cmd->ldata.data = sc->slot.ldata_buf;
 		mmcspi_cmd->ldata.flags = MMC_DATA_READ;
-		
+
 		mmcspi_cmd->data = &mmcspi_cmd->ldata;
 	} else
 		mmcspi_cmd->data = mmc_cmd->data;
@@ -1188,7 +1188,7 @@ mmcspi_send_cmd(device_t dev, struct mmcspi_command *cmd, uint8_t *rspbuf)
 		crc = update_crc7(CRC7_INITIAL, &txbuf[1], 5);
 	else
 		crc = 0;
-	
+
 	txbuf[6] = (crc << 1) | 0x01;
 
 	 /*
@@ -1251,7 +1251,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 	TRACE_ENTER(dev);
 	TRACE(dev, ACTION, "read block(%u)\n", len);
 
-	/* 
+	/*
 	 * With this approach, we could pointlessly read up to
 	 * (MMCSPI_POLL_LEN - 3 - len) bytes from the spi bus, but only in
 	 * the odd situation where MMCSPI_POLL_LEN is greater than len + 3.
@@ -1265,13 +1265,13 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 			TRACE_EXIT(dev);
 			return (err);
 		}
-	  
+
 		for (i = 0; i < MMCSPI_POLL_LEN; i++) {
 			if (MMCSPI_TOKEN_SB == pollbuf[i]) {
 				TRACE(dev, RESULT,
 				      "found start block token at %d\n", i);
 				break;
-			} else if (MMCSPI_IS_DE_TOKEN(pollbuf[i])) { 
+			} else if (MMCSPI_IS_DE_TOKEN(pollbuf[i])) {
 				TRACE(dev, ERROR,
 				      "found data error token at %d\n", i);
 				TRACE_EXIT(dev);
@@ -1283,12 +1283,12 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 		bintime_sub(&elapsed, &start);
 
 		if (elapsed.sec > MMCSPI_TIMEOUT_SEC) {
-			TRACE(dev, ERROR,
-			      "timeout while looking for read token\n");
+			TRACE(dev, ERROR, "timeout while looking for read "
+			    "token\n");
 			return (MMC_ERR_TIMEOUT);
 		}
 	} while (MMCSPI_POLL_LEN == i);
-	
+
 	/* copy any data captured in tail of poll buf to data buf */
 	non_token_bytes = MMCSPI_POLL_LEN - i - 1;
 	data_captured = min(non_token_bytes, len);
@@ -1333,8 +1333,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 		}
 	}
 
-
-	/* 
+	/*
 	 * The following crc checking code is deliberately structured to
 	 * both require a passing crc-7 check and allow a passing crc-7
 	 * check to override a failing crc-16 check when crc-7 checking is
@@ -1351,7 +1350,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 
 			TRACE(dev, ERROR, "crc16 mismatch, should be 0x%04x, "
 			    " is 0x%04x\n", crc16, computed_crc16);
-			
+
 			if (!check_crc7) {
 				TRACE_EXIT(dev);
 				return (MMC_ERR_BADCRC);
@@ -1382,7 +1381,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 			return (MMC_ERR_BADCRC);
 		}
 	}
-	
+
 	TRACE_EXIT(dev);
 
 	return (MMC_ERR_NONE);
@@ -1409,7 +1408,7 @@ mmcspi_send_stop(device_t dev, unsigned int retries)
 		return (err);
 	}
 
-	/* 
+	/*
 	 * Retry stop commands that fail due to bad crc here because having
 	 * the caller retry the entire read/write command due to such a
 	 * failure is pointlessly expensive.
@@ -1434,7 +1433,7 @@ mmcspi_send_stop(device_t dev, unsigned int retries)
 	if (stop_response & stop.error_mask) {
 		TRACE_EXIT(dev);
 
-		/* 
+		/*
 		 * Don't return MMC_ERR_BADCRC here, even if
 		 * MMCSPI_R1_CRC_ERR is set, because that would trigger the
 		 * caller's retry-on-crc-error mechanism, effectively
@@ -1497,7 +1496,7 @@ mmcspi_read_phase(device_t dev, struct mmcspi_command *cmd)
 			TRACE_EXIT(dev);
 			return (err);
 		}
-					
+
 		data_offset += MMCSPI_DATA_BLOCK_LEN;
 	}
 
@@ -1548,7 +1547,7 @@ mmcspi_write_block(device_t dev, uint8_t *data, unsigned int is_multi,
 		return (err);
 	}
 
-	err = mmcspi_get_response_token(dev, MMCSPI_DR_MASK, MMCSPI_DR_VALUE, 
+	err = mmcspi_get_response_token(dev, MMCSPI_DR_MASK, MMCSPI_DR_VALUE,
 	    1, 1, &response_token);
 	if (MMC_ERR_NONE != err) {
 		TRACE_EXIT(dev);
@@ -1602,7 +1601,7 @@ mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd)
 				mmcspi_send_stop(dev, cmd->retries);
 			}
 
-			/* 
+			/*
 			 * A CRC error can't be ignored here, even if crc
 			 * use is disabled, as there is no way to simply
 			 * carry on when a data error token has been sent.
@@ -1615,7 +1614,7 @@ mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd)
 				return (MMC_ERR_FAILED);
 			}
 		}
-					
+
 		data_offset += MMCSPI_DATA_BLOCK_LEN;
 	}
 
@@ -1623,7 +1622,7 @@ mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd)
 	if (num_blocks > 1) {
 		TRACE(dev, ACTION, "Sending stop token\n");
 
-		/* 
+		/*
 		 * Most/all cards are a bit sluggish in assserting busy
 		 * after receipt of the STOP_TRAN token. Clocking out an
 		 * extra byte here provides a byte of dead time before
@@ -1785,7 +1784,7 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 		if (MMCSPI_RSP_R3 == cmd->rsp_type) {
 
 			TRACE(dev, ACTION, "translating SPI-R3 to SD-R3\n");
-			
+
 			/* rspbuf contains a 40-bit spi-R3 from the
 			   MMCSPI_READ_OCR response, of which bits 31:0 are
 			   the OCR value */
@@ -1826,7 +1825,7 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 
 			if (rspbuf[0] & MMCSPI_R1_ILL_CMD)
 				mmc_cmd->resp[0] |= 0x4000;
-			
+
 			if (rspbuf[1] & MMCSPI_R2_ERR)
 				mmc_cmd->resp[0] |= 0x2000;
 
@@ -1842,7 +1841,7 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 
 			/* rsp buf contains a 40-bit spi-R7, of which bits
 			   11:0 need to be transferred */
-			
+
 			/* spi  response bits 11:0 mapped to
 			   sdhc register bits 11:0 */
 			mmc_cmd->resp[0] =
@@ -1885,7 +1884,7 @@ mmcspi_get_ocr(device_t dev, uint8_t *ocrbuf)
 		TRACE_EXIT(dev);
 		return (err);
 	}
-		
+
 	r1_status = rspbuf[0] & cmd.error_mask;
 	if (r1_status) {
 		if (r1_status & MMCSPI_R1_CRC_ERR)
@@ -1925,13 +1924,13 @@ mmcspi_set_crc_on_off(device_t dev, unsigned int crc_on)
 		TRACE_EXIT(dev);
 		return (err);
 	}
-			
+
 	err = mmcspi_send_cmd(dev, &cmd, rspbuf);
 	if (MMC_ERR_NONE != err) {
 		TRACE_EXIT(dev);
 		return (err);
 	}
-		
+
 	r1_status = rspbuf[0] & cmd.error_mask;
 	if (r1_status) {
 		if (r1_status & MMCSPI_R1_CRC_ERR)
@@ -1965,12 +1964,12 @@ mmcspi_update_crc_setting(device_t dev, unsigned int crc_on)
 		if (MMC_ERR_BADCRC != err)
 			break;
 	}
-	
+
 	if (MMC_ERR_NONE != err) {
 		TRACE_EXIT(dev);
 		return (err);
 	}
-	
+
 	if (crc_on)
 		slot->crc_enabled = 1;
 	else
@@ -2034,7 +2033,7 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 
 	/* enforce restrictions on request parameters */
 	if (data) {
-		/* 
+		/*
 		 * All writes must be a multiple of the block length. All
 		 * reads greater than the block length must be a multiple of
 		 * the block length.
@@ -2060,7 +2059,7 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 	}
 
 	for (i = 0; i <= cmd.retries; i++) {
-		/* 
+		/*
 		 * On the next command following a CMD8, collect the OCR and
 		 * save it off for use in the next ACMD41.
 		 */
@@ -2096,15 +2095,14 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 					continue;
 				goto out;
 			}
-		} 
+		}
 		break;
 	}
 
 	if (MMC_ERR_NONE != err)
 		goto out;
 
-
-	/* 
+	/*
 	 * If this was an ACMD_SD_SEND_OP_COND or MMC_SEND_OP_COND, we need
 	 * to return an OCR value in the result.  If the response from the
 	 * card indicates it is still in the IDLE state, supply the OCR
@@ -2252,7 +2250,6 @@ mmcspi_modevent_handler(module_t mod, int what, void *arg)
 	return (0);
 }
 
- 
 static int
 mmcspi_switch_vccq(device_t bus, device_t child)
 {
@@ -2262,23 +2259,23 @@ mmcspi_switch_vccq(device_t bus, device_t child)
 
 static device_method_t mmcspi_methods[] = {
 	/* device_if */
-	DEVMETHOD(device_probe, mmcspi_probe),
-	DEVMETHOD(device_attach, mmcspi_attach),
-	DEVMETHOD(device_detach, mmcspi_detach),
-	DEVMETHOD(device_suspend, mmcspi_suspend),
-	DEVMETHOD(device_resume, mmcspi_resume),
+	DEVMETHOD(device_probe,		mmcspi_probe),
+	DEVMETHOD(device_attach,	mmcspi_attach),
+	DEVMETHOD(device_detach,	mmcspi_detach),
+	DEVMETHOD(device_suspend,	mmcspi_suspend),
+	DEVMETHOD(device_resume,	mmcspi_resume),
 
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	mmcspi_read_ivar),
 	DEVMETHOD(bus_write_ivar,	mmcspi_write_ivar),
 
 	/* mmcbr_if */
-	DEVMETHOD(mmcbr_update_ios, mmcspi_update_ios),
-	DEVMETHOD(mmcbr_request, mmcspi_request),
-	DEVMETHOD(mmcbr_get_ro, mmcspi_get_ro),
-	DEVMETHOD(mmcbr_acquire_host, mmcspi_acquire_host),
-	DEVMETHOD(mmcbr_release_host, mmcspi_release_host),
-	DEVMETHOD(mmcbr_switch_vccq, mmcspi_switch_vccq),
+	DEVMETHOD(mmcbr_update_ios,	mmcspi_update_ios),
+	DEVMETHOD(mmcbr_request,	mmcspi_request),
+	DEVMETHOD(mmcbr_get_ro,		mmcspi_get_ro),
+	DEVMETHOD(mmcbr_acquire_host,	mmcspi_acquire_host),
+	DEVMETHOD(mmcbr_release_host,	mmcspi_release_host),
+	DEVMETHOD(mmcbr_switch_vccq,	mmcspi_switch_vccq),
 
 	{0, 0},
 };
@@ -2315,14 +2312,14 @@ mmcspi_dump_data(device_t dev, const char *label, uint8_t *data,
 	for(i = 0; i < num_lines; i++) {
 		device_printf(dev, "%s:", label);
 		for(j = 0; j < 16; j++)
-			printf(" %02x", data[i * 16 + j]); 
+			printf(" %02x", data[i * 16 + j]);
 		printf("\n");
 	}
 
 	if (residual) {
 		device_printf(dev, "%s:", label);
 		for(j = 0; j < residual; j++)
-			printf(" %02x", data[num_lines * 16 + j]); 
+			printf(" %02x", data[num_lines * 16 + j]);
 		printf("\n");
 	}
 
