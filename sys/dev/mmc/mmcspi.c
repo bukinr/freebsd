@@ -188,7 +188,7 @@ struct mmcspi_slot {
 	uint32_t	last_flags;	/* last flags requested by mmc layer */
 	unsigned int	crc_enabled;	/* crc checking is enabled */
 	unsigned int	crc_init_done;  /* whether the initial crc setting has
-						   been sent to the card */
+					   been sent to the card */
 #define MMCSPI_MAX_LDATA_LEN 16
 	uint8_t	ldata_buf[MMCSPI_MAX_LDATA_LEN];
 };
@@ -231,24 +231,20 @@ static void mmcspi_card_add(struct mmcspi_slot *slot);
 static void mmcspi_card_delete(struct mmcspi_slot *slot);
 
 static unsigned int mmcspi_do_spi_read(device_t dev, uint8_t *data,
-				       unsigned int len);
+    unsigned int len);
 static unsigned int mmcspi_do_spi_write(device_t dev, uint8_t *cmd,
-					unsigned int cmdlen, uint8_t *data,
-					unsigned int datalen);
+    unsigned int cmdlen, uint8_t *data, unsigned int datalen);
 
 static unsigned int mmcspi_wait_for_not_busy(device_t dev);
 static unsigned int mmcspi_shift_copy(uint8_t *dest, uint8_t *src,
-				      unsigned int src_len, unsigned int shift);
+    unsigned int src_len, unsigned int shift);
 static unsigned int mmcspi_get_response_token(device_t dev, uint8_t mask,
-					      uint8_t value, unsigned int len,
-					      unsigned int has_busy,
-					      uint8_t *rspbuf);
+    uint8_t value, unsigned int len, unsigned int has_busy, uint8_t *rspbuf);
 
 static unsigned int mmcspi_set_up_command(device_t dev,
-					  struct mmcspi_command *mmcspi_cmd,
-					  struct mmc_command *mmc_cmd);
+    struct mmcspi_command *mmcspi_cmd, struct mmc_command *mmc_cmd);
 static unsigned int mmcspi_send_cmd(device_t dev, struct mmcspi_command *cmd,
-				    uint8_t *rspbuf);
+    uint8_t *rspbuf);
 
 static unsigned int mmcspi_read_block(device_t dev, uint8_t *data,
     unsigned int len, unsigned int check_crc16, unsigned int check_crc7);
@@ -256,10 +252,9 @@ static unsigned int mmcspi_send_stop(device_t dev, unsigned int retries);
 static unsigned int mmcspi_read_phase(device_t dev, struct mmcspi_command *cmd);
 static unsigned int mmcspi_write_block(device_t dev, uint8_t *data,
     unsigned int is_multi, unsigned char use_crc, uint8_t *status);
-static unsigned int mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd);
+static unsigned int mmcspi_write_phase(device_t dev,struct mmcspi_command *cmd);
 static unsigned int mmcspi_translate_response(device_t dev,
-					      struct mmcspi_command *cmd,
-					      uint8_t *rspbuf);
+    struct mmcspi_command *cmd, uint8_t *rspbuf);
 static unsigned int mmcspi_get_ocr(device_t dev, uint8_t *ocrbuf);
 static unsigned int mmcspi_set_crc_on_off(device_t dev, unsigned int crc_on);
 static unsigned int mmcspi_update_crc_setting(device_t dev, unsigned int crc_on);
@@ -277,15 +272,15 @@ static void mmcspi_dump_data(device_t dev, const char *label, uint8_t *data,
 static void mmcspi_dump_spi_bus(device_t dev, unsigned int len);
 #endif
 
-
 #define MMCSPI_LOCK_SLOT(_slot)			mtx_lock(&(_slot)->mtx)
 #define	MMCSPI_UNLOCK_SLOT(_slot)		mtx_unlock(&(_slot)->mtx)
 #define MMCSPI_SLOT_LOCK_INIT(_slot)		\
   mtx_init(&(_slot)->mtx, "SD slot mtx", "mmcspi", MTX_DEF)
 #define MMCSPI_SLOT_LOCK_DESTROY(_slot)		mtx_destroy(&(_slot)->mtx);
-#define MMCSPI_ASSERT_SLOT_LOCKED(_slot)	mtx_assert(&(_slot)->mtx, MA_OWNED);
-#define MMCSPI_ASSERT_SLOT_UNLOCKED(_slot)	mtx_assert(&(_slot)->mtx, MA_NOTOWNED);
-
+#define MMCSPI_ASSERT_SLOT_LOCKED(_slot)	\
+    mtx_assert(&(_slot)->mtx, MA_OWNED);
+#define MMCSPI_ASSERT_SLOT_UNLOCKED(_slot)	\
+    mtx_assert(&(_slot)->mtx, MA_NOTOWNED);
 
 #define TRACE_ZONE_ENABLED(zone) (trace_zone_mask & TRACE_ZONE_##zone)
 
