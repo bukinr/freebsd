@@ -571,7 +571,8 @@ mmcspi_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
 		*result = slot->host.ios.timing;
 		break;
 	case MMCBR_IVAR_MAX_DATA:
-		*result = 64*1024;  /* seems reasonable, not dictated by anything */
+		/* seems reasonable, not dictated by anything */
+		*result = 64 * 1024;
 		break;
 	default:
 		return (EINVAL);
