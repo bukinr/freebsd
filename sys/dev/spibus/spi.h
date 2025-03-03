@@ -52,3 +52,9 @@ struct spi_command {
 #else
 #define	SPIBUS_ACPI_PNP_INFO(t)
 #endif
+
+struct spi_config {
+       unsigned int clock_hz;  /* sending a 0 to spibus_set_config
+                                  requests the maximum possible
+                                  frequency */
+};
