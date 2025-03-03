@@ -2322,23 +2322,6 @@ static int
 mmcspi_switch_vccq(device_t bus, device_t child)
 {
 
-	printf("%s\n", __func__);
-
-#if 0
-        struct mmcspi_softc *sc;
-
-        sc = device_get_softc(bus);
-
-        switch (sc->mmcspi_host.ios.vccq) {
-        case vccq_180:  
-                break;
-        case vccq_330:
-                break;
-        default:
-                return (EINVAL);
-        }
-#endif
-
 	return (0);
 }
 
@@ -2396,17 +2379,15 @@ mmcspi_dump_data(device_t dev, const char *label, uint8_t *data,
 
 	for(i = 0; i < num_lines; i++) {
 		device_printf(dev, "%s:", label);
-		for(j = 0; j < 16; j++) {
+		for(j = 0; j < 16; j++)
 			printf(" %02x", data[i * 16 + j]); 
-		}
 		printf("\n");
 	}
 
 	if (residual) {
 		device_printf(dev, "%s:", label);
-		for(j = 0; j < residual; j++) {
+		for(j = 0; j < residual; j++)
 			printf(" %02x", data[num_lines * 16 + j]); 
-		}
 		printf("\n");
 	}
 
@@ -2425,20 +2406,20 @@ mmcspi_dump_spi_bus(device_t dev, unsigned int len)
 	num_blocks = len / MMCSPI_DATA_BLOCK_LEN;
 	residual = len - num_blocks * MMCSPI_DATA_BLOCK_LEN;
 
-	for(i = 0; i < num_blocks; i++) {
-		if (MMC_ERR_NONE !=
-		    mmcspi_do_spi_read(dev, junkbuf, MMCSPI_DATA_BLOCK_LEN)) {
+	for (i = 0; i < num_blocks; i++) {
+		if (MMC_ERR_NONE != mmcspi_do_spi_read(dev, junkbuf,
+		    MMCSPI_DATA_BLOCK_LEN)) {
 			device_printf(dev, "spi read failed\n");
 			return;
 		}
 
 		mmcspi_dump_data(dev, "bus_data", junkbuf,
-				 MMCSPI_DATA_BLOCK_LEN);
+		    MMCSPI_DATA_BLOCK_LEN);
 	}
 
 	if (residual) {
-		if (MMC_ERR_NONE !=
-		    mmcspi_do_spi_read(dev, junkbuf, residual)) {
+		if (MMC_ERR_NONE != mmcspi_do_spi_read(dev, junkbuf,
+		    residual)) {
 			device_printf(dev, "spi read failed\n");
 			return;
 		}
