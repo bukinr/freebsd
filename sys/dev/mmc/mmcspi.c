@@ -107,47 +107,47 @@
 
 #define	MMCSPI_POLL_LEN		8  /* amount to read when searching */
 
-#define	MMCSPI_R1_MASK	0x80  /* mask used to search for R1 tokens */
-#define	MMCSPI_R1_VALUE	0x00  /* value used to search for R1 tokens */
-#define	MMCSPI_DR_MASK	0x11  /* mask used to search for data resp tokens */
-#define	MMCSPI_DR_VALUE	0x01  /* value used to search for data resp tokens */
+#define	MMCSPI_R1_MASK	0x80 /* mask used to search for R1 tokens */
+#define	MMCSPI_R1_VALUE	0x00 /* value used to search for R1 tokens */
+#define	MMCSPI_DR_MASK	0x11 /* mask used to search for data resp tokens */
+#define	MMCSPI_DR_VALUE	0x01 /* value used to search for data resp tokens */
 
 #define	MMCSPI_DR_ERR_MASK	0x0e
 #define	MMCSPI_DR_ERR_NONE	0x04
 #define	MMCSPI_DR_ERR_CRC	0x0a
 #define	MMCSPI_DR_ERR_WRITE	0x0c
 
-#define	MMCSPI_TOKEN_SB		0xfe  /* start block token for read single,
-				      read multi, and write single */
-#define	MMCSPI_TOKEN_SB_WM	0xfc  /* start block token for write multi */
-#define	MMCSPI_TOKEN_ST		0xfd  /* stop transmission token */
-#define	MMCSPI_IS_DE_TOKEN(x)	(0 == ((x) & 0xf0))	/* detector for data
-							   error token */
+#define	MMCSPI_TOKEN_SB		0xfe /* start block token for read single,
+					read multi, and write single */
+#define	MMCSPI_TOKEN_SB_WM	0xfc /* start block token for write multi */
+#define	MMCSPI_TOKEN_ST		0xfd /* stop transmission token */
+#define	MMCSPI_IS_DE_TOKEN(x)	(0 == ((x) & 0xf0)) /* detector for data
+						       error token */
 
-#define	MMCSPI_R1_IDLE      0x01
-#define	MMCSPI_R1_ERASE_RST 0x02
-#define	MMCSPI_R1_ILL_CMD   0x04
-#define	MMCSPI_R1_CRC_ERR   0x08
-#define	MMCSPI_R1_ERASE_ERR 0x10
-#define	MMCSPI_R1_ADDR_ERR  0x20
-#define	MMCSPI_R1_PARAM_ERR 0x40
+#define	MMCSPI_R1_IDLE		0x01
+#define	MMCSPI_R1_ERASE_RST	0x02
+#define	MMCSPI_R1_ILL_CMD	0x04
+#define	MMCSPI_R1_CRC_ERR	0x08
+#define	MMCSPI_R1_ERASE_ERR	0x10
+#define	MMCSPI_R1_ADDR_ERR	0x20
+#define	MMCSPI_R1_PARAM_ERR	0x40
 
 #define	MMCSPI_R1_ERR_MASK (MMCSPI_R1_PARAM_ERR | MMCSPI_R1_ADDR_ERR |	\
 			    MMCSPI_R1_ERASE_ERR | MMCSPI_R1_CRC_ERR |	\
 			    MMCSPI_R1_ILL_CMD)
 
-#define	MMCSPI_R2_LOCKED      0x01
-#define	MMCSPI_R2_WP_ER_LCK   0x02
-#define	MMCSPI_R2_ERR         0x04
-#define	MMCSPI_R2_CC_ERR      0x08
-#define	MMCSPI_R2_ECC_FAIL    0x10
-#define	MMCSPI_R2_WP_VIOLATE  0x20
-#define	MMCSPI_R2_ERASE_PARAM 0x40
-#define	MMCSPI_R2_OOR_CSD_OW  0x80
+#define	MMCSPI_R2_LOCKED	0x01
+#define	MMCSPI_R2_WP_ER_LCK	0x02
+#define	MMCSPI_R2_ERR		0x04
+#define	MMCSPI_R2_CC_ERR	0x08
+#define	MMCSPI_R2_ECC_FAIL	0x10
+#define	MMCSPI_R2_WP_VIOLATE	0x20
+#define	MMCSPI_R2_ERASE_PARAM	0x40
+#define	MMCSPI_R2_OOR_CSD_OW	0x80
 
 /* commands that only apply to the SPI interface */
-#define	MMCSPI_READ_OCR   58
-#define	MMCSPI_CRC_ON_OFF 59
+#define	MMCSPI_READ_OCR		58
+#define	MMCSPI_CRC_ON_OFF	59
 
 static struct ofw_compat_data compat_data[] = {
 	{ "mmc-spi-slot",	1 },
@@ -1928,7 +1928,7 @@ mmcspi_get_ocr(device_t dev, uint8_t *ocrbuf)
 		TRACE_EXIT(dev);
 		return (err);
 	}
-			
+
 	err = mmcspi_send_cmd(dev, &cmd, rspbuf);
 	if (MMC_ERR_NONE != err) {
 		TRACE_EXIT(dev);
