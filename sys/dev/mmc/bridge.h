@@ -104,7 +104,7 @@ enum mmc_chip_select {
 };
 
 enum mmc_bus_type {
-	bus_type_sd = 0, bus_type_spi
+	bus_type_default = 0, bus_type_spi
 };
 
 enum mmc_bus_width {
