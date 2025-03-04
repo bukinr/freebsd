@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2012 Patrick Kelsey.  All rights reserved.
+ * Copyright (c) 2025 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
