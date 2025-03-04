@@ -333,21 +333,6 @@ init_crc16tab(void)
 	}
 }
 
-static int
-mmcspi_probe(device_t dev)
-{
-
-	if (!ofw_bus_status_okay(dev))
-		return (ENXIO);
-
-	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
-		return (ENXIO);
-
-	device_set_desc(dev, "MMC SPI mode controller");
-
-	return (BUS_PROBE_DEFAULT);
-}
-
 static void
 mmcspi_slot_init(device_t brdev, struct mmcspi_slot *slot)
 {
@@ -385,13 +370,16 @@ static void
 mmcspi_card_add(struct mmcspi_slot *slot)
 {
 	device_t brdev;
+	device_t child;
 
 	brdev = slot->sc->dev;
 
 	TRACE_ENTER(brdev);
 
+	child = device_add_child(brdev, "mmc", DEVICE_UNIT_ANY);
+
 	MMCSPI_LOCK_SLOT(slot);
-	slot->dev = device_add_child(brdev, "mmc", -1);
+	slot->dev = child;
 	device_set_ivars(slot->dev, slot);
 	MMCSPI_UNLOCK_SLOT(slot);
 
@@ -420,6 +408,21 @@ mmcspi_card_delete(struct mmcspi_slot *slot)
 }
 
 static int
+mmcspi_probe(device_t dev)
+{
+
+	if (!ofw_bus_status_okay(dev))
+		return (ENXIO);
+
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
+		return (ENXIO);
+
+	device_set_desc(dev, "MMC SPI mode controller");
+
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
 mmcspi_attach(device_t dev)
 {
 	struct mmcspi_softc *sc;
@@ -437,10 +440,6 @@ mmcspi_attach(device_t dev)
 	sc->dev = dev;
 	sc->busdev = device_get_parent(dev);
 	sc->use_crc = 1;
-
-	init_crc7tab();
-	init_crc16tab();
-	memset(onesbuf, 0xff, sizeof(onesbuf));
 
 	SYSCTL_ADD_UINT(ctx, child, OID_AUTO, "use_crc", CTLFLAG_RW,
 	    &sc->use_crc, sizeof(sc->use_crc), "Enable/disable crc checking");
@@ -2237,6 +2236,8 @@ mmcspi_release_host(device_t brdev, device_t reqdev)
 static int
 mmcspi_modevent_handler(module_t mod, int what, void *arg)
 {
+
+printf("%s\n", __func__);
 	switch (what) {
 	case MOD_LOAD:
 		init_crc7tab();
@@ -2256,44 +2257,6 @@ mmcspi_switch_vccq(device_t bus, device_t child)
 
 	return (0);
 }
-
-static device_method_t mmcspi_methods[] = {
-	/* device_if */
-	DEVMETHOD(device_probe,		mmcspi_probe),
-	DEVMETHOD(device_attach,	mmcspi_attach),
-	DEVMETHOD(device_detach,	mmcspi_detach),
-	DEVMETHOD(device_suspend,	mmcspi_suspend),
-	DEVMETHOD(device_resume,	mmcspi_resume),
-
-	/* Bus interface */
-	DEVMETHOD(bus_read_ivar,	mmcspi_read_ivar),
-	DEVMETHOD(bus_write_ivar,	mmcspi_write_ivar),
-
-	/* mmcbr_if */
-	DEVMETHOD(mmcbr_update_ios,	mmcspi_update_ios),
-	DEVMETHOD(mmcbr_request,	mmcspi_request),
-	DEVMETHOD(mmcbr_get_ro,		mmcspi_get_ro),
-	DEVMETHOD(mmcbr_acquire_host,	mmcspi_acquire_host),
-	DEVMETHOD(mmcbr_release_host,	mmcspi_release_host),
-	DEVMETHOD(mmcbr_switch_vccq,	mmcspi_switch_vccq),
-
-	{0, 0},
-};
-
-static driver_t mmcspi_driver = {
-	"mmcspi",
-	mmcspi_methods,
-	sizeof(struct mmcspi_softc),
-};
-
-//DRIVER_MODULE(mmcspi, spibus, mmcspi_driver, mmcspi_devclass, mmcspi_modevent_handler, 0);
-
-DRIVER_MODULE(mmcspi, spibus, mmcspi_driver, NULL, NULL);
-MODULE_DEPEND(mmcspi, spibus, 1, 1, 1);
-MMC_DECLARE_BRIDGE(mmcspi);
-#ifdef FDT
-SPIBUS_FDT_PNP_INFO(compat_data);
-#endif
 
 #if defined(MMCSPI_ENABLE_DEBUG_FUNCS)
 static void
@@ -2361,4 +2324,40 @@ mmcspi_dump_spi_bus(device_t dev, unsigned int len)
 
 	TRACE_EXIT(dev);
 }
+#endif
+
+static device_method_t mmcspi_methods[] = {
+	/* device_if */
+	DEVMETHOD(device_probe,		mmcspi_probe),
+	DEVMETHOD(device_attach,	mmcspi_attach),
+	DEVMETHOD(device_detach,	mmcspi_detach),
+	DEVMETHOD(device_suspend,	mmcspi_suspend),
+	DEVMETHOD(device_resume,	mmcspi_resume),
+
+	/* Bus interface */
+	DEVMETHOD(bus_read_ivar,	mmcspi_read_ivar),
+	DEVMETHOD(bus_write_ivar,	mmcspi_write_ivar),
+
+	/* mmcbr_if */
+	DEVMETHOD(mmcbr_update_ios,	mmcspi_update_ios),
+	DEVMETHOD(mmcbr_request,	mmcspi_request),
+	DEVMETHOD(mmcbr_get_ro,		mmcspi_get_ro),
+	DEVMETHOD(mmcbr_acquire_host,	mmcspi_acquire_host),
+	DEVMETHOD(mmcbr_release_host,	mmcspi_release_host),
+	DEVMETHOD(mmcbr_switch_vccq,	mmcspi_switch_vccq),
+
+	{0, 0},
+};
+
+static driver_t mmcspi_driver = {
+	"mmcspi",
+	mmcspi_methods,
+	sizeof(struct mmcspi_softc),
+};
+
+DRIVER_MODULE(mmcspi, spibus, mmcspi_driver, mmcspi_modevent_handler, NULL);
+MODULE_DEPEND(mmcspi, spibus, 1, 1, 1);
+MMC_DECLARE_BRIDGE(mmcspi);
+#ifdef FDT
+SPIBUS_FDT_PNP_INFO(compat_data);
 #endif
