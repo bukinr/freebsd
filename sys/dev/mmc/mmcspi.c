@@ -757,8 +757,6 @@ mmcspi_update_ios(device_t brdev, device_t reqdev)
 	sc = device_get_softc(brdev);
 	slot = device_get_ivars(reqdev);
 
-	printf("%s\n", __func__);
-
 	if (power_up == slot->host.ios.power_mode) {
 		/*
 		 * This sequence provides the initialization steps required
@@ -2065,22 +2063,16 @@ mmcspi_request(device_t brdev, device_t reqdev, struct mmc_request *req)
 		if (IS_CMD(SD_SEND_IF_COND, last_opcode, last_flags)) {
 			err = mmcspi_get_ocr(brdev, slot->last_ocr);
 			if (MMC_ERR_NONE != err) {
-				printf("err1\n");
-				if (MMC_ERR_BADCRC == err) {
-					printf("bad crc\n");
+				if (MMC_ERR_BADCRC == err)
 					continue;
-				}
 				goto out;
 			}
 		}
 
 		err = mmcspi_send_cmd(brdev, &cmd, rspbuf);
 		if (MMC_ERR_NONE != err) {
-			printf("err2\n");
-			if (MMC_ERR_BADCRC == err) {
-				printf("bad crc err2\n");
+			if (MMC_ERR_BADCRC == err)
 				continue;
-			}
 			goto out;
 		}
 
@@ -2237,7 +2229,6 @@ static int
 mmcspi_modevent_handler(module_t mod, int what, void *arg)
 {
 
-printf("%s\n", __func__);
 	switch (what) {
 	case MOD_LOAD:
 		init_crc7tab();
