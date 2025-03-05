@@ -213,10 +213,11 @@ include		"std.starfive"
 # options 	VERBOSE_SYSINIT=1
 
 # Uncomment for memory disk
-options 	MD_ROOT
-options 	MD_ROOT_SIZE=8192
-makeoptions	MFS_IMAGE=/home/br/dev/freebsd/mdroot-small.img
-options 	ROOTDEVNAME=\"ufs:/dev/md0\"
+#options 	MD_ROOT
+#options 	MD_ROOT_SIZE=8192
+#makeoptions	MFS_IMAGE=/home/br/dev/freebsd/mdroot-small.img
+#options 	ROOTDEVNAME=\"ufs:/dev/md0\"
+options 	ROOTDEVNAME=\"ufs:/dev/mmcsd0s3\"
 
 options 	FDT
 options 	FDT_DTB_STATIC
