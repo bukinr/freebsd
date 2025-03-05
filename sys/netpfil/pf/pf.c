@@ -601,6 +601,8 @@ pf_addr_cmp(struct pf_addr *a, struct pf_addr *b, sa_family_t af)
 			return (-1);
 		break;
 #endif /* INET6 */
+	default:
+		unhandled_af(af);
 	}
 	return (0);
 }
@@ -616,7 +618,7 @@ pf_is_loopback(sa_family_t af, struct pf_addr *addr)
 	case AF_INET6:
 		return IN6_IS_ADDR_LOOPBACK(&addr->v6);
 	default:
-		panic("Unknown af %d", af);
+		unhandled_af(af);
 	}
 }
 
@@ -696,6 +698,8 @@ pf_packet_rework_nat(struct mbuf *m, struct pf_pdesc *pd, int off,
 			case AF_INET6:
 				PF_ACPY(pd->src, &nk->addr[pd->sidx], pd->af);
 				break;
+			default:
+				unhandled_af(pd->af);
 			}
 		}
 		if (PF_ANEQ(pd->dst, &nk->addr[pd->didx], pd->af)) {
@@ -708,6 +712,8 @@ pf_packet_rework_nat(struct mbuf *m, struct pf_pdesc *pd, int off,
 			case AF_INET6:
 				PF_ACPY(pd->dst, &nk->addr[pd->didx], pd->af);
 				break;
+			default:
+				unhandled_af(pd->af);
 			}
 		}
 		break;
@@ -740,6 +746,8 @@ pf_hashsrc(struct pf_addr *addr, sa_family_t af)
 		h = murmur3_32_hash32((uint32_t *)&addr->v6,
 		    sizeof(addr->v6)/sizeof(uint32_t), V_pf_hashseed);
 		break;
+	default:
+		unhandled_af(af);
 	}
 
 	return (h & V_pf_srchashmask);
@@ -931,6 +939,8 @@ pf_overload_task(void *v, int pending)
 			p.pfra_ip6addr = pfoe->addr.v6;
 			break;
 #endif
+		default:
+			unhandled_af(pfoe->af);
 		}
 
 		PF_RULES_WLOCK();
@@ -2174,6 +2184,8 @@ pf_isforlocal(struct mbuf *m, int af)
 		return (! (ia->ia6_flags & IN6_IFF_NOTREADY));
 	}
 #endif
+	default:
+		unhandled_af(af);
 	}
 
 	return (false);
@@ -2335,6 +2347,8 @@ pf_icmp_mapping(struct pf_pdesc *pd, u_int8_t type,
 		}
 		break;
 #endif /* INET6 */
+	default:
+		unhandled_af(pd->af);
 	}
 	HTONS(*virtual_type);
 	return (0);  /* These types match to their own state */
@@ -2960,6 +2974,8 @@ pf_print_host(struct pf_addr *addr, u_int16_t p, sa_family_t af)
 		break;
 	}
 #endif /* INET6 */
+	default:
+		unhandled_af(af);
 	}
 }
 
@@ -3333,6 +3349,8 @@ pf_change_ap(struct mbuf *m, struct pf_addr *a, u_int16_t *p, u_int16_t *ic,
 		}
 		break;
 #endif /* INET6 */
+	default:
+		unhandled_af(af);
 	}
 
 	if (m->m_pkthdr.csum_flags & (CSUM_DELAY_DATA | 
@@ -3509,7 +3527,7 @@ pf_translate_af(struct pf_pdesc *pd)
 		ip4->ip_hl = hlen >> 2;
 		ip4->ip_tos = pd->tos;
 		ip4->ip_len = htons(hlen + (pd->tot_len - pd->off));
-		ip_fillid(ip4);
+		ip_fillid(ip4, V_ip_random_id);
 		ip4->ip_ttl = pd->ttl;
 		ip4->ip_p = pd->proto;
 		ip4->ip_src = pd->nsaddr.v4;
@@ -3612,7 +3630,7 @@ pf_change_icmp_af(struct mbuf *m, int off, struct pf_pdesc *pd,
 		ip4->ip_v = IPVERSION;
 		ip4->ip_hl = sizeof(*ip4) >> 2;
 		ip4->ip_len = htons(sizeof(*ip4) + pd2->tot_len - olen);
-		ip_fillid(ip4);
+		ip_fillid(ip4, V_ip_random_id);
 		ip4->ip_off = htons(IP_DF);
 		ip4->ip_ttl = pd2->ttl;
 		if (pd2->proto == IPPROTO_ICMPV6)
@@ -3639,6 +3657,8 @@ pf_change_icmp_af(struct mbuf *m, int off, struct pf_pdesc *pd,
 		ip6->ip6_src = src->v6;
 		ip6->ip6_dst = dst->v6;
 		break;
+	default:
+		unhandled_af(naf);
 	}
 
 	/* adjust payload offset and total packet length */
@@ -3877,6 +3897,8 @@ pf_translate_icmp_af(int af, void *arg)
 			icmp4->icmp_void = htonl(ptr);
 		}
 		break;
+	default:
+		unhandled_af(af);
 	}
 #endif /* INET && INET6 */
 
@@ -3983,6 +4005,8 @@ pf_build_tcp(const struct pf_krule *r, sa_family_t af,
 		len = sizeof(struct ip6_hdr) + tlen;
 		break;
 #endif /* INET6 */
+	default:
+		unhandled_af(af);
 	}
 
 	m = m_gethdr(M_NOWAIT, MT_DATA);
@@ -4148,6 +4172,8 @@ pf_send_sctp_abort(sa_family_t af, struct pf_pdesc *pd,
 		off += sizeof(struct ip6_hdr);
 		break;
 #endif /* INET6 */
+	default:
+		unhandled_af(af);
 	}
 
 	/* SCTP header */
@@ -4231,6 +4257,8 @@ pf_send_tcp(const struct pf_krule *r, sa_family_t af,
 		pfse->pfse_type = PFSE_IP6;
 		break;
 #endif /* INET6 */
+	default:
+		unhandled_af(af);
 	}
 
 	pfse->pfse_m = m;
@@ -7648,6 +7676,8 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 		icmpsum = &pd->hdr.icmp6.icmp6_cksum;
 		break;
 #endif /* INET6 */
+	default:
+		panic("unhandled proto %d", pd->proto);
 	}
 
 	if (pf_icmp_mapping(pd, icmptype, &icmp_dir, &virtual_id,
@@ -7849,6 +7879,8 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 			pd2.ip_sum = NULL;
 			break;
 #endif /* INET6 */
+		default:
+			unhandled_af(pd->af);
 		}
 
 		if (PF_ANEQ(pd->dst, pd2.src, pd->af)) {
@@ -7993,10 +8025,6 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    &nk->addr[didx], pd->af,
 					    nk->af))
 						return (PF_DROP);
-					if (nk->af == AF_INET)
-						pd->proto = IPPROTO_ICMP;
-					else
-						pd->proto = IPPROTO_ICMPV6;
 					pf_change_ap(pd->m, pd2.src, &th.th_sport,
 					    pd->ip_sum, &th.th_sum, &nk->addr[pd2.sidx],
 					    nk->port[sidx], 1, pd->af, nk->af);
@@ -8004,10 +8032,24 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    pd->ip_sum, &th.th_sum, &nk->addr[pd2.didx],
 					    nk->port[didx], 1, pd->af, nk->af);
 					m_copyback(pd2.m, pd2.off, 8, (c_caddr_t)&th);
-					PF_ACPY(pd->src,
-					    &nk->addr[pd2.sidx], nk->af);
-					PF_ACPY(pd->dst,
+					PF_ACPY(&pd->nsaddr, &nk->addr[pd2.sidx],
+					    nk->af);
+					PF_ACPY(&pd->ndaddr,
 					    &nk->addr[pd2.didx], nk->af);
+					if (nk->af == AF_INET) {
+						pd->proto = IPPROTO_ICMP;
+					} else {
+						pd->proto = IPPROTO_ICMPV6;
+						/*
+						 * IPv4 becomes IPv6 so we must
+						 * copy IPv4 src addr to least
+						 * 32bits in IPv6 address to
+						 * keep traceroute/icmp
+						 * working.
+						 */
+						pd->nsaddr.addr32[3] =
+						    pd->src->addr32[0];
+					}
 					pd->naf = nk->af;
 					return (PF_AFRT);
 				}
@@ -8052,6 +8094,8 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    (caddr_t )&h2_6);
 					break;
 #endif /* INET6 */
+				default:
+					unhandled_af(pd->af);
 				}
 				m_copyback(pd->m, pd2.off, 8, (caddr_t)&th);
 			}
@@ -8114,10 +8158,6 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    &nk->addr[didx], pd->af,
 					    nk->af))
 						return (PF_DROP);
-					if (nk->af == AF_INET)
-						pd->proto = IPPROTO_ICMP;
-					else
-						pd->proto = IPPROTO_ICMPV6;
 					pf_change_ap(pd->m, pd2.src, &uh.uh_sport,
 					    pd->ip_sum, &uh.uh_sum, &nk->addr[pd2.sidx],
 					    nk->port[sidx], 1, pd->af, nk->af);
@@ -8130,6 +8170,20 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    &nk->addr[pd2.sidx], nk->af);
 					PF_ACPY(&pd->ndaddr,
 					    &nk->addr[pd2.didx], nk->af);
+					if (nk->af == AF_INET) {
+						pd->proto = IPPROTO_ICMP;
+					} else {
+						pd->proto = IPPROTO_ICMPV6;
+						/*
+						 * IPv4 becomes IPv6 so we must
+						 * copy IPv4 src addr to least
+						 * 32bits in IPv6 address to
+						 * keep traceroute/icmp
+						 * working.
+						 */
+						pd->nsaddr.addr32[3] =
+						    pd->src->addr32[0];
+					}
 					pd->naf = nk->af;
 					return (PF_AFRT);
 				}
@@ -8254,17 +8308,27 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    &nk->addr[didx], pd->af,
 					    nk->af))
 						return (PF_DROP);
-					if (nk->af == AF_INET)
-						pd->proto = IPPROTO_ICMP;
-					else
-						pd->proto = IPPROTO_ICMPV6;
 					sh.src_port = nk->port[sidx];
 					sh.dest_port = nk->port[didx];
 					m_copyback(pd2.m, pd2.off, sizeof(sh), (c_caddr_t)&sh);
-					PF_ACPY(pd->src,
+					PF_ACPY(&pd->nsaddr,
 					    &nk->addr[pd2.sidx], nk->af);
-					PF_ACPY(pd->dst,
+					PF_ACPY(&pd->ndaddr,
 					    &nk->addr[pd2.didx], nk->af);
+					if (nk->af == AF_INET) {
+						pd->proto = IPPROTO_ICMP;
+					} else {
+						pd->proto = IPPROTO_ICMPV6;
+						/*
+						 * IPv4 becomes IPv6 so we must
+						 * copy IPv4 src addr to least
+						 * 32bits in IPv6 address to
+						 * keep traceroute/icmp
+						 * working.
+						 */
+						pd->nsaddr.addr32[3] =
+						    pd->src->addr32[0];
+					}
 					pd->naf = nk->af;
 					return (PF_AFRT);
 				}
@@ -8388,11 +8452,19 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    nk->port[iidx] != iih->icmp_id)
 						iih->icmp_id = nk->port[iidx];
 					m_copyback(pd2.m, pd2.off, ICMP_MINLEN,
-					    (c_caddr_t)&iih);
+					    (c_caddr_t)iih);
 					PF_ACPY(&pd->nsaddr,
 					    &nk->addr[pd2.sidx], nk->af);
 					PF_ACPY(&pd->ndaddr,
 					    &nk->addr[pd2.didx], nk->af);
+					/*
+					 * IPv4 becomes IPv6 so we must copy
+					 * IPv4 src addr to least 32bits in
+					 * IPv6 address to keep traceroute
+					 * working.
+					 */
+					pd->nsaddr.addr32[3] =
+					    pd->src->addr32[0];
 					pd->naf = nk->af;
 					return (PF_AFRT);
 				}
@@ -8507,7 +8579,7 @@ pf_test_state_icmp(struct pf_kstate **state, struct pf_pdesc *pd,
 					    nk->port[iidx] != iih->icmp6_id)
 						iih->icmp6_id = nk->port[iidx];
 					m_copyback(pd2.m, pd2.off,
-					    sizeof(struct icmp6_hdr), (c_caddr_t)&iih);
+					    sizeof(struct icmp6_hdr), (c_caddr_t)iih);
 					PF_ACPY(&pd->nsaddr,
 					    &nk->addr[pd2.sidx], nk->af);
 					PF_ACPY(&pd->ndaddr,
