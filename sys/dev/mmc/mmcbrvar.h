@@ -86,7 +86,6 @@ enum mmcbr_device_ivars {
 #define	MMCBR_ACCESSOR(var, ivar, type)					\
 	__BUS_ACCESSOR(mmcbr, var, MMCBR, ivar, type)
 
-MMCBR_ACCESSOR(bus_type, BUS_TYPE, int)
 MMCBR_ACCESSOR(bus_mode, BUS_MODE, int)
 MMCBR_ACCESSOR(bus_width, BUS_WIDTH, int)
 MMCBR_ACCESSOR(chip_select, CHIP_SELECT, int)
@@ -112,6 +111,17 @@ mmcbr_get_retune_req(device_t dev)
 	if (__predict_false(BUS_READ_IVAR(device_get_parent(dev), dev,
 	    MMCBR_IVAR_RETUNE_REQ, &v) != 0))
 		return (retune_req_none);
+	return ((int)v);
+}
+
+static int __inline
+mmcbr_get_bus_type(device_t dev)
+{
+	uintptr_t v;
+
+	if (__predict_false(BUS_READ_IVAR(device_get_parent(dev), dev,
+	    MMCBR_IVAR_BUS_TYPE, &v) != 0))
+		return (bus_type_default);
 	return ((int)v);
 }
 
