@@ -1649,7 +1649,7 @@ mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd)
 }
 
 static unsigned int
-mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd, 
+mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
     uint8_t *rspbuf)
 {
 	struct mmc_command *mmc_cmd;
