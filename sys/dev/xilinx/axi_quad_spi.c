@@ -222,7 +222,7 @@ static phandle_t
 axispi_get_node(device_t bus, device_t dev)
 {
 
-	return ofw_bus_get_node(bus);
+	return (ofw_bus_get_node(bus));
 }
 
 static device_method_t spi_methods[] = {
