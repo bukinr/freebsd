@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2019-2025 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -897,7 +897,7 @@ setup_xdma(struct xae_softc *sc)
 		    BUF_NPAGES, 0, BUS_SPACE_MAXADDR_32BIT, PAGE_SIZE, 0,
 		    VM_MEMATTR_DEFAULT);
 		phys = VM_PAGE_TO_PHYS(m);
-		vmem = vmem_create("xDMA vmem", 0, 0, PAGE_SIZE, PAGE_SIZE,
+		vmem = vmem_create("xdma vmem", 0, 0, PAGE_SIZE, PAGE_SIZE,
 		    M_BESTFIT | M_WAITOK);
 		vmem_add(vmem, phys, BUF_NPAGES * PAGE_SIZE, 0);
 	}
