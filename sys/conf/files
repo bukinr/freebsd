@@ -3793,6 +3793,7 @@ kern/kern_hhook.c		standard
 kern/kern_idle.c		standard
 kern/kern_intr.c		standard
 kern/kern_jail.c		standard
+kern/kern_jailmeta.c		standard
 kern/kern_kcov.c		optional kcov			\
 	compile-with "${NOSAN_C} ${MSAN_CFLAGS}"
 kern/kern_khelp.c		standard
@@ -4389,8 +4390,6 @@ netinet/tcp_output.c		optional inet | inet6
 netinet/tcp_offload.c		optional tcp_offload inet | tcp_offload inet6
 netinet/tcp_hpts.c		optional tcphpts inet | tcphpts inet6
 netinet/tcp_ratelimit.c		optional ratelimit inet | ratelimit inet6
-netinet/tcp_pcap.c		optional inet tcppcap | inet6 tcppcap \
-	compile-with "${NORMAL_C} ${NO_WNONNULL}"
 netinet/tcp_reass.c		optional inet | inet6
 netinet/tcp_sack.c		optional inet | inet6
 netinet/tcp_stacks/bbr.c	optional inet tcphpts tcp_bbr | inet6 tcphpts tcp_bbr \
