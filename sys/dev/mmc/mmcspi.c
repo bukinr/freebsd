@@ -72,7 +72,7 @@
  *   - Yielding the CPU during long card busy cycles
  *
  * Originally developed and tested using a MicroTik RouterBOARD RB450G and
- * the 31 microSD cards listed at the end of this file.
+ * 31 microSD cards available circa 2012.
  */
 
 #include <sys/param.h>
@@ -1333,9 +1333,8 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 
 	/*
 	 * The following crc checking code is deliberately structured to
-	 * both require a passing crc-7 check and allow a passing crc-7
-	 * check to override a failing crc-16 check when crc-7 checking is
-	 * enabled.
+	 * allow a passing crc-7 check to override a failing crc-16 check
+	 * when both are enabled.
 	 */
 	if (check_crc16) {
 		crc16 = ((uint16_t)crcbuf[0] << 8) | crcbuf[1];
