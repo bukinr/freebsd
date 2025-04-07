@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 Patrick Kelsey.  All rights reserved.
+ * Copyright (c) 2012-2025 Patrick Kelsey.  All rights reserved.
  * Copyright (c) 2025 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -164,13 +164,21 @@ struct mmcspi_command {
 	struct mmc_data	*data;		/* possibly redirected data segment */
 	unsigned int	error_mask;	/* R1 errors check mask */
 	unsigned char	use_crc;	/* do crc checking for this command */
-	unsigned char	rsp_type;	/* type of response to this command */
+	unsigned char	rsp_type;	/* SPI response type of this command */
 #define	MMCSPI_RSP_R1	0
 #define	MMCSPI_RSP_R1B	1
 #define	MMCSPI_RSP_R2	2
 #define	MMCSPI_RSP_R3	3
 #define	MMCSPI_RSP_R7	4
 	unsigned char	rsp_len;	/* response len of this command */
+	unsigned char	mmc_rsp_type;	/* MMC reponse type to translate to */
+#define	MMCSPI_TO_MMC_RSP_NONE	0
+#define	MMCSPI_TO_MMC_RSP_R1	1
+#define	MMCSPI_TO_MMC_RSP_R1B	2
+#define	MMCSPI_TO_MMC_RSP_R2	3
+#define	MMCSPI_TO_MMC_RSP_R3	4
+#define	MMCSPI_TO_MMC_RSP_R6	5
+#define	MMCSPI_TO_MMC_RSP_R7	6
 	struct mmc_data	ldata;		/* local read data */
 };
 
@@ -994,6 +1002,7 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 	uint32_t retries;
 	unsigned char rsp_type;
 	unsigned char rsp_len;
+	unsigned char mmc_rsp_type;
 	unsigned int ldata_len = 0;
 	unsigned int use_crc;
 
@@ -1010,17 +1019,20 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 		switch (opcode) {
 		case ACMD_SD_STATUS:
 			rsp_type = MMCSPI_RSP_R2;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R1;
 			break;
 		case ACMD_SEND_NUM_WR_BLOCKS:
 		case ACMD_SET_WR_BLK_ERASE_COUNT:
 		case ACMD_SET_CLR_CARD_DETECT:
 		case ACMD_SEND_SCR:
 			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R1;
 			break;
 		case ACMD_SD_SEND_OP_COND:
 			/* only HCS bit is valid in spi mode */
 			arg &= 0x40000000;
 			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R3;
 			break;
 		default:
 			TRACE(dev, ERROR, "Invalid app command opcode %u\n",
@@ -1032,6 +1044,7 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 		case MMC_GO_IDLE_STATE:
 			use_crc = 1;
 			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_NONE;
 			break;
 
 		case MMC_SEND_OP_COND:
@@ -1047,20 +1060,26 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 		case SD_ERASE_WR_BLK_END:
 		case MMC_LOCK_UNLOCK:
 		case MMC_GEN_CMD:
+			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R1;
+			break;
 		case MMCSPI_CRC_ON_OFF:
 			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_NONE;
 			break;
 
 		case MMC_SEND_CSD:
 		case MMC_SEND_CID:
 			arg = 0; /* no rca in spi mode */
 			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R2;
 			ldata_len = 16;
 			break;
 
 		case MMC_APP_CMD:
 			arg = 0; /* no rca in spi mode */
 			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R1;
 			break;
 
 		case MMC_STOP_TRANSMISSION:
@@ -1068,23 +1087,27 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 		case MMC_CLR_WRITE_PROT:
 		case MMC_ERASE:
 			rsp_type = MMCSPI_RSP_R1B;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R1B;
 			break;
 
 		case MMC_ALL_SEND_CID:
 			/* handle MMC_ALL_SEND_CID as MMC_SEND_CID */
 			opcode = MMC_SEND_CID;
 			rsp_type = MMCSPI_RSP_R1;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R2;
 			ldata_len = 16;
 			break;
 
 		case MMC_SEND_STATUS:
 			arg = 0; /* no rca in spi mode */
 			rsp_type = MMCSPI_RSP_R2;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R1;
 			break;
 
 
 		case MMCSPI_READ_OCR:
 			rsp_type = MMCSPI_RSP_R3;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_NONE;
 			break;
 
 		case SD_SEND_RELATIVE_ADDR:
@@ -1094,11 +1117,13 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 			 */
 			opcode = MMC_SEND_STATUS;
 			rsp_type = MMCSPI_RSP_R2;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R6;
 			break;
 
 		case SD_SEND_IF_COND:
 			use_crc = 1;
 			rsp_type = MMCSPI_RSP_R7;
+			mmc_rsp_type = MMCSPI_TO_MMC_RSP_R7;
 			break;
 
 		default:
@@ -1135,6 +1160,7 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 		mmcspi_cmd->error_mask &= ~MMCSPI_R1_CRC_ERR;
 	mmcspi_cmd->rsp_type = rsp_type;
 	mmcspi_cmd->rsp_len = rsp_len;
+	mmcspi_cmd->mmc_rsp_type = mmc_rsp_type;
 
 	memset(&mmcspi_cmd->ldata, 0, sizeof(struct mmc_data));
 	mmcspi_cmd->ldata.len = ldata_len;
@@ -1656,7 +1682,7 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 	uint8_t *ldata;
 
 	mmc_cmd = cmd->mmc_cmd;
-	mmc_rsp_type = MMC_RSP(cmd->flags);
+	mmc_rsp_type = cmd->mmc_rsp_type;
 	ldata = cmd->ldata.data;
 
 	TRACE_ENTER(dev);
@@ -1664,7 +1690,8 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 	TRACE(dev, ACTION, "translating SPI rsp %u to SD rsp %u\n",
 	    cmd->rsp_type, mmc_rsp_type);
 
-	if ((MMC_RSP_R1 == mmc_rsp_type) || (MMC_RSP_R1B == mmc_rsp_type)) {
+	if ((MMCSPI_TO_MMC_RSP_R1 == mmc_rsp_type) ||
+	    (MMCSPI_TO_MMC_RSP_R1B == mmc_rsp_type)) {
 
 		TRACE(dev, ACTION, "translating SPI-R1/2 to SD-R1\n");
 
@@ -1734,14 +1761,10 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 					mmc_cmd->resp[0] |= R1_CARD_IS_LOCKED;
 
 			}
-		} else if (MMCSPI_RSP_R7 == cmd->rsp_type) {
-			mmc_cmd->resp[0] =
-			    (uint32_t)(rspbuf[3] & 0xf) << 8 |
-			    (uint32_t)rspbuf[4];
 		} else
 			return (MMC_ERR_INVALID);
 
-	} else if (MMC_RSP_R2 == mmc_rsp_type) {
+	} else if (MMCSPI_TO_MMC_RSP_R2 == mmc_rsp_type) {
 
 		if (16 == cmd->ldata.len) {
 
@@ -1776,7 +1799,7 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 		} else
 			return (MMC_ERR_INVALID);
 
-	} else if (MMC_RSP_R3 == mmc_rsp_type) {
+	} else if (MMCSPI_TO_MMC_RSP_R3 == mmc_rsp_type) {
 
 		if (MMCSPI_RSP_R3 == cmd->rsp_type) {
 
@@ -1806,10 +1829,7 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 		} else
 			return (MMC_ERR_INVALID);
 
-	} else if (MMC_RSP_R7 == mmc_rsp_type) {
-		/* Note MMC_RSP_R6 and MMC_RSP_R7 are numerically equal, so
-		   this handles both cases. */
-
+	} else if (MMCSPI_TO_MMC_RSP_R6 == mmc_rsp_type) {
 		if (MMCSPI_RSP_R2 == cmd->rsp_type) {
 
 			TRACE(dev, ACTION, "translating SPI-R2 to SD-R6\n");
@@ -1832,8 +1852,12 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 			else
 				mmc_cmd->resp[0] |=
 				    (uint32_t)R1_STATE_READY << 9;
+		} else
+			return (MMC_ERR_INVALID);
 
-		} else if (MMCSPI_RSP_R7 == cmd->rsp_type) {
+	} else if (MMCSPI_TO_MMC_RSP_R7 == mmc_rsp_type) {
+		if (MMCSPI_RSP_R7 == cmd->rsp_type) {
+
 			TRACE(dev, ACTION, "translating SPI-R7 to SD-R7\n");
 
 			/* rsp buf contains a 40-bit spi-R7, of which bits
@@ -1847,7 +1871,7 @@ mmcspi_translate_response(device_t dev, struct mmcspi_command *cmd,
 		} else
 			return (MMC_ERR_INVALID);
 
-	} else if (MMC_RSP_NONE != mmc_rsp_type)
+	} else if (MMCSPI_TO_MMC_RSP_NONE != mmc_rsp_type)
 		return (MMC_ERR_INVALID);
 
 	TRACE_EXIT(dev);
