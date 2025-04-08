@@ -1156,7 +1156,7 @@ mmcspi_set_up_command(device_t dev, struct mmcspi_command *mmcspi_cmd,
 	mmcspi_cmd->retries = retries;
 	mmcspi_cmd->use_crc = use_crc;
 	mmcspi_cmd->error_mask = MMCSPI_R1_ERR_MASK;
-	if (mmcspi_cmd->use_crc)
+	if (!mmcspi_cmd->use_crc)
 		mmcspi_cmd->error_mask &= ~MMCSPI_R1_CRC_ERR;
 	mmcspi_cmd->rsp_type = rsp_type;
 	mmcspi_cmd->rsp_len = rsp_len;
