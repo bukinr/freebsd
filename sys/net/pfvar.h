@@ -696,6 +696,7 @@ struct pf_rule_actions {
 	uint8_t		 min_ttl;
 	uint8_t		 set_prio[2];
 	uint8_t		 rt;
+	uint8_t		 allow_opts;
 };
 
 union pf_keth_rule_ptr {
@@ -2474,7 +2475,7 @@ void	pf_normalize_cleanup(void);
 int	pf_normalize_tcp(struct pf_pdesc *);
 void	pf_normalize_tcp_cleanup(struct pf_kstate *);
 int	pf_normalize_tcp_init(struct pf_pdesc *,
-	    struct tcphdr *, struct pf_state_peer *, struct pf_state_peer *);
+	    struct tcphdr *, struct pf_state_peer *);
 int	pf_normalize_tcp_stateful(struct pf_pdesc *,
 	    u_short *, struct tcphdr *, struct pf_kstate *,
 	    struct pf_state_peer *, struct pf_state_peer *, int *);
