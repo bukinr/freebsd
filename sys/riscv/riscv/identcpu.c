@@ -53,6 +53,7 @@
 #include <machine/elf.h>
 #include <machine/md_var.h>
 #include <machine/thead.h>
+#include <machine/zicbom.h>
 
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
@@ -77,6 +78,7 @@ bool has_hyp;
 bool __read_frequently has_sstc;
 bool __read_frequently has_sscofpmf;
 bool has_svpbmt;
+bool has_zicbom;
 
 struct cpu_desc {
 	const char	*cpu_mvendor_name;
@@ -89,6 +91,8 @@ struct cpu_desc {
 #define	 SV_SVPBMT	(1 << 2)
 #define	 SV_SVINVAL	(1 << 3)
 #define	 SV_SSCOFPMF	(1 << 4)
+	u_int		z_extensions;		/* Multi-letter extensions. */
+#define	 Z_ZICBOM	(1 << 0)
 };
 
 struct cpu_desc cpu_desc[MAXCPU];
@@ -196,6 +200,19 @@ parse_ext_x(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 static __inline int
 parse_ext_z(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 {
+#define	CHECK_Z_EXT(str, flag)						\
+	do {								\
+		if (strncmp(&isa[idx], (str),				\
+		    MIN(strlen(str), len - idx)) == 0) {		\
+			desc->z_extensions |= flag;			\
+			return (idx + strlen(str));			\
+		}							\
+	} while (0)
+
+	/* Check for known/supported extensions. */
+	CHECK_Z_EXT("zicbom",	Z_ZICBOM);
+
+#undef CHECK_Z_EXT
 	/*
 	 * Proceed to the next multi-letter extension or the end of the
 	 * string.
@@ -422,6 +439,9 @@ update_global_capabilities(u_int cpu, struct cpu_desc *desc)
 	UPDATE_CAP(has_sscofpmf, (desc->smode_extensions & SV_SSCOFPMF) != 0);
 	UPDATE_CAP(has_svpbmt, (desc->smode_extensions & SV_SVPBMT) != 0);
 
+	/* Z extension support. */
+	UPDATE_CAP(has_zicbom, (desc->z_extensions & Z_ZICBOM) != 0);
+
 #undef UPDATE_CAP
 }
 
@@ -506,6 +526,9 @@ identify_cpu(u_int cpu)
 
 	update_global_capabilities(cpu, desc);
 	handle_cpu_quirks(cpu, desc);
+
+	if (has_zicbom)
+		zicbom_setup_cache();
 }
 
 void
