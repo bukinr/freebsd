@@ -93,8 +93,8 @@ struct cpu_desc {
 #define	 SV_SSCOFPMF	(1 << 4)
 	u_int		z_extensions;		/* Multi-letter extensions. */
 #define	 Z_ZICBOM	(1 << 0)
-	int		cbom_bsize;
-	int		cboz_bsize;
+	int		cbom_block_size;
+	int		cboz_block_size;
 };
 
 struct cpu_desc cpu_desc[MAXCPU];
@@ -347,13 +347,13 @@ parse_cache_fdt(struct cpu_desc *desc, phandle_t node)
 
 	len = OF_getproplen(node, "riscv,cbom-block-size");
 	if (len == sizeof(uint32_t))
-		OF_getencprop(node, "riscv,cbom-block-size", &desc->cbom_bsize,
-		    len);
+		OF_getencprop(node, "riscv,cbom-block-size",
+		    &desc->cbom_block_size, len);
 
 	len = OF_getproplen(node, "riscv,cbom-block-size");
 	if (len == sizeof(uint32_t))
-		OF_getencprop(node, "riscv,cboz-block-size", &desc->cboz_bsize,
-		    len);
+		OF_getencprop(node, "riscv,cboz-block-size",
+		    &desc->cboz_block_size, len);
 }
 
 static void
@@ -549,10 +549,21 @@ identify_cpu(u_int cpu)
 	handle_cpu_quirks(cpu, desc);
 
 	if (has_zicbom) {
-		if (desc->cbom_bsize > 0)
-			zicbom_setup_cache(desc->cbom_bsize);
-		else if (bootverbose)
-			printf("Zicbom present, but no cache line specified\n");
+		if (desc->cbom_block_size <= 0) {
+			if (bootverbose)
+				printf("Zicbom present, but cache line is not"
+				    " specified\n");
+			return;
+		}
+
+		if (!powerof2(desc->cbom_block_size)) {
+			if (bootverbose)
+				printf("Zicbom present, but cache line is not"
+				    " power of 2.\n");
+			return;
+		}
+
+		zicbom_setup_cache(desc->cbom_block_size);
 	}
 }
 
