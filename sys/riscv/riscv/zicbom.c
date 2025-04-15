@@ -53,8 +53,11 @@ zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 
 	/*
 	 * An invalidate operation makes data from store operations performed by
-	 * a set of non-coherent agents visible to the set of coherent agents."
+	 * a set of non-coherent agents visible to the set of coherent agents at
+	 * a point common to both sets by deallocating all copies of a cache
+	 * block from the set of coherent caches up to that point.
 	 */
+
 	va &= ~(cache_line - 1);
 	for (addr = va; addr < va + len; addr += cache_line)
 		__asm __volatile("cbo.inval 0(%[addr])\n" :: [addr] "r"(addr));
@@ -67,8 +70,13 @@ zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 
 	/*
 	 * A clean operation makes data from store operations performed by the
-	 * set of coherent agents visible to a set of non-coherent agents.
+	 * set of coherent agents visible to a set of non-coherent agents at a
+	 * point common to both sets by performing a write transfer of a copy of
+	 * a cache block to that point provided a coherent agent performed a
+	 * store operation that modified the data in the cache block since the
+	 * previous invalidate, clean, or flush operation on the cache block.
 	 */
+
 	va &= ~(cache_line - 1);
 	for (addr = va; addr < va + len; addr += cache_line)
 		__asm __volatile("cbo.clean 0(%[addr])\n" :: [addr] "r"(addr));
