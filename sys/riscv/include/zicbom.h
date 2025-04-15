@@ -28,6 +28,6 @@
 #ifndef _RISCV_ZICBOM_H_
 #define	_RISCV_ZICBOM_H_
 
-void zicbom_setup_cache(void);
+void zicbom_setup_cache(int cbom_bsize);
 
 #endif /* _RISCV_ZICBOM_H_ */

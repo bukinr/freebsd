@@ -93,6 +93,8 @@ struct cpu_desc {
 #define	 SV_SSCOFPMF	(1 << 4)
 	u_int		z_extensions;		/* Multi-letter extensions. */
 #define	 Z_ZICBOM	(1 << 0)
+	int		cbom_bsize;
+	int		cboz_bsize;
 };
 
 struct cpu_desc cpu_desc[MAXCPU];
@@ -339,6 +341,22 @@ parse_mmu_fdt(struct cpu_desc *desc, phandle_t node)
 }
 
 static void
+parse_cache_fdt(struct cpu_desc *desc, phandle_t node)
+{
+	int len;
+
+	len = OF_getproplen(node, "riscv,cbom-block-size");
+	if (len == sizeof(uint32_t))
+		OF_getencprop(node, "riscv,cbom-block-size", &desc->cbom_bsize,
+		    len);
+
+	len = OF_getproplen(node, "riscv,cbom-block-size");
+	if (len == sizeof(uint32_t))
+		OF_getencprop(node, "riscv,cboz-block-size", &desc->cboz_bsize,
+		    len);
+}
+
+static void
 identify_cpu_features_fdt(u_int cpu, struct cpu_desc *desc)
 {
 	char isa[1024];
@@ -388,6 +406,9 @@ identify_cpu_features_fdt(u_int cpu, struct cpu_desc *desc)
 
 		/* Check MMU features. */
 		parse_mmu_fdt(desc, node);
+
+		/* Zicbom/Zicboz */
+		parse_cache_fdt(desc, node);
 
 		/* We are done. */
 		break;
@@ -527,8 +548,12 @@ identify_cpu(u_int cpu)
 	update_global_capabilities(cpu, desc);
 	handle_cpu_quirks(cpu, desc);
 
-	if (has_zicbom)
-		zicbom_setup_cache();
+	if (has_zicbom) {
+		if (desc->cbom_bsize > 0)
+			zicbom_setup_cache(desc->cbom_bsize);
+		else if (bootverbose)
+			printf("Zicbom present, but no cache line specified\n");
+	}
 }
 
 void

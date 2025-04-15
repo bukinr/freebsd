@@ -30,16 +30,15 @@
 
 #include <machine/zicbom.h>
 
-#define	ZICBOM_CACHELINE_SIZE	64
+static int cbom_block_size;
 
 static void
 flush_dcache_range(vm_offset_t start, vm_size_t len)
 {
-	unsigned long addr;
+	vm_offset_t addr;
 
-	start &= ~(ZICBOM_CACHELINE_SIZE - 1);
-
-	for (addr = start; addr < start + len; addr += ZICBOM_CACHELINE_SIZE)
+	start &= ~(cbom_block_size - 1);
+	for (addr = start; addr < start + len; addr += cbom_block_size)
 		__asm __volatile("cbo.flush 0(%[addr])\n" :: [addr] "r"(addr));
 }
 
@@ -65,12 +64,14 @@ zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 }
 
 void
-zicbom_setup_cache(void)
+zicbom_setup_cache(int cbom_bsize)
 {
 	struct riscv_cache_ops zicbom_ops;
+
+	cbom_block_size = cbom_bsize;
 
 	zicbom_ops.dcache_wbinv_range = zicbom_cpu_dcache_wbinv_range;
 	zicbom_ops.dcache_inv_range = zicbom_cpu_dcache_inv_range;
 	zicbom_ops.dcache_wb_range = zicbom_cpu_dcache_wb_range;
-	riscv_cache_install_hooks(&zicbom_ops, ZICBOM_CACHELINE_SIZE);
+	riscv_cache_install_hooks(&zicbom_ops, cbom_block_size);
 }
