@@ -33,34 +33,45 @@
 static int cache_line;
 
 static void
-flush_dcache_range(vm_offset_t start, vm_size_t len)
+zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 {
 	vm_offset_t addr;
 
-	start &= ~(cache_line - 1);
-	for (addr = start; addr < start + len; addr += cache_line)
+	/*
+	 * A flush operation atomically performs a clean operation followed by
+	 * an invalidate operation.
+	 */
+	va &= ~(cache_line - 1);
+	for (addr = va; addr < va + len; addr += cache_line)
 		__asm __volatile("cbo.flush 0(%[addr])\n" :: [addr] "r"(addr));
-}
-
-static void
-zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
-{
-
-	flush_dcache_range(va, len);
 }
 
 static void
 zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 {
+	vm_offset_t addr;
 
-	flush_dcache_range(va, len);
+	/*
+	 * An invalidate operation makes data from store operations performed by
+	 * a set of non-coherent agents visible to the set of coherent agents."
+	 */
+	va &= ~(cache_line - 1);
+	for (addr = va; addr < va + len; addr += cache_line)
+		__asm __volatile("cbo.inval 0(%[addr])\n" :: [addr] "r"(addr));
 }
 
 static void
 zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 {
+	vm_offset_t addr;
 
-	flush_dcache_range(va, len);
+	/*
+	 * A clean operation makes data from store operations performed by the
+	 * set of coherent agents visible to a set of non-coherent agents.
+	 */
+	va &= ~(cache_line - 1);
+	for (addr = va; addr < va + len; addr += cache_line)
+		__asm __volatile("cbo.clean 0(%[addr])\n" :: [addr] "r"(addr));
 }
 
 void
