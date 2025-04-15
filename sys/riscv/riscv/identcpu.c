@@ -341,7 +341,7 @@ parse_mmu_fdt(struct cpu_desc *desc, phandle_t node)
 }
 
 static void
-parse_cache_fdt(struct cpu_desc *desc, phandle_t node)
+parse_cbo_fdt(struct cpu_desc *desc, phandle_t node)
 {
 	int len;
 
@@ -350,7 +350,7 @@ parse_cache_fdt(struct cpu_desc *desc, phandle_t node)
 		OF_getencprop(node, "riscv,cbom-block-size",
 		    &desc->cbom_block_size, len);
 
-	len = OF_getproplen(node, "riscv,cbom-block-size");
+	len = OF_getproplen(node, "riscv,cboz-block-size");
 	if (len == sizeof(uint32_t))
 		OF_getencprop(node, "riscv,cboz-block-size",
 		    &desc->cboz_block_size, len);
@@ -407,8 +407,8 @@ identify_cpu_features_fdt(u_int cpu, struct cpu_desc *desc)
 		/* Check MMU features. */
 		parse_mmu_fdt(desc, node);
 
-		/* Zicbom/Zicboz */
-		parse_cache_fdt(desc, node);
+		/* Cache-block operations (CBO). */
+		parse_cbo_fdt(desc, node);
 
 		/* We are done. */
 		break;
@@ -551,8 +551,8 @@ identify_cpu(u_int cpu)
 	if (has_zicbom) {
 		if (desc->cbom_block_size <= 0) {
 			if (bootverbose)
-				printf("Zicbom present, but cache line is not"
-				    " specified\n");
+				printf("Zicbom present, but no cache line"
+				    " specified.\n");
 			return;
 		}
 
