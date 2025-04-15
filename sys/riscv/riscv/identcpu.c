@@ -78,7 +78,11 @@ bool has_hyp;
 bool __read_frequently has_sstc;
 bool __read_frequently has_sscofpmf;
 bool has_svpbmt;
+
+/* Z-extensions support. */
 bool has_zicbom;
+bool has_zicboz;
+bool has_zicbop;
 
 struct cpu_desc {
 	const char	*cpu_mvendor_name;
@@ -93,6 +97,8 @@ struct cpu_desc {
 #define	 SV_SSCOFPMF	(1 << 4)
 	u_int		z_extensions;		/* Multi-letter extensions. */
 #define	 Z_ZICBOM	(1 << 0)
+#define	 Z_ZICBOZ	(1 << 1)
+#define	 Z_ZICBOP	(1 << 2)
 	int		cbom_block_size;
 	int		cboz_block_size;
 };
@@ -213,6 +219,8 @@ parse_ext_z(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 
 	/* Check for known/supported extensions. */
 	CHECK_Z_EXT("zicbom",	Z_ZICBOM);
+	CHECK_Z_EXT("zicboz",	Z_ZICBOZ);
+	CHECK_Z_EXT("zicbop",	Z_ZICBOP);
 
 #undef CHECK_Z_EXT
 	/*
@@ -462,6 +470,8 @@ update_global_capabilities(u_int cpu, struct cpu_desc *desc)
 
 	/* Z extension support. */
 	UPDATE_CAP(has_zicbom, (desc->z_extensions & Z_ZICBOM) != 0);
+	UPDATE_CAP(has_zicboz, (desc->z_extensions & Z_ZICBOZ) != 0);
+	UPDATE_CAP(has_zicbop, (desc->z_extensions & Z_ZICBOP) != 0);
 
 #undef UPDATE_CAP
 }
