@@ -226,8 +226,6 @@ parse_ext_z(struct cpu_desc *desc __unused, char *isa, int idx, int len)
 	/*
 	 * Proceed to the next multi-letter extension or the end of the
 	 * string.
-	 *
-	 * TODO: parse some of these.
 	 */
 	while (isa[idx] != '_' && idx < len) {
 		idx++;
