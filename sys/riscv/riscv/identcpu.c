@@ -558,7 +558,7 @@ identify_cpu(u_int cpu)
 	update_global_capabilities(cpu, desc);
 	handle_cpu_quirks(cpu, desc);
 
-	if (has_zicbom)
+	if (has_zicbom && cpu == 0)
 		cbo_zicbom_setup_cache(desc->cbom_block_size);
 }
 

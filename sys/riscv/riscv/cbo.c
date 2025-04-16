@@ -32,8 +32,6 @@
 
 #include <machine/cbo.h>
 
-static int cache_line;
-
 static void
 cbo_zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 {
@@ -44,8 +42,8 @@ cbo_zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 	 * an invalidate operation.
 	 */
 
-	va &= ~(cache_line - 1);
-	for (addr = va; addr < va + len; addr += cache_line)
+	va &= ~(dcache_line_size - 1);
+	for (addr = va; addr < va + len; addr += dcache_line_size)
 		__asm __volatile("cbo.flush 0(%[addr])\n" :: [addr] "r"(addr));
 }
 
@@ -61,8 +59,8 @@ cbo_zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 	 * block from the set of coherent caches up to that point.
 	 */
 
-	va &= ~(cache_line - 1);
-	for (addr = va; addr < va + len; addr += cache_line)
+	va &= ~(dcache_line_size - 1);
+	for (addr = va; addr < va + len; addr += dcache_line_size)
 		__asm __volatile("cbo.inval 0(%[addr])\n" :: [addr] "r"(addr));
 }
 
@@ -80,8 +78,8 @@ cbo_zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 	 * previous invalidate, clean, or flush operation on the cache block.
 	 */
 
-	va &= ~(cache_line - 1);
-	for (addr = va; addr < va + len; addr += cache_line)
+	va &= ~(dcache_line_size - 1);
+	for (addr = va; addr < va + len; addr += dcache_line_size)
 		__asm __volatile("cbo.clean 0(%[addr])\n" :: [addr] "r"(addr));
 }
 
@@ -91,12 +89,10 @@ cbo_zicbom_setup_cache(int cbom_block_size)
 	struct riscv_cache_ops zicbom_ops;
 
 	if (cbom_block_size <= 0 || !powerof2(cbom_block_size)) {
-		printf("Zicbom: could not initialize, invalid cache line %d\n",
+		printf("Zicbom: could not initialise (invalid cache line %d)\n",
 		    cbom_block_size);
 		return;
 	}
-
-	cache_line = cbom_block_size;
 
 	zicbom_ops.dcache_wbinv_range = cbo_zicbom_cpu_dcache_wbinv_range;
 	zicbom_ops.dcache_inv_range = cbo_zicbom_cpu_dcache_inv_range;
