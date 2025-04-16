@@ -43,6 +43,7 @@ zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 	 * A flush operation atomically performs a clean operation followed by
 	 * an invalidate operation.
 	 */
+
 	va &= ~(cache_line - 1);
 	for (addr = va; addr < va + len; addr += cache_line)
 		__asm __volatile("cbo.flush 0(%[addr])\n" :: [addr] "r"(addr));
