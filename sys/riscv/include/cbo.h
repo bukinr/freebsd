@@ -28,6 +28,6 @@
 #ifndef	_RISCV_CBO_H_
 #define	_RISCV_CBO_H_
 
-void zicbom_setup_cache(int cbom_block_size);
+void cbo_zicbom_setup_cache(int cbom_block_size);
 
 #endif	/* _RISCV_CBO_H_ */

@@ -35,7 +35,7 @@
 static int cache_line;
 
 static void
-zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
+cbo_zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 {
 	vm_offset_t addr;
 
@@ -50,7 +50,7 @@ zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 }
 
 static void
-zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
+cbo_zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 {
 	vm_offset_t addr;
 
@@ -67,7 +67,7 @@ zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 }
 
 static void
-zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
+cbo_zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 {
 	vm_offset_t addr;
 
@@ -86,7 +86,7 @@ zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 }
 
 void
-zicbom_setup_cache(int cbom_block_size)
+cbo_zicbom_setup_cache(int cbom_block_size)
 {
 	struct riscv_cache_ops zicbom_ops;
 
@@ -98,8 +98,8 @@ zicbom_setup_cache(int cbom_block_size)
 
 	cache_line = cbom_block_size;
 
-	zicbom_ops.dcache_wbinv_range = zicbom_cpu_dcache_wbinv_range;
-	zicbom_ops.dcache_inv_range = zicbom_cpu_dcache_inv_range;
-	zicbom_ops.dcache_wb_range = zicbom_cpu_dcache_wb_range;
+	zicbom_ops.dcache_wbinv_range = cbo_zicbom_cpu_dcache_wbinv_range;
+	zicbom_ops.dcache_inv_range = cbo_zicbom_cpu_dcache_inv_range;
+	zicbom_ops.dcache_wb_range = cbo_zicbom_cpu_dcache_wb_range;
 	riscv_cache_install_hooks(&zicbom_ops, cbom_block_size);
 }
