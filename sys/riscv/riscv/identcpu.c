@@ -349,17 +349,17 @@ parse_mmu_fdt(struct cpu_desc *desc, phandle_t node)
 static void
 parse_cbo_fdt(struct cpu_desc *desc, phandle_t node)
 {
-	int len;
+	int error;
 
-	len = OF_getproplen(node, "riscv,cbom-block-size");
-	if (len == sizeof(uint32_t))
-		OF_getencprop(node, "riscv,cbom-block-size",
-		    &desc->cbom_block_size, len);
+	error = OF_getencprop(node, "riscv,cbom-block-size",
+	    &desc->cbom_block_size, sizeof(desc->cbom_block_size));
+	if (error)
+		desc->cbom_block_size = 0;
 
-	len = OF_getproplen(node, "riscv,cboz-block-size");
-	if (len == sizeof(uint32_t))
-		OF_getencprop(node, "riscv,cboz-block-size",
-		    &desc->cboz_block_size, len);
+	error = OF_getencprop(node, "riscv,cboz-block-size",
+	    &desc->cboz_block_size, sizeof(desc->cboz_block_size));
+	if (error)
+		desc->cboz_block_size = 0;
 }
 
 static void
