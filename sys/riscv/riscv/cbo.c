@@ -87,6 +87,12 @@ zicbom_setup_cache(int cbom_block_size)
 {
 	struct riscv_cache_ops zicbom_ops;
 
+	if (cbom_block_size <= 0 || !powerof2(cbom_block_size)) {
+		printf("Zicbom: could not initialize, invalid cache line %d\n",
+		    cbom_block_size);
+		return;
+	}
+
 	cache_line = cbom_block_size;
 
 	zicbom_ops.dcache_wbinv_range = zicbom_cpu_dcache_wbinv_range;

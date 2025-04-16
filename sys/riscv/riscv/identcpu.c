@@ -558,23 +558,8 @@ identify_cpu(u_int cpu)
 	update_global_capabilities(cpu, desc);
 	handle_cpu_quirks(cpu, desc);
 
-	if (has_zicbom) {
-		if (desc->cbom_block_size <= 0) {
-			if (bootverbose)
-				printf("Zicbom present, but no cache line"
-				    " specified.\n");
-			return;
-		}
-
-		if (!powerof2(desc->cbom_block_size)) {
-			if (bootverbose)
-				printf("Zicbom present, but cache line is not"
-				    " power of 2.\n");
-			return;
-		}
-
+	if (has_zicbom)
 		zicbom_setup_cache(desc->cbom_block_size);
-	}
 }
 
 void
