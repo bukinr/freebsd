@@ -46,6 +46,7 @@ riscv/riscv/bus_space_asm.S	standard
 riscv/riscv/busdma_bounce.c	standard
 riscv/riscv/busdma_machdep.c	standard
 riscv/riscv/cache.c		standard
+riscv/riscv/cbo.c		standard
 riscv/riscv/clock.c		standard
 riscv/riscv/copyinout.S		standard
 riscv/riscv/cpufunc_asm.S	standard
@@ -85,7 +86,6 @@ riscv/riscv/timer.c		standard
 riscv/riscv/uio_machdep.c	standard
 riscv/riscv/unwind.c		optional	ddb | kdtrace_hooks | stack
 riscv/riscv/vm_machdep.c	standard
-riscv/riscv/zicbom.c		standard
 riscv/vmm/vmm.c					optional	vmm
 riscv/vmm/vmm_aplic.c				optional	vmm
 riscv/vmm/vmm_dev_machdep.c			optional	vmm

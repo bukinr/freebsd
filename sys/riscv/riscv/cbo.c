@@ -28,7 +28,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#include <machine/zicbom.h>
+#include <machine/cbo.h>
 
 static int cache_line;
 
