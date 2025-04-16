@@ -53,7 +53,7 @@
 #include <machine/elf.h>
 #include <machine/md_var.h>
 #include <machine/thead.h>
-#include <machine/zicbom.h>
+#include <machine/cbo.h>
 
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
