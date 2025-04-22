@@ -169,7 +169,7 @@ axidma_intr(struct axidma_softc *sc,
 
 	while (chan->idx_tail != chan->idx_head) {
 		desc = chan->descs[chan->idx_tail];
-		cpu_dcache_wbinv_range((uint64_t)desc,
+		cpu_dcache_wbinv_range((vm_offset_t)desc,
 		    sizeof(struct axidma_desc));
 
 		if ((desc->status & BD_STATUS_CMPLT) == 0)
@@ -497,7 +497,7 @@ axidma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 		if (sg[i].last == 1)
 			desc->control |= BD_CONTROL_TXEOF;
 
-		cpu_dcache_wbinv_range((uint64_t)desc,
+		cpu_dcache_wbinv_range((vm_offset_t)desc,
 		    sizeof(struct axidma_desc));
 
 		tmp = chan->idx_head;
