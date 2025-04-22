@@ -353,12 +353,12 @@ parse_cbo_fdt(struct cpu_desc *desc, phandle_t node)
 
 	error = OF_getencprop(node, "riscv,cbom-block-size",
 	    &desc->cbom_block_size, sizeof(desc->cbom_block_size));
-	if (error)
+	if (error == -1)
 		desc->cbom_block_size = 0;
 
 	error = OF_getencprop(node, "riscv,cboz-block-size",
 	    &desc->cboz_block_size, sizeof(desc->cboz_block_size));
-	if (error)
+	if (error == -1)
 		desc->cboz_block_size = 0;
 }
 
