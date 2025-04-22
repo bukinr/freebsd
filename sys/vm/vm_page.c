@@ -1895,46 +1895,6 @@ vm_page_find_least(vm_object_t object, vm_pindex_t pindex)
 }
 
 /*
- * Returns the given page's successor (by pindex) within the object if it is
- * resident; if none is found, NULL is returned.
- *
- * The object must be locked.
- */
-vm_page_t
-vm_page_next(vm_page_t m)
-{
-	vm_page_t next;
-
-	VM_OBJECT_ASSERT_LOCKED(m->object);
-	if ((next = TAILQ_NEXT(m, listq)) != NULL) {
-		MPASS(next->object == m->object);
-		if (next->pindex != m->pindex + 1)
-			next = NULL;
-	}
-	return (next);
-}
-
-/*
- * Returns the given page's predecessor (by pindex) within the object if it is
- * resident; if none is found, NULL is returned.
- *
- * The object must be locked.
- */
-vm_page_t
-vm_page_prev(vm_page_t m)
-{
-	vm_page_t prev;
-
-	VM_OBJECT_ASSERT_LOCKED(m->object);
-	if ((prev = TAILQ_PREV(m, pglist, listq)) != NULL) {
-		MPASS(prev->object == m->object);
-		if (prev->pindex != m->pindex - 1)
-			prev = NULL;
-	}
-	return (prev);
-}
-
-/*
  * Uses the page mnew as a replacement for an existing page at index
  * pindex which must be already present in the object.
  *
@@ -2222,7 +2182,7 @@ again:
 	 * Can we allocate the page from a reservation?
 	 */
 	if (vm_object_reserv(object) &&
-	    (m = vm_reserv_alloc_page(object, pindex, domain, req, mpred)) !=
+	    (m = vm_reserv_alloc_page(object, pages, pindex, domain, req)) !=
 	    NULL) {
 		goto found;
 	}
@@ -2458,8 +2418,9 @@ vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
 		 * Can we allocate the pages from a reservation?
 		 */
 		if (vm_object_reserv(object) &&
-		    (m_ret = vm_reserv_alloc_contig(object, pindex, domain, req,
-		    mpred, npages, low, high, alignment, boundary)) != NULL) {
+		    (m_ret = vm_reserv_alloc_contig(object, &pages, pindex,
+		    domain, req, npages, low, high, alignment, boundary)) !=
+		    NULL) {
 			break;
 		}
 #endif
