@@ -45,7 +45,7 @@ cbo_zicbom_cpu_dcache_wbinv_range(vm_offset_t va, vm_size_t len)
 	va &= ~(dcache_line_size - 1);
 	for (addr = va; addr < va + len; addr += dcache_line_size)
 		__asm __volatile(".option push; .option arch, +zicbom\n"
-				 "cbo.flush 0(%0); .option pop\n" :: "r"(addr));
+				 "cbo.flush (%0); .option pop\n" :: "r"(addr));
 }
 
 static void
@@ -63,7 +63,7 @@ cbo_zicbom_cpu_dcache_inv_range(vm_offset_t va, vm_size_t len)
 	va &= ~(dcache_line_size - 1);
 	for (addr = va; addr < va + len; addr += dcache_line_size)
 		__asm __volatile(".option push; .option arch, +zicbom\n"
-				 "cbo.inval 0(%0); .option pop\n" :: "r"(addr));
+				 "cbo.inval (%0); .option pop\n" :: "r"(addr));
 }
 
 static void
@@ -83,7 +83,7 @@ cbo_zicbom_cpu_dcache_wb_range(vm_offset_t va, vm_size_t len)
 	va &= ~(dcache_line_size - 1);
 	for (addr = va; addr < va + len; addr += dcache_line_size)
 		__asm __volatile(".option push; .option arch, +zicbom\n"
-				 "cbo.clean 0(%0); .option pop\n" :: "r"(addr));
+				 "cbo.clean (%0); .option pop\n" :: "r"(addr));
 }
 
 void
