@@ -70,7 +70,7 @@
 		serial@60100000 {
 
 			compatible = "ns16550a";
-			reg = <0x60101000 0x1020>;
+			reg = <0x60100000 0x1020>;
 			clock-frequency = <0x5f5e100>;
 			current-speed = <0x1c200>;
 			reg-shift = <0x2>;
@@ -192,7 +192,6 @@
 			xlnx,txcsum = <0x2>;
 			phy-handle = <0x7>;
 			axistream-connected = <0x8>;
-			local-mac-address = [00 0a 35 00 00 03];
 			status = "disabled";
 			mdio {
 
