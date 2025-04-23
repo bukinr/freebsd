@@ -68,6 +68,12 @@ _alt_start:
 	li	a0, 0
 	li	a1, 0x88000000
 
+#if 0
+	li	t0, 0x60100000
+	li	t1, 0x61
+	sb	t1, 0(t0)
+#endif
+
 	/* Set the global pointer */
 .option push
 .option norelax
@@ -108,6 +114,12 @@ _alt_start:
  */
 	.globl _start
 _start:
+#if 0
+	li	t0, 0x60100000
+	li	t1, 0x62
+	sb	t1, 0(t0)
+#endif
+
 	/* Set the global pointer */
 .option push
 .option norelax
@@ -262,6 +274,20 @@ pagetables:
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
 	sfence.vma
+
+#if 0
+	li	t0, 0x60100000
+	li	t1, 0x63
+	sb	t1, 0(t0)
+#endif
+
+#if 0
+	li	a0, 0x64
+	li	a7, 1 // SBI_CONSOLE_PUTCHAR
+	li	a6, 0
+	ecall
+#endif
+
 	csrw	satp, s2
 
 	.align 2
@@ -276,6 +302,13 @@ va:
 	li	t0, VM_EARLY_UART_ADDRESS
 	li	t1, 0x61
 	sb	t1, 0(t0)
+#endif
+
+#if 0
+	li	a0, 0x65
+	li	a7, 1 // SBI_CONSOLE_PUTCHAR
+	li	a6, 0
+	ecall
 #endif
 
 	/* Set the trap vector to the real handler. */
