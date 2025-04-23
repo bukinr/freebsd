@@ -65,8 +65,11 @@
  */
 	.globl _alt_start
 _alt_start:
+#if 0
+	/* uncomment for 'go' command */
 	li	a0, 0
 	li	a1, 0x88000000
+#endif
 
 #if 0
 	li	t0, 0x60100000
@@ -399,8 +402,10 @@ bootstrap_pt_l1:
 	.space	PAGE_SIZE
 bootstrap_pt_l2:
 	.space	PAGE_SIZE
+#if 0
 pagetable_l2_devmap:
 	.space  PAGE_SIZE
+#endif
 
 	.align 3
 virt_map:
