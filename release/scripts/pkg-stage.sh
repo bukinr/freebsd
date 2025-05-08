@@ -12,7 +12,8 @@ export ROOTDIR="$PWD/dvd"
 export PKGCMD="/usr/sbin/pkg -d --rootdir ${ROOTDIR}"
 export PORTSDIR="${PORTSDIR:-/usr/ports}"
 
-_DVD_PACKAGES="devel/git@lite
+_DVD_PACKAGES="
+devel/git@lite
 graphics/drm-kmod
 graphics/drm-510-kmod
 graphics/drm-515-kmod
@@ -33,7 +34,8 @@ x11/gnome
 x11/kde
 x11/sddm
 x11/xorg
-x11-wm/sway"
+x11-wm/sway
+"
 
 # If NOPORTS is set for the release, do not attempt to build pkg(8).
 if [ ! -f ${PORTSDIR}/Makefile ]; then
@@ -53,7 +55,7 @@ export PKG_ALTABI=$(pkg --rootdir ${ROOTDIR} config ALTABI 2>/dev/null)
 export PKG_REPODIR="packages/${PKG_ABI}"
 
 /bin/mkdir -p ${ROOTDIR}/${PKG_REPODIR}
-if [ ! -z "${PKG_ALTABI}" ]; then
+if [ -n "${PKG_ALTABI}" ]; then
 	ln -s ${PKG_ABI} ${ROOTDIR}/packages/${PKG_ALTABI}
 fi
 
@@ -81,12 +83,11 @@ ${PKGCMD} -vv
 ${PKGCMD} update -f
 ${PKGCMD} fetch -o ${PKG_REPODIR} -d ${DVD_PACKAGES}
 
-# Create the 'Latest/pkg.txz' symlink so 'pkg bootstrap' works
+# Create the 'Latest/pkg.pkg' symlink so 'pkg bootstrap' works
 # using the on-disc packages.
 export LATEST_DIR="${ROOTDIR}/${PKG_REPODIR}/Latest"
 mkdir -p ${LATEST_DIR}
 ln -s ../All/$(${PKGCMD} rquery %n-%v pkg).pkg ${LATEST_DIR}/pkg.pkg
-ln -sf pkg.pkg ${LATEST_DIR}/pkg.txz
 
 ${PKGCMD} repo ${PKG_REPODIR}
 
