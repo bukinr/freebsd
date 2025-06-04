@@ -215,6 +215,10 @@ vm_page_init_cache_zones(void *dummy __unused)
 	for (domain = 0; domain < vm_ndomains; domain++) {
 		vmd = VM_DOMAIN(domain);
 		for (pool = 0; pool < VM_NFREEPOOL; pool++) {
+#ifdef VM_FREEPOOL_LAZYINIT
+			if (pool == VM_FREEPOOL_LAZYINIT)
+				continue;
+#endif
 			pgcache = &vmd->vmd_pgcache[pool];
 			pgcache->domain = domain;
 			pgcache->pool = pool;
@@ -1532,7 +1536,7 @@ vm_page_insert(vm_page_t m, vm_object_t object, vm_pindex_t pindex)
  *
  *	The object must be locked.
  */
-static int
+int
 vm_page_iter_insert(vm_page_t m, vm_object_t object, vm_pindex_t pindex,
     struct pctrie_iter *pages)
 {
@@ -1992,10 +1996,8 @@ vm_page_alloc(vm_object_t object, vm_pindex_t pindex, int req)
 }
 
 /*
- * Allocate a page in the specified object with the given page index.  To
- * optimize insertion of the page into the object, the caller must also specify
- * the resident page in the object with largest index smaller than the given
- * page index, or NULL if no such page exists.
+ * Allocate a page in the specified object with the given page index.  If the
+ * object lock is dropped and regained, the pages iter is reset.
  */
 vm_page_t
 vm_page_alloc_iter(vm_object_t object, vm_pindex_t pindex, int req,
@@ -2005,13 +2007,14 @@ vm_page_alloc_iter(vm_object_t object, vm_pindex_t pindex, int req,
 	vm_page_t m;
 	int domain;
 
-	vm_domainset_iter_page_init(&di, object, pindex, &domain, &req);
+	vm_domainset_iter_page_init(&di, object, pindex, &domain, &req,
+	    pages);
 	do {
 		m = vm_page_alloc_domain_iter(object, pindex, domain, req,
 		    pages);
 		if (m != NULL)
 			break;
-	} while (vm_domainset_iter_page(&di, object, &domain) == 0);
+	} while (vm_domainset_iter_page(&di, object, &domain, pages) == 0);
 
 	return (m);
 }
@@ -2093,7 +2096,9 @@ vm_page_alloc_domain_iter(vm_object_t object, vm_pindex_t pindex, int domain,
 	m = NULL;
 	if (!vm_pager_can_alloc_page(object, pindex))
 		return (NULL);
+#if VM_NRESERVLEVEL > 0
 again:
+#endif
 	if (__predict_false((req & VM_ALLOC_NOFREE) != 0)) {
 		m = vm_page_alloc_nofree_domain(domain, req);
 		if (m != NULL)
@@ -2137,9 +2142,9 @@ again:
 		/*
 		 * Not allocatable, give up.
 		 */
-		pctrie_iter_reset(pages);
-		if (vm_domain_alloc_fail(vmd, object, req))
-			goto again;
+		(void)vm_domain_alloc_fail(vmd, object, req);
+		if ((req & VM_ALLOC_WAITFAIL) != 0)
+			pctrie_iter_reset(pages);
 		return (NULL);
 	}
 
@@ -2251,7 +2256,7 @@ vm_page_alloc_contig(vm_object_t object, vm_pindex_t pindex, int req,
 
 	start_segind = -1;
 
-	vm_domainset_iter_page_init(&di, object, pindex, &domain, &req);
+	vm_domainset_iter_page_init(&di, object, pindex, &domain, &req, NULL);
 	do {
 		m = vm_page_alloc_contig_domain(object, pindex, domain, req,
 		    npages, low, high, alignment, boundary, memattr);
@@ -2263,7 +2268,7 @@ vm_page_alloc_contig(vm_object_t object, vm_pindex_t pindex, int req,
 		    npages, low, high) == -1) {
 			vm_domainset_iter_ignore(&di, domain);
 		}
-	} while (vm_domainset_iter_page(&di, object, &domain) == 0);
+	} while (vm_domainset_iter_page(&di, object, &domain, NULL) == 0);
 
 	return (m);
 }
@@ -2331,26 +2336,23 @@ vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
 	KASSERT(npages > 0, ("vm_page_alloc_contig: npages is zero"));
 
 	vm_page_iter_init(&pages, object);
-	mpred = vm_radix_iter_lookup_lt(&pages, pindex);
-	KASSERT(mpred == NULL || mpred->pindex != pindex,
-	    ("vm_page_alloc_contig: pindex already allocated"));
-	for (;;) {
+	m_ret = NULL;
 #if VM_NRESERVLEVEL > 0
-		/*
-		 * Can we allocate the pages from a reservation?
-		 */
-		if (vm_object_reserv(object) &&
-		    (m_ret = vm_reserv_alloc_contig(object, pindex, domain,
-		    req, npages, low, high, alignment, boundary, &pages)) !=
-		    NULL) {
-			break;
-		}
+	/*
+	 * Can we allocate the pages from a reservation?
+	 */
+	if (vm_object_reserv(object)) {
+		m_ret = vm_reserv_alloc_contig(object, pindex, domain,
+		    req, npages, low, high, alignment, boundary, &pages);
+	}
 #endif
-		if ((m_ret = vm_page_find_contig_domain(domain, req, npages,
-		    low, high, alignment, boundary)) != NULL)
-			break;
-		if (!vm_domain_alloc_fail(VM_DOMAIN(domain), object, req))
-			return (NULL);
+	if (m_ret == NULL) {
+		m_ret = vm_page_find_contig_domain(domain, req, npages,
+		    low, high, alignment, boundary);
+	}
+	if (m_ret == NULL) {
+		(void)vm_domain_alloc_fail(VM_DOMAIN(domain), object, req);
+		return (NULL);
 	}
 
 	/*
@@ -2404,7 +2406,6 @@ vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
 			}
 			return (NULL);
 		}
-		mpred = m;
 		if (memattr != VM_MEMATTR_DEFAULT)
 			pmap_page_set_memattr(m, memattr);
 		pindex++;
@@ -2463,9 +2464,9 @@ again:
 		}
 	}
 	if (m == NULL) {
-		if (vm_domain_alloc_fail(vmd, NULL, req))
-			goto again;
-		return (NULL);
+		if (!vm_domain_alloc_fail(vmd, NULL, req))
+			return (NULL);
+		goto again;
 	}
 
 found:
@@ -2577,12 +2578,12 @@ vm_page_alloc_noobj(int req)
 	vm_page_t m;
 	int domain;
 
-	vm_domainset_iter_page_init(&di, NULL, 0, &domain, &req);
+	vm_domainset_iter_page_init(&di, NULL, 0, &domain, &req, NULL);
 	do {
 		m = vm_page_alloc_noobj_domain(domain, req);
 		if (m != NULL)
 			break;
-	} while (vm_domainset_iter_page(&di, NULL, &domain) == 0);
+	} while (vm_domainset_iter_page(&di, NULL, &domain, NULL) == 0);
 
 	return (m);
 }
@@ -2596,13 +2597,13 @@ vm_page_alloc_noobj_contig(int req, u_long npages, vm_paddr_t low,
 	vm_page_t m;
 	int domain;
 
-	vm_domainset_iter_page_init(&di, NULL, 0, &domain, &req);
+	vm_domainset_iter_page_init(&di, NULL, 0, &domain, &req, NULL);
 	do {
 		m = vm_page_alloc_noobj_contig_domain(domain, req, npages, low,
 		    high, alignment, boundary, memattr);
 		if (m != NULL)
 			break;
-	} while (vm_domainset_iter_page(&di, NULL, &domain) == 0);
+	} while (vm_domainset_iter_page(&di, NULL, &domain, NULL) == 0);
 
 	return (m);
 }
@@ -3317,7 +3318,7 @@ vm_page_reclaim_contig(int req, u_long npages, vm_paddr_t low, vm_paddr_t high,
 
 	ret = ERANGE;
 
-	vm_domainset_iter_page_init(&di, NULL, 0, &domain, &req);
+	vm_domainset_iter_page_init(&di, NULL, 0, &domain, &req, NULL);
 	do {
 		status = vm_page_reclaim_contig_domain(domain, req, npages, low,
 		    high, alignment, boundary);
@@ -3330,7 +3331,7 @@ vm_page_reclaim_contig(int req, u_long npages, vm_paddr_t low, vm_paddr_t high,
 			    "from vm_page_reclaim_contig_domain()", status));
 			ret = ENOMEM;
 		}
-	} while (vm_domainset_iter_page(&di, NULL, &domain) == 0);
+	} while (vm_domainset_iter_page(&di, NULL, &domain, NULL) == 0);
 
 	return (ret);
 }
@@ -4879,9 +4880,9 @@ int
 vm_page_grab_valid_iter(vm_page_t *mp, vm_object_t object, vm_pindex_t pindex,
     int allocflags, struct pctrie_iter *pages)
 {
-	vm_page_t m, mpred;
+	vm_page_t m;
 	vm_page_t ma[VM_INITIAL_PAGEIN];
-	int after, i, pflags, rv;
+	int after, ahead, i, pflags, rv;
 
 	KASSERT((allocflags & VM_ALLOC_SBUSY) == 0 ||
 	    (allocflags & VM_ALLOC_IGN_SBUSY) != 0,
@@ -4923,14 +4924,12 @@ retrylookup:
 		*mp = NULL;
 		return (VM_PAGER_FAIL);
 	} else {
-		mpred = vm_radix_iter_lookup_lt(pages, pindex);
 		m = vm_page_alloc_iter(object, pindex, pflags, pages);
 		if (m == NULL) {
 			if (!vm_pager_can_alloc_page(object, pindex)) {
 				*mp = NULL;
 				return (VM_PAGER_AGAIN);
 			}
-			pctrie_iter_reset(pages);
 			goto retrylookup;
 		}
 	}
@@ -4940,23 +4939,29 @@ retrylookup:
 		after = MIN(after, VM_INITIAL_PAGEIN);
 		after = MIN(after, allocflags >> VM_ALLOC_COUNT_SHIFT);
 		after = MAX(after, 1);
-		ma[0] = mpred = m;
+		ma[0] = m;
 		pctrie_iter_reset(pages);
 		for (i = 1; i < after; i++) {
-			m = vm_radix_iter_lookup(pages, pindex + i);
-			if (m == NULL) {
-				m = vm_page_alloc_iter(object, pindex + i,
+			m = vm_radix_iter_lookup_ge(pages, pindex + i);
+			ahead = after;
+			if (m != NULL)
+				ahead = MIN(ahead, m->pindex - pindex);
+			for (; i < ahead; i++) {
+				ma[i] = vm_page_alloc_iter(object, pindex + i,
 				    VM_ALLOC_NORMAL, pages);
-				if (m == NULL)
+				if (ma[i] == NULL)
 					break;
-			} else if (vm_page_any_valid(m) || !vm_page_tryxbusy(m))
+			}
+			if (m == NULL || m->pindex != pindex + i ||
+			    vm_page_any_valid(m) || !vm_page_tryxbusy(m))
 				break;
-			mpred = ma[i] = m;
+			ma[i] = m;
 		}
 		after = i;
 		vm_object_pip_add(object, after);
 		VM_OBJECT_WUNLOCK(object);
 		rv = vm_pager_get_pages(object, ma, after, NULL, NULL);
+		pctrie_iter_reset(pages);
 		VM_OBJECT_WLOCK(object);
 		vm_object_pip_wakeupn(object, after);
 		/* Pager may have replaced a page. */
@@ -4976,8 +4981,8 @@ retrylookup:
 		MPASS(vm_page_all_valid(m));
 	} else {
 		vm_page_zero_invalid(m, TRUE);
+		pctrie_iter_reset(pages);
 	}
-	pctrie_iter_reset(pages);
 out:
 	if ((allocflags & VM_ALLOC_WIRED) != 0)
 		vm_page_wire(m);
@@ -5150,7 +5155,7 @@ vm_page_grab_pages(vm_object_t object, vm_pindex_t pindex, int allocflags,
 	struct pctrie_iter pages;
 	vm_page_t m;
 	int pflags;
-	int i;
+	int ahead, i;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	KASSERT(((u_int)allocflags >> VM_ALLOC_COUNT_SHIFT) == 0,
@@ -5163,9 +5168,14 @@ vm_page_grab_pages(vm_object_t object, vm_pindex_t pindex, int allocflags,
 	i = 0;
 	vm_page_iter_init(&pages, object);
 retrylookup:
+	ahead = -1;
 	for (; i < count; i++) {
-		m = vm_radix_iter_lookup(&pages, pindex + i);
-		if (m != NULL) {
+		if (ahead < 0) {
+			ahead = vm_radix_iter_lookup_range(
+			    &pages, pindex + i, &ma[i], count - i);
+		}
+		if (ahead-- > 0) {
+			m = ma[i];
 			if (!vm_page_tryacquire(m, allocflags)) {
 				if (vm_page_grab_sleep(object, m, pindex + i,
 				    "grbmaw", allocflags, true)) {
@@ -5179,12 +5189,14 @@ retrylookup:
 				break;
 			m = vm_page_alloc_iter(object, pindex + i,
 			    pflags | VM_ALLOC_COUNT(count - i), &pages);
+			/* pages was reset if alloc_iter lost the lock. */
 			if (m == NULL) {
 				if ((allocflags & (VM_ALLOC_NOWAIT |
 				    VM_ALLOC_WAITFAIL)) != 0)
 					break;
 				goto retrylookup;
 			}
+			ma[i] = m;
 		}
 		if (vm_page_none_valid(m) &&
 		    (allocflags & VM_ALLOC_ZERO) != 0) {
@@ -5193,7 +5205,6 @@ retrylookup:
 			vm_page_valid(m);
 		}
 		vm_page_grab_release(m, allocflags);
-		ma[i] = m;
 	}
 	return (i);
 }

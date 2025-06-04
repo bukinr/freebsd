@@ -522,6 +522,7 @@ static void
 lkpi_sta_sync_vht_from_ni(struct ieee80211_vif *vif, struct ieee80211_sta *sta,
     struct ieee80211_node *ni)
 {
+	enum ieee80211_sta_rx_bw bw;
 	uint32_t width;
 	int rx_nss;
 	uint16_t rx_mcs_map;
@@ -545,23 +546,38 @@ lkpi_sta_sync_vht_from_ni(struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 	if (ni->ni_vht_chanwidth == IEEE80211_VHT_CHANWIDTH_USE_HT)
 		goto skip_bw;
 
+	bw = sta->deflink.bandwidth;
 	width = (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_MASK);
 	switch (width) {
-#if 0
+	/* Deprecated. */
 	case IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160MHZ:
 	case IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160_80PLUS80MHZ:
-		sta->deflink.bandwidth = IEEE80211_STA_RX_BW_160;
+		bw = IEEE80211_STA_RX_BW_160;
 		break;
-#endif
 	default:
 		/* Check if we do support 160Mhz somehow after all. */
-#if 0
 		if ((sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_EXT_NSS_BW_MASK) != 0)
-			sta->deflink.bandwidth = IEEE80211_STA_RX_BW_160;
+			bw = IEEE80211_STA_RX_BW_160;
 		else
-#endif
-			sta->deflink.bandwidth = IEEE80211_STA_RX_BW_80;
+			bw = IEEE80211_STA_RX_BW_80;
 	}
+	/*
+	 * While we can set what is possibly supported we also need to be
+	 * on a channel which supports that bandwidth; e.g., we can support
+	 * VHT160 but the AP only does VHT80.
+	 * Further ni_chan will also have filtered out what we disabled
+	 * by configuration.
+	 * Once net80211 channel selection is fixed for 802.11-2020 and
+	 * VHT160 we can possibly spare ourselves the above.
+	 */
+	if (bw == IEEE80211_STA_RX_BW_160 &&
+	    !IEEE80211_IS_CHAN_VHT160(ni->ni_chan) &&
+	    !IEEE80211_IS_CHAN_VHT80P80(ni->ni_chan))
+		bw = IEEE80211_STA_RX_BW_80;
+	if (bw == IEEE80211_STA_RX_BW_80 &&
+	    !IEEE80211_IS_CHAN_VHT80(ni->ni_chan))
+		bw = sta->deflink.bandwidth;
+	sta->deflink.bandwidth = bw;
 skip_bw:
 
 	rx_nss = 0;
@@ -603,6 +619,13 @@ lkpi_sta_sync_from_ni(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 #if defined(LKPI_80211_VHT)
 	lkpi_sta_sync_vht_from_ni(vif, sta, ni);
 #endif
+
+	/*
+	 * Ensure rx_nss is at least 1 as otherwise drivers run into
+	 * unexpected problems.
+	 */
+	sta->deflink.rx_nss = MAX(1, sta->deflink.rx_nss);
+
 	/*
 	 * We are also called from node allocation which net80211
 	 * can do even on `ifconfig down`; in that case the chanctx
@@ -2021,6 +2044,7 @@ lkpi_sta_scan_to_auth(struct ieee80211vap *vap, enum ieee80211_state nstate, int
 	struct ieee80211_prep_tx_info prep_tx_info;
 	uint32_t changed;
 	int error;
+	bool synched;
 
 	/*
 	 * In here we use vap->iv_bss until lvif->lvif_bss is set.
@@ -2111,14 +2135,11 @@ lkpi_sta_scan_to_auth(struct ieee80211vap *vap, enum ieee80211_state nstate, int
 #endif
 #ifdef LKPI_80211_VHT
 	if (IEEE80211_IS_CHAN_VHT_5GHZ(ni->ni_chan)) {
-#ifdef __notyet__
 		if (IEEE80211_IS_CHAN_VHT80P80(ni->ni_chan))
 			chanctx_conf->def.width = NL80211_CHAN_WIDTH_80P80;
 		else if (IEEE80211_IS_CHAN_VHT160(ni->ni_chan))
 			chanctx_conf->def.width = NL80211_CHAN_WIDTH_160;
-		else
-#endif
-		if (IEEE80211_IS_CHAN_VHT80(ni->ni_chan))
+		else if (IEEE80211_IS_CHAN_VHT80(ni->ni_chan))
 			chanctx_conf->def.width = NL80211_CHAN_WIDTH_80;
 	}
 #endif
@@ -2211,14 +2232,6 @@ lkpi_sta_scan_to_auth(struct ieee80211vap *vap, enum ieee80211_state nstate, int
 	    __func__, ni, ni->ni_drv_data));
 	lsta = ni->ni_drv_data;
 
-	/*
-	 * Make sure in case the sta did not change and we re-add it,
-	 * that we can tx again.
-	 */
-	LKPI_80211_LSTA_TXQ_LOCK(lsta);
-	lsta->txq_ready = true;
-	LKPI_80211_LSTA_TXQ_UNLOCK(lsta);
-
 	/* Insert the [l]sta into the list of known stations. */
 	list_add_tail(&lsta->lsta_list, &lvif->lsta_list);
 
@@ -2292,10 +2305,10 @@ lkpi_sta_scan_to_auth(struct ieee80211vap *vap, enum ieee80211_state nstate, int
 	ieee80211_ref_node(lsta->ni);
 	lvif->lvif_bss = lsta;
 	if (lsta->ni == vap->iv_bss) {
-		lvif->lvif_bss_synched = true;
+		lvif->lvif_bss_synched = synched = true;
 	} else {
 		/* Set to un-synched no matter what. */
-		lvif->lvif_bss_synched = false;
+		lvif->lvif_bss_synched = synched = false;
 		/*
 		 * We do not error as someone has to take us down.
 		 * If we are followed by a 2nd, new net80211::join1() going to
@@ -2305,9 +2318,20 @@ lkpi_sta_scan_to_auth(struct ieee80211vap *vap, enum ieee80211_state nstate, int
 		 * to net80211 as we never used the node beyond alloc()/free()
 		 * and we do not hold an extra reference for that anymore given
 		 * ni : lsta == 1:1.
+		 * Problem is if we do not error a MGMT/AUTH frame will be
+		 * sent from net80211::sta_newstate(); disable lsta queue below.
 		 */
 	}
 	LKPI_80211_LVIF_UNLOCK(lvif);
+	/*
+	 * Make sure in case the sta did not change and we re-added it,
+	 * that we can tx again but only if the vif/iv_bss are in sync.
+	 * Otherwise this should prevent the MGMT/AUTH frame from being
+	 * sent triggering a warning in iwlwifi.
+	 */
+	LKPI_80211_LSTA_TXQ_LOCK(lsta);
+	lsta->txq_ready = synched;
+	LKPI_80211_LSTA_TXQ_UNLOCK(lsta);
 	goto out_relocked;
 
 out:
@@ -2921,7 +2945,6 @@ lkpi_sta_assoc_to_run(struct ieee80211vap *vap, enum ieee80211_state nstate, int
 		IMPROVE("net80211 does not consider node authorized");
 	}
 
-	sta->deflink.rx_nss = MAX(1, sta->deflink.rx_nss);
 	IMPROVE("Is this the right spot, has net80211 done all updates already?");
 	lkpi_sta_sync_from_ni(hw, vif, sta, ni, true);
 
@@ -6793,7 +6816,7 @@ linuxkpi_ieee80211_rx(struct ieee80211_hw *hw, struct sk_buff *skb,
 	 * For now do the data copy; we can later improve things. Might even
 	 * have an mbuf backing the skb data then?
 	 */
-	m = m_get2(skb->len, M_NOWAIT, MT_DATA, M_PKTHDR);
+	m = m_get3(skb->len, M_NOWAIT, MT_DATA, M_PKTHDR);
 	if (m == NULL) {
 		counter_u64_add(ic->ic_ierrors, 1);
 		goto err;
