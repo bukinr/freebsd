@@ -104,6 +104,7 @@ xchan_bufs_alloc_reserved(xdma_channel_t *xchan)
 	for (i = 0; i < xchan->xr_num; i++) {
 		xr = &xchan->xr_mem[i];
 		size = round_page(xchan->maxsegsize);
+printf("%s: size %lx\n", __func__, size);
 		if (vmem_alloc(xchan->vmem, size,
 		    M_BESTFIT | M_NOWAIT, &addr)) {
 			device_printf(xdma->dev,
