@@ -92,8 +92,8 @@
 #define dprintf(fmt, ...)
 #endif
 
-#define	RX_QUEUE_SIZE		32
-#define	TX_QUEUE_SIZE		32
+#define	RX_QUEUE_SIZE		16
+#define	TX_QUEUE_SIZE		16
 #define	NUM_RX_MBUF		16
 #define	BUFRING_SIZE		8192
 #define	MDIO_CLK_DIV_DEFAULT	29
