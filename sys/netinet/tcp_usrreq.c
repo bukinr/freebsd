@@ -523,7 +523,7 @@ tcp_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 	}
 	if ((error = prison_remote_ip4(td->td_ucred, &sinp->sin_addr)) != 0)
 		goto out;
-	if (SOLISTENING(so) || so->so_options & SO_REUSEPORT_LB) {
+	if (SOLISTENING(so)) {
 		error = EOPNOTSUPP;
 		goto out;
 	}
@@ -590,7 +590,7 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		error = EAFNOSUPPORT;
 		goto out;
 	}
-	if (SOLISTENING(so) || so->so_options & SO_REUSEPORT_LB) {
+	if (SOLISTENING(so)) {
 		error = EOPNOTSUPP;
 		goto out;
 	}
@@ -1478,6 +1478,8 @@ tcp_connect(struct tcpcb *tp, struct sockaddr_in *sin, struct thread *td)
 	    (SS_ISCONNECTING | SS_ISCONNECTED | SS_ISDISCONNECTING |
 	    SS_ISDISCONNECTED)) != 0))
 		return (EISCONN);
+	if (__predict_false((so->so_options & SO_REUSEPORT_LB) != 0))
+		return (EOPNOTSUPP);
 
 	INP_HASH_WLOCK(&V_tcbinfo);
 	error = in_pcbconnect(inp, sin, td->td_ucred);
@@ -1518,8 +1520,11 @@ tcp6_connect(struct tcpcb *tp, struct sockaddr_in6 *sin6, struct thread *td)
 	INP_WLOCK_ASSERT(inp);
 
 	if (__predict_false((so->so_state &
-	    (SS_ISCONNECTING | SS_ISCONNECTED)) != 0))
+	    (SS_ISCONNECTING | SS_ISCONNECTED | SS_ISDISCONNECTING |
+	    SS_ISDISCONNECTED)) != 0))
 		return (EISCONN);
+	if (__predict_false((so->so_options & SO_REUSEPORT_LB) != 0))
+		return (EOPNOTSUPP);
 
 	INP_HASH_WLOCK(&V_tcbinfo);
 	error = in6_pcbconnect(inp, sin6, td->td_ucred, true);
@@ -3083,7 +3088,7 @@ db_print_bblog_state(int state)
 }
 
 static void
-db_print_tcpcb(struct tcpcb *tp, const char *name, int indent)
+db_print_tcpcb(struct tcpcb *tp, const char *name, int indent, bool show_bblog)
 {
 
 	db_print_indent(indent);
@@ -3208,35 +3213,47 @@ db_print_tcpcb(struct tcpcb *tp, const char *name, int indent)
 	db_print_indent(indent);
 	db_printf("t_lognum: %d   t_loglimit: %d   t_logsn: %u\n",
 	    tp->t_lognum, tp->t_loglimit, tp->t_logsn);
+
+	if (show_bblog) {
+#ifdef TCP_BLACKBOX
+		db_print_bblog_entries(&tp->t_logs, indent);
+#else
+		db_print_indent(indent);
+		db_printf("BBLog not supported\n");
+#endif
+	}
 }
 
 DB_SHOW_COMMAND(tcpcb, db_show_tcpcb)
 {
 	struct tcpcb *tp;
+	bool show_bblog;
 
 	if (!have_addr) {
 		db_printf("usage: show tcpcb <addr>\n");
 		return;
 	}
+	show_bblog = strchr(modif, 'b') != NULL;
 	tp = (struct tcpcb *)addr;
 
-	db_print_tcpcb(tp, "tcpcb", 0);
+	db_print_tcpcb(tp, "tcpcb", 0, show_bblog);
 }
 
 DB_SHOW_ALL_COMMAND(tcpcbs, db_show_all_tcpcbs)
 {
 	VNET_ITERATOR_DECL(vnet_iter);
 	struct inpcb *inp;
-	bool only_locked;
+	bool only_locked, show_bblog;
 
 	only_locked = strchr(modif, 'l') != NULL;
+	show_bblog = strchr(modif, 'b') != NULL;
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET(vnet_iter);
 		CK_LIST_FOREACH(inp, &V_tcbinfo.ipi_listhead, inp_list) {
 			if (only_locked &&
 			    inp->inp_lock.rw_lock == RW_UNLOCKED)
 				continue;
-			db_print_tcpcb(intotcpcb(inp), "tcpcb", 0);
+			db_print_tcpcb(intotcpcb(inp), "tcpcb", 0, show_bblog);
 			if (db_pager_quit)
 				break;
 		}

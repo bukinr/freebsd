@@ -141,6 +141,7 @@ SUBDIR=	\
 	${_hptnr} \
 	${_hptrr} \
 	hwpmc \
+	${_hwt} \
 	${_hyperv} \
 	i2c \
 	${_iavf} \
@@ -401,6 +402,7 @@ SUBDIR=	\
 	udf \
 	udf_iconv \
 	ufs \
+	${_ufshci} \
 	uinput \
 	unionfs \
 	usb \
@@ -858,6 +860,10 @@ _smartpqi=	smartpqi
 _p2sb=		p2sb
 .endif
 
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64"
+_hwt=		hwt
+.endif
+
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "riscv"
 .if ${MK_BHYVE} != "no" || defined(ALL_MODULES)
@@ -915,6 +921,10 @@ _bcm283x_pwm=  bcm283x_pwm
 # LLVM 10 crashes when building if_malo_pci.c, fixed in LLVM11:
 # https://bugs.llvm.org/show_bug.cgi?id=44351
 _malo=	malo
+.endif
+
+.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "aarch64"
+_ufshci=ufshci
 .endif
 
 SUBDIR+=${MODULES_EXTRA}

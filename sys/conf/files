@@ -598,42 +598,24 @@ contrib/dev/acpica/components/utilities/utxface.c	optional acpi
 contrib/dev/acpica/components/utilities/utxferror.c	optional acpi
 contrib/dev/acpica/components/utilities/utxfinit.c	optional acpi
 contrib/dev/acpica/os_specific/service_layers/osgendbg.c	optional acpi acpi_debug
-netpfil/ipfilter/netinet/fil.c	optional ipfilter inet \
-	compile-with "${NORMAL_C} ${NO_WSELF_ASSIGN} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_auth.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_fil_freebsd.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_frag.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_log.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_nat.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_proxy.c optional ipfilter inet \
-	compile-with "${NORMAL_C} ${NO_WSELF_ASSIGN} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_state.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_lookup.c optional ipfilter inet \
-	compile-with "${NORMAL_C} ${NO_WSELF_ASSIGN} -Wno-unused -Wno-error -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_pool.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_htable.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter ${NO_WTAUTOLOGICAL_POINTER_COMPARE}"
-netpfil/ipfilter/netinet/ip_sync.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/mlfk_ipl.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_nat6.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_rules.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_scan.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/ip_dstlist.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -Wno-unused -I$S/netpfil/ipfilter"
-netpfil/ipfilter/netinet/radix_ipf.c optional ipfilter inet \
-	compile-with "${NORMAL_C} -I$S/netpfil/ipfilter"
+netpfil/ipfilter/netinet/fil.c	optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_auth.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_fil_freebsd.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_frag.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_log.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_nat.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_proxy.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_state.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_lookup.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_pool.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_htable.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_sync.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/mlfk_ipl.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_nat6.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_rules.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_scan.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/ip_dstlist.c optional ipfilter inet compile-with "${IPFILTER_C}"
+netpfil/ipfilter/netinet/radix_ipf.c optional ipfilter inet compile-with "${IPFILTER_C}"
 contrib/libfdt/fdt.c		optional fdt
 contrib/libfdt/fdt_ro.c		optional fdt
 contrib/libfdt/fdt_rw.c		optional fdt
@@ -1776,6 +1758,19 @@ dev/hwpmc/hwpmc_soft.c		optional hwpmc
 dev/hwreset/hwreset.c		optional hwreset
 dev/hwreset/hwreset_array.c	optional hwreset
 dev/hwreset/hwreset_if.m	optional hwreset
+dev/hwt/hwt.c			optional hwt
+dev/hwt/hwt_backend.c		optional hwt
+dev/hwt/hwt_config.c		optional hwt
+dev/hwt/hwt_context.c		optional hwt
+dev/hwt/hwt_contexthash.c	optional hwt
+dev/hwt/hwt_cpu.c		optional hwt
+dev/hwt/hwt_hook.c		optional hwt
+dev/hwt/hwt_ioctl.c		optional hwt
+dev/hwt/hwt_owner.c		optional hwt
+dev/hwt/hwt_ownerhash.c		optional hwt
+dev/hwt/hwt_record.c		optional hwt
+dev/hwt/hwt_thread.c		optional hwt
+dev/hwt/hwt_vm.c		optional hwt
 dev/ichiic/ig4_acpi.c		optional ig4 acpi iicbus
 dev/ichiic/ig4_iic.c		optional ig4 iicbus
 dev/ichiic/ig4_pci.c		optional ig4 pci iicbus
@@ -2538,7 +2533,7 @@ dev/nvme/nvme_qpair.c		optional nvme
 dev/nvme/nvme_sim.c		optional nvme scbus
 dev/nvme/nvme_sysctl.c		optional nvme
 dev/nvme/nvme_test.c		optional nvme
-dev/nvme/nvme_util.c		optional nvme
+dev/nvme/nvme_util.c		optional nvme | scbus
 dev/nvmem/nvmem.c		optional nvmem fdt
 dev/nvmem/nvmem_if.m		optional nvmem
 dev/nvmf/controller/ctl_frontend_nvmf.c		optional nvmft
@@ -2553,7 +2548,7 @@ dev/nvmf/host/nvmf_ns.c		optional nvmf
 dev/nvmf/host/nvmf_qpair.c	optional nvmf
 dev/nvmf/host/nvmf_sim.c	optional nvmf
 dev/nvmf/nvmf_tcp.c		optional nvmf_tcp
-dev/nvmf/nvmf_transport.c	optional nvmf | optional nvmft
+dev/nvmf/nvmf_transport.c	optional nvmf | nvmft
 dev/oce/oce_hw.c		optional oce pci
 dev/oce/oce_if.c		optional oce pci
 dev/oce/oce_mbox.c		optional oce pci
@@ -3160,8 +3155,6 @@ dev/sound/midi/midi.c		optional sound
 dev/sound/midi/mpu401.c		optional sound
 dev/sound/midi/mpu_if.m		optional sound
 dev/sound/midi/mpufoi_if.m	optional sound
-dev/sound/midi/sequencer.c	optional sound
-dev/sound/midi/synth_if.m	optional sound
 dev/spibus/acpi_spibus.c	optional acpi spibus
 dev/spibus/ofw_spibus.c		optional fdt spibus
 dev/spibus/spibus.c		optional spibus				\
@@ -3865,7 +3858,7 @@ kern/sched_ule.c		optional sched_ule
 kern/serdev_if.m		standard
 kern/stack_protector.c		standard \
 	compile-with "${NORMAL_C:N-fstack-protector*}"
-kern/subr_acl_nfs4.c		optional ufs_acl | zfs
+kern/subr_acl_nfs4.c		optional ufs_acl | zfs | nfscl
 kern/subr_acl_posix1e.c		optional ufs_acl
 kern/subr_asan.c		optional kasan \
 	compile-with "${NOSAN_C:N-fstack-protector*}"
@@ -3979,6 +3972,7 @@ kern/vfs_export.c		standard
 kern/vfs_extattr.c		standard
 kern/vfs_hash.c			standard
 kern/vfs_init.c			standard
+kern/vfs_inotify.c		standard
 kern/vfs_lookup.c		standard
 kern/vfs_mount.c		standard
 kern/vfs_mountroot.c		standard

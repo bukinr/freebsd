@@ -46,10 +46,12 @@
 #include <sys/ktrace.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <sys/inotify.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/sysent.h>
+#include <sys/thr.h>
 #include <sys/umtx.h>
 #include <sys/un.h>
 #include <sys/queue.h>
@@ -104,11 +106,13 @@ static void ktrcsw(struct ktr_csw *);
 static void ktrcsw_old(struct ktr_csw_old *);
 static void ktruser(int, void *);
 static void ktrcaprights(cap_rights_t *);
+static void ktrinotify(struct inotify_event *);
 static void ktritimerval(struct itimerval *it);
 static void ktrsockaddr(struct sockaddr *);
 static void ktrsplice(struct splice *);
 static void ktrstat(struct stat *);
 static void ktrstruct(char *, size_t);
+static void ktrthrparam(struct thr_param *);
 static void ktrcapfail(struct ktr_cap_fail *);
 static void ktrfault(struct ktr_fault *);
 static void ktrfaultend(struct ktr_faultend *);
@@ -1859,6 +1863,14 @@ ktrtimeval(struct timeval *tv)
 }
 
 static void
+ktrinotify(struct inotify_event *ev)
+{
+	printf(
+    "inotify { .wd = %d, .mask = %#x, .cookie = %u, .len = %u, .name = %s }\n",
+	    ev->wd, ev->mask, ev->cookie, ev->len, ev->name);
+}
+
+static void
 ktritimerval(struct itimerval *it)
 {
 
@@ -1950,6 +1962,18 @@ ktrsplice(struct splice *sp)
 	printf("struct splice { fd=%d, max=%#jx, idle=%jd.%06jd }\n",
 	    sp->sp_fd, (uintmax_t)sp->sp_max, (intmax_t)sp->sp_idle.tv_sec,
 	    (intmax_t)sp->sp_idle.tv_usec);
+}
+
+static void
+ktrthrparam(struct thr_param *tp)
+{
+	printf("thr param { start=%p arg=%p stack_base=%p "
+	    "stack_size=%#zx tls_base=%p tls_size=%#zx child_tidp=%p "
+	    "parent_tidp=%p flags=",
+	    tp->start_func, tp->arg, tp->stack_base, tp->stack_size,
+	    tp->tls_base, tp->tls_size, tp->child_tid, tp->parent_tid);
+	print_mask_arg(sysdecode_thr_create_flags, tp->flags);
+	printf(" rtp=%p }\n", tp->rtp);
 }
 
 static void
@@ -2114,6 +2138,17 @@ ktrstruct(char *buf, size_t buflen)
 			goto invalid;
 		memcpy(&rights, data, datalen);
 		ktrcaprights(&rights);
+	} else if (strcmp(name, "inotify") == 0) {
+		struct inotify_event *ev;
+
+		if (datalen < sizeof(struct inotify_event) ||
+		    datalen > sizeof(struct inotify_event) + NAME_MAX + 1)
+			goto invalid;
+		ev = malloc(datalen);
+		if (ev == NULL)
+			err(1, "malloc");
+		memcpy(ev, data, datalen);
+		ktrinotify(ev);
 	} else if (strcmp(name, "itimerval") == 0) {
 		if (datalen != sizeof(struct itimerval))
 			goto invalid;
@@ -2147,6 +2182,13 @@ ktrstruct(char *buf, size_t buflen)
 			goto invalid;
 		memcpy(&sp, data, datalen);
 		ktrsplice(&sp);
+	} else if (strcmp(name, "thrparam") == 0) {
+		struct thr_param tp;
+
+		if (datalen != sizeof(tp))
+			goto invalid;
+		memcpy(&tp, data, datalen);
+		ktrthrparam(&tp);
 	} else {
 #ifdef SYSDECODE_HAVE_LINUX
 		if (ktrstruct_linux(name, data, datalen) == false)
