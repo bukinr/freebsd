@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd June 10, 2021
+.Dd July 16, 2025
 .Dt EFITABLE 8
 .Os
 .Sh NAME
@@ -45,7 +45,7 @@ Generate output via
 .Xr libxo 3
 in a selection of different human and machine readable formats.
 See
-.Xr xo_parse_args 3
+.Xr xo_options 7
 for details on command line arguments.
 .It Fl t Ar name Fl -table Ar name
 Specify the name of the table to print.
@@ -54,6 +54,8 @@ Currently supported tables:
 .Bl -tag -width indent -compact
 .It Cm esrt
 EFI System Resource Table
+.It Cm memory
+EFI Memory Attributes Table
 .It Cm prop
 EFI Properties Table
 .El
