@@ -301,6 +301,10 @@ va:
 	lla	gp, __global_pointer$
 .option pop
 
+	/* Enable counters access from userspace. */
+	li	t0, 0xffffffff
+	csrw	scounteren, t0
+
 #if 0
 	li	t0, VM_EARLY_UART_ADDRESS
 	li	t1, 0x61
@@ -472,6 +476,10 @@ mpva:
 .option norelax
 	lla	gp, __global_pointer$
 .option pop
+
+	/* Enable counters access from userspace. */
+	li	t0, 0xffffffff
+	csrw	scounteren, t0
 
 	/* Set the trap vector to the real handler. */
 	la	t0, cpu_exception_handler
