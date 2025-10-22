@@ -111,6 +111,7 @@ static const struct filterops inotify_rfiltops = {
 	.f_isfd = 1,
 	.f_detach = filt_inotifydetach,
 	.f_event = filt_inotifyevent,
+	.f_copy = knote_triv_copy,
 };
 
 static MALLOC_DEFINE(M_INOTIFY, "inotify", "inotify data structures");
@@ -801,6 +802,7 @@ vn_inotify_add_watch(struct vnode *vp, struct inotify_softc *sc, uint32_t mask,
 			vn_lock(vp, LK_SHARED | LK_RETRY);
 			if (error != 0)
 				break;
+			NDFREE_PNBUF(&nd);
 			vn_irflag_set_cond(nd.ni_vp, VIRF_INOTIFY_PARENT);
 			vrele(nd.ni_vp);
 		}

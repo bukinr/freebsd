@@ -14,6 +14,7 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
+#include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
 #include <sys/sx.h>
@@ -120,18 +121,18 @@ vcpu_unlock_one(struct vcpu *vcpu)
 	vcpu_set_state(vcpu, VCPU_IDLE, false);
 }
 
+#ifndef __amd64__
 static int
-vcpu_lock_all(struct vmmdev_softc *sc)
+vcpu_set_state_all(struct vm *vm, enum vcpu_state newstate)
 {
 	struct vcpu *vcpu;
 	int error;
 	uint16_t i, j, maxcpus;
 
 	error = 0;
-	vm_slock_vcpus(sc->vm);
-	maxcpus = vm_get_maxcpus(sc->vm);
+	maxcpus = vm_get_maxcpus(vm);
 	for (i = 0; i < maxcpus; i++) {
-		vcpu = vm_vcpu(sc->vm, i);
+		vcpu = vm_vcpu(vm, i);
 		if (vcpu == NULL)
 			continue;
 		error = vcpu_lock_one(vcpu);
@@ -141,14 +142,30 @@ vcpu_lock_all(struct vmmdev_softc *sc)
 
 	if (error) {
 		for (j = 0; j < i; j++) {
-			vcpu = vm_vcpu(sc->vm, j);
+			vcpu = vm_vcpu(vm, j);
 			if (vcpu == NULL)
 				continue;
 			vcpu_unlock_one(vcpu);
 		}
-		vm_unlock_vcpus(sc->vm);
 	}
 
+	return (error);
+}
+#endif
+
+static int
+vcpu_lock_all(struct vmmdev_softc *sc)
+{
+	int error;
+
+	/*
+	 * Serialize vcpu_lock_all() callers.  Individual vCPUs are not locked
+	 * in a consistent order so we need to serialize to avoid deadlocks.
+	 */
+	vm_lock_vcpus(sc->vm);
+	error = vcpu_set_state_all(sc->vm, VCPU_FROZEN);
+	if (error != 0)
+		vm_unlock_vcpus(sc->vm);
 	return (error);
 }
 
@@ -454,6 +471,12 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	if (ioctl == NULL)
 		return (ENOTTY);
 
+	if ((ioctl->flags & VMMDEV_IOCTL_PRIV_CHECK_DRIVER) != 0) {
+		error = priv_check(td, PRIV_DRIVER);
+		if (error != 0)
+			return (error);
+	}
+
 	if ((ioctl->flags & VMMDEV_IOCTL_XLOCK_MEMSEGS) != 0)
 		vm_xlock_memsegs(sc->vm);
 	else if ((ioctl->flags & VMMDEV_IOCTL_SLOCK_MEMSEGS) != 0)
@@ -640,10 +663,10 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 			error = EINVAL;
 			break;
 		}
-		regvals = malloc(sizeof(regvals[0]) * vmregset->count, M_VMMDEV,
-		    M_WAITOK);
-		regnums = malloc(sizeof(regnums[0]) * vmregset->count, M_VMMDEV,
-		    M_WAITOK);
+		regvals = mallocarray(vmregset->count, sizeof(regvals[0]),
+		    M_VMMDEV, M_WAITOK);
+		regnums = mallocarray(vmregset->count, sizeof(regnums[0]),
+		    M_VMMDEV, M_WAITOK);
 		error = copyin(vmregset->regnums, regnums, sizeof(regnums[0]) *
 		    vmregset->count);
 		if (error == 0)
@@ -666,10 +689,10 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 			error = EINVAL;
 			break;
 		}
-		regvals = malloc(sizeof(regvals[0]) * vmregset->count, M_VMMDEV,
-		    M_WAITOK);
-		regnums = malloc(sizeof(regnums[0]) * vmregset->count, M_VMMDEV,
-		    M_WAITOK);
+		regvals = mallocarray(vmregset->count, sizeof(regvals[0]),
+		    M_VMMDEV, M_WAITOK);
+		regnums = mallocarray(vmregset->count, sizeof(regnums[0]),
+		    M_VMMDEV, M_WAITOK);
 		error = copyin(vmregset->regnums, regnums, sizeof(regnums[0]) *
 		    vmregset->count);
 		if (error == 0)
@@ -901,6 +924,7 @@ vmmdev_lookup_and_destroy(const char *name, struct ucred *cred)
 	sc->cdev = NULL;
 	sx_xunlock(&vmmdev_mtx);
 
+	vm_suspend(sc->vm, VM_SUSPEND_DESTROY);
 	destroy_dev(cdev);
 	vmmdev_destroy(sc);
 

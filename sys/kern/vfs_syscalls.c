@@ -1932,7 +1932,7 @@ restart:
 	if (error != 0)
 		return (error);
 
-	if (nd.ni_vp != NULLVP || !(nd.ni_cnd.cn_flags & ISWHITEOUT)) {
+	if (nd.ni_vp != NULL || !(nd.ni_cnd.cn_flags & ISWHITEOUT)) {
 		NDFREE_PNBUF(&nd);
 		if (nd.ni_vp == nd.ni_dvp)
 			vrele(nd.ni_dvp);
@@ -2839,7 +2839,7 @@ setfflags(struct thread *td, struct vnode *vp, u_long flags)
 	 * if they are allowed to set flags and programs assume that
 	 * chown can't fail when done as root.
 	 */
-	if (vp->v_type == VCHR || vp->v_type == VBLK) {
+	if (VN_ISDEV(vp)) {
 		error = priv_check(td, PRIV_VFS_CHFLAGS_DEV);
 		if (error != 0)
 			return (error);
@@ -4363,7 +4363,7 @@ unionread:
 		struct vnode *tvp = vp;
 
 		vp = vp->v_mount->mnt_vnodecovered;
-		VREF(vp);
+		vref(vp);
 		fp->f_vnode = vp;
 		foffset = 0;
 		vput(tvp);
@@ -5050,15 +5050,16 @@ kern_copy_file_range(struct thread *td, int infd, off_t *inoffp, int outfd,
 	size_t retlen;
 	void *rl_rcookie, *rl_wcookie;
 	off_t inoff, outoff, savinoff, savoutoff;
-	bool foffsets_locked;
+	bool foffsets_locked, foffsets_set;
 
 	infp = outfp = NULL;
 	rl_rcookie = rl_wcookie = NULL;
 	foffsets_locked = false;
+	foffsets_set = false;
 	error = 0;
 	retlen = 0;
 
-	if (flags != 0) {
+	if ((flags & ~COPY_FILE_RANGE_USERFLAGS) != 0) {
 		error = EINVAL;
 		goto out;
 	}
@@ -5122,6 +5123,8 @@ kern_copy_file_range(struct thread *td, int infd, off_t *inoffp, int outfd,
 		}
 		foffset_lock_pair(infp1, &inoff, outfp1, &outoff, 0);
 		foffsets_locked = true;
+	} else {
+		foffsets_set = true;
 	}
 	savinoff = inoff;
 	savoutoff = outoff;
@@ -5180,11 +5183,12 @@ out:
 		vn_rangelock_unlock(invp, rl_rcookie);
 	if (rl_wcookie != NULL)
 		vn_rangelock_unlock(outvp, rl_wcookie);
+	if ((foffsets_locked || foffsets_set) &&
+	    (error == EINTR || error == ERESTART)) {
+		inoff = savinoff;
+		outoff = savoutoff;
+	}
 	if (foffsets_locked) {
-		if (error == EINTR || error == ERESTART) {
-			inoff = savinoff;
-			outoff = savoutoff;
-		}
 		if (inoffp == NULL)
 			foffset_unlock(infp, inoff, 0);
 		else
@@ -5193,6 +5197,9 @@ out:
 			foffset_unlock(outfp, outoff, 0);
 		else
 			*outoffp = outoff;
+	} else if (foffsets_set) {
+		*inoffp = inoff;
+		*outoffp = outoff;
 	}
 	if (outfp != NULL)
 		fdrop(outfp, td);

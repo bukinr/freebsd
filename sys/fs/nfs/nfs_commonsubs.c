@@ -187,7 +187,7 @@ struct nfsv4_opflag nfsv4_opflag[NFSV42_NOPS] = {
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Read Plus */
 	{ 0, 1, 0, 0, LK_SHARED, 1, 0 },		/* Seek */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Write Same */
-	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Clone */
+	{ 2, 1, 1, 0, LK_SHARED, 1, 0 },		/* Clone */
 	{ 0, 1, 0, 0, LK_SHARED, 1, 1 },		/* Getxattr */
 	{ 0, 1, 1, 1, LK_EXCLUSIVE, 1, 1 },		/* Setxattr */
 	{ 0, 1, 0, 0, LK_SHARED, 1, 1 },		/* Listxattrs */
@@ -216,10 +216,17 @@ NFSD_VNET_DEFINE_STATIC(u_char *, nfsrv_dnsname) = NULL;
  * marked 0 in this array, the code will still work, just not quite as
  * efficiently.)
  */
-static int nfs_bigreply[NFSV42_NPROCS] = { 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 0, 0, 1, 0, 0, 0, 0, 0, 0 };
+static bool nfs_bigreply[NFSV42_NPROCS] = {
+	[NFSPROC_GETACL] = true,
+	[NFSPROC_GETEXTATTR] = true,
+	[NFSPROC_LISTEXTATTR] = true,
+	[NFSPROC_LOOKUP] = true,
+	[NFSPROC_READ] = true,
+	[NFSPROC_READDIR] = true,
+	[NFSPROC_READDIRPLUS] = true,
+	[NFSPROC_READDS] = true,
+	[NFSPROC_READLINK] = true,
+};
 
 /* local functions */
 static int nfsrv_skipace(struct nfsrv_descript *nd, int *acesizep);
@@ -232,6 +239,8 @@ static int nfsrv_getrefstr(struct nfsrv_descript *, u_char **, u_char **,
 static void nfsrv_refstrbigenough(int, u_char **, u_char **, int *);
 static uint32_t vtonfsv4_type(struct vattr *);
 static __enum_uint8(vtype) nfsv4tov_type(uint32_t, uint16_t *);
+static void nfsv4_setsequence(struct nfsmount *, struct nfsrv_descript *,
+    struct nfsclsession *, bool, struct ucred *);
 
 static struct {
 	int	op;
@@ -310,6 +319,7 @@ static struct {
 	{ NFSV4OP_LAYOUTERROR, 1, "LayoutError", 11, },
 	{ NFSV4OP_VERIFY, 3, "AppendWrite", 11, },
 	{ NFSV4OP_OPENATTR, 3, "OpenAttr", 8, },
+	{ NFSV4OP_SAVEFH, 5, "Clone", 5, },
 };
 
 /*
@@ -319,7 +329,7 @@ static int nfs_bigrequest[NFSV42_NPROCS] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
-	0, 1, 0
+	0, 1, 0, 0
 };
 
 /*
@@ -648,7 +658,7 @@ nfscl_fillsattr(struct nfsrv_descript *nd, struct vattr *vap,
 			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_TIMECREATE);
 		(void) nfsv4_fillattr(nd, vp->v_mount, vp, NULL, vap, NULL, 0,
 		    &attrbits, NULL, NULL, 0, 0, 0, 0, (uint64_t)0, NULL,
-		    false, false, false);
+		    false, false, false, 0);
 		break;
 	}
 }
@@ -1302,7 +1312,7 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
     struct nfsv3_pathconf *pc, struct statfs *sbp, struct nfsstatfs *sfp,
     struct nfsfsinfo *fsp, NFSACL_T *aclp, int compare, int *retcmpp,
     u_int32_t *leasep, u_int32_t *rderrp, bool *has_namedattrp,
-    NFSPROC_T *p, struct ucred *cred)
+    uint32_t *clone_blksizep, NFSPROC_T *p, struct ucred *cred)
 {
 	u_int32_t *tl;
 	int i = 0, j, k, l = 0, m, bitpos, attrsum = 0;
@@ -1437,6 +1447,13 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 				 NFSCLRBIT_ATTRBIT(&checkattrbits,
 				    NFSATTRBIT_SYSTEM);
 			   }
+			   /* Some filesystems do not support block cloning */
+			   if (vp == NULL || VOP_PATHCONF(vp,
+				_PC_CLONE_BLKSIZE, &has_pathconf) != 0)
+			       has_pathconf = 0;
+			   if (has_pathconf == 0)
+				 NFSCLRBIT_ATTRBIT(&checkattrbits,
+				    NFSATTRBIT_CLONEBLKSIZE);
 			   if (!NFSEQUAL_ATTRBIT(&retattrbits, &checkattrbits)
 			       || retnotsup)
 				*retcmpp = NFSERR_NOTSAME;
@@ -2374,6 +2391,23 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			if (compare && !(*retcmpp) && i != nfs_srvmaxio)
 				*retcmpp = NFSERR_NOTSAME;
 			break;
+		case NFSATTRBIT_CLONEBLKSIZE:
+			NFSM_DISSECT(tl, uint32_t *, NFSX_UNSIGNED);
+			if (compare) {
+				if (!(*retcmpp)) {
+					if (vp == NULL || VOP_PATHCONF(vp,
+					    _PC_CLONE_BLKSIZE, &has_pathconf)
+					    != 0)
+						has_pathconf = 0;
+					if (has_pathconf !=
+					    fxdr_unsigned(uint32_t, *tl))
+						*retcmpp = NFSERR_NOTSAME;
+				}
+			} else if (clone_blksizep != NULL) {
+				*clone_blksizep = fxdr_unsigned(uint32_t, *tl);
+			}
+			attrsum += NFSX_UNSIGNED;
+			break;
 		case NFSATTRBIT_CHANGEATTRTYPE:
 			NFSM_DISSECT(tl, uint32_t *, NFSX_UNSIGNED);
 			if (compare) {
@@ -2648,7 +2682,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
     nfsattrbit_t *attrbitp, struct ucred *cred, NFSPROC_T *p, int isdgram,
     int reterr, int supports_nfsv4acls, int at_root, uint64_t mounted_on_fileno,
     struct statfs *pnfssf, bool xattrsupp, bool has_hiddensystem,
-    bool has_namedattr)
+    bool has_namedattr, uint32_t clone_blksize)
 {
 	int bitpos, retnum = 0;
 	u_int32_t *tl;
@@ -2771,6 +2805,9 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			    NFSCLRBIT_ATTRBIT(&attrbits, NFSATTRBIT_HIDDEN);
 			    NFSCLRBIT_ATTRBIT(&attrbits, NFSATTRBIT_SYSTEM);
 			}
+			if (clone_blksize == 0)
+			    NFSCLRBIT_ATTRBIT(&attrbits,
+				NFSATTRBIT_CLONEBLKSIZE);
 			retnum += nfsrv_putattrbit(nd, &attrbits);
 			break;
 		case NFSATTRBIT_TYPE:
@@ -3247,6 +3284,11 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 					*tl = txdr_unsigned(
 					   NFSV4CHANGETYPE_TIME_METADATA);
 			}
+			retnum += NFSX_UNSIGNED;
+			break;
+		case NFSATTRBIT_CLONEBLKSIZE:
+			NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
+			*tl = txdr_unsigned(clone_blksize);
 			retnum += NFSX_UNSIGNED;
 			break;
 		default:
@@ -4988,9 +5030,9 @@ nfsv4_seqsess_cacherep(uint32_t slotid, struct nfsslot *slots, int repstat,
 /*
  * Generate the xdr for an NFSv4.1 Sequence Operation.
  */
-void
+static void
 nfsv4_setsequence(struct nfsmount *nmp, struct nfsrv_descript *nd,
-    struct nfsclsession *sep, int dont_replycache, struct ucred *cred)
+    struct nfsclsession *sep, bool dont_replycache, struct ucred *cred)
 {
 	uint32_t *tl, slotseq = 0;
 	int error, maxslot, slotpos;
@@ -5021,7 +5063,7 @@ nfsv4_setsequence(struct nfsmount *nmp, struct nfsrv_descript *nd,
 		*tl++ = txdr_unsigned(slotseq);
 		*tl++ = txdr_unsigned(slotpos);
 		*tl++ = txdr_unsigned(maxslot);
-		if (dont_replycache == 0)
+		if (!dont_replycache)
 			*tl = newnfs_true;
 		else
 			*tl = newnfs_false;

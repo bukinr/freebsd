@@ -73,7 +73,7 @@ VNET_DEFINE_STATIC(int, pf_rdr_srcport_rewrite_tries) = 16;
 
 static uint64_t		 pf_hash(struct pf_addr *, struct pf_addr *,
 			    struct pf_poolhashkey *, sa_family_t);
-struct pf_krule		*pf_match_translation(int, struct pf_test_ctx *);
+static struct pf_krule	*pf_match_translation(int, struct pf_test_ctx *);
 static enum pf_test_status pf_step_into_translation_anchor(int, struct pf_test_ctx *,
 			    struct pf_krule *);
 static int		 pf_get_sport(struct pf_pdesc *, struct pf_krule *,
@@ -216,6 +216,7 @@ pf_match_translation_rule(int rs_num, struct pf_test_ctx *ctx, struct pf_krulese
 				 */
 				ctx->arsm = ctx->aruleset;
 			}
+			break;
 		} else {
 			ctx->a = r;			/* remember anchor */
 			ctx->aruleset = ruleset;	/* and its ruleset */
@@ -273,7 +274,7 @@ pf_step_into_translation_anchor(int rs_num, struct pf_test_ctx *ctx, struct pf_k
 	return (rv);
 }
 
-struct pf_krule *
+static struct pf_krule *
 pf_match_translation(int rs_num, struct pf_test_ctx *ctx)
 {
 	enum pf_test_status rv;
@@ -545,11 +546,18 @@ pf_map_addr(sa_family_t saf, struct pf_krule *r, struct pf_addr *saddr,
 	uint64_t		 hashidx;
 	int			 cnt;
 	sa_family_t		 wanted_af;
+	u_int8_t		 pool_type;
+	bool			 prefer_ipv6_nexthop = rpool->opts & PF_POOL_IPV6NH;
 
 	KASSERT(saf != 0, ("%s: saf == 0", __func__));
 	KASSERT(naf != NULL, ("%s: naf = NULL", __func__));
 	KASSERT((*naf) != 0, ("%s: *naf = 0", __func__));
 
+	/*
+	 * Given (*naf) is a hint about AF of the forwarded packet.
+	 * It might be changed if prefer_ipv6_nexthop is enabled and
+	 * the combination of nexthop AF and packet AF allows for it.
+	 */
 	wanted_af = (*naf);
 
 	mtx_lock(&rpool->mtx);
@@ -594,19 +602,38 @@ pf_map_addr(sa_family_t saf, struct pf_krule *r, struct pf_addr *saddr,
 	} else {
 		raddr = &rpool->cur->addr.v.a.addr;
 		rmask = &rpool->cur->addr.v.a.mask;
-		/*
-		 * For single addresses check their address family. Unless they
-		 * have none, which happens when addresses are added with
-		 * the old ioctl mechanism. In such case trust that the address
-		 * has the proper AF.
-		 */
-		if (rpool->cur->af && rpool->cur->af != wanted_af) {
-			reason = PFRES_MAPFAILED;
-			goto done_pool_mtx;
+	}
+
+	/*
+	 * For pools with a single host with the prefer-ipv6-nexthop option
+	 * we can return pool address of any AF, unless the forwarded packet
+	 * is IPv6, then we can return only if pool address is IPv6.
+	 * For non-prefer-ipv6-nexthop we can return pool address only
+	 * of wanted AF, unless the pool address'es AF is unknown, which
+	 * happens in case old ioctls have been used to set up the pool.
+	 *
+	 * Round-robin pools have their own logic for retrying next addresses.
+	 */
+	pool_type = rpool->opts & PF_POOL_TYPEMASK;
+	if (pool_type == PF_POOL_NONE || pool_type == PF_POOL_BITMASK ||
+	    ((pool_type == PF_POOL_RANDOM || pool_type == PF_POOL_SRCHASH) &&
+	    rpool->cur->addr.type != PF_ADDR_TABLE &&
+	    rpool->cur->addr.type != PF_ADDR_DYNIFTL)) {
+		if (prefer_ipv6_nexthop) {
+			if (rpool->cur->af == AF_INET && (*naf) == AF_INET6) {
+				reason = PFRES_MAPFAILED;
+				goto done_pool_mtx;
+			}
+			wanted_af = rpool->cur->af;
+		} else {
+			if (rpool->cur->af != 0 && rpool->cur->af != (*naf)) {
+				reason = PFRES_MAPFAILED;
+				goto done_pool_mtx;
+			}
 		}
 	}
 
-	switch (rpool->opts & PF_POOL_TYPEMASK) {
+	switch (pool_type) {
 	case PF_POOL_NONE:
 		pf_addrcpy(naddr, raddr, wanted_af);
 		break;
@@ -631,10 +658,22 @@ pf_map_addr(sa_family_t saf, struct pf_krule *r, struct pf_addr *saddr,
 			else
 				rpool->tblidx = (int)arc4random_uniform(cnt);
 			memset(&rpool->counter, 0, sizeof(rpool->counter));
+			if (prefer_ipv6_nexthop)
+				wanted_af = AF_INET6;
+		retry_other_af_random:
 			if (pfr_pool_get(kt, &rpool->tblidx, &rpool->counter,
 			    wanted_af, pf_islinklocal, false)) {
-				reason = PFRES_MAPFAILED;
-				goto done_pool_mtx; /* unsupported */
+				/* Retry with IPv4 nexthop for IPv4 traffic */
+				if (prefer_ipv6_nexthop &&
+				    wanted_af == AF_INET6 &&
+				    (*naf) == AF_INET) {
+					wanted_af = AF_INET;
+					goto retry_other_af_random;
+				} else {
+					 /* no hosts in wanted AF */
+					reason = PFRES_MAPFAILED;
+					goto done_pool_mtx;
+				}
 			}
 			pf_addrcpy(naddr, &rpool->counter, wanted_af);
 		} else if (init_addr != NULL && PF_AZERO(init_addr,
@@ -702,10 +741,22 @@ pf_map_addr(sa_family_t saf, struct pf_krule *r, struct pf_addr *saddr,
 			else
 				rpool->tblidx = (int)(hashidx % cnt);
 			memset(&rpool->counter, 0, sizeof(rpool->counter));
+			if (prefer_ipv6_nexthop)
+				wanted_af = AF_INET6;
+		retry_other_af_srchash:
 			if (pfr_pool_get(kt, &rpool->tblidx, &rpool->counter,
 			    wanted_af, pf_islinklocal, false)) {
-				reason = PFRES_MAPFAILED;
-				goto done_pool_mtx; /* unsupported */
+				/* Retry with IPv4 nexthop for IPv4 traffic */
+				if (prefer_ipv6_nexthop &&
+				    wanted_af == AF_INET6 &&
+				    (*naf) == AF_INET) {
+					wanted_af = AF_INET;
+					goto retry_other_af_srchash;
+				} else {
+					 /* no hosts in wanted AF */
+					reason = PFRES_MAPFAILED;
+					goto done_pool_mtx;
+				}
 			}
 			pf_addrcpy(naddr, &rpool->counter, wanted_af);
 		} else {
@@ -718,6 +769,9 @@ pf_map_addr(sa_family_t saf, struct pf_krule *r, struct pf_addr *saddr,
 	    {
 		struct pf_kpooladdr *acur = rpool->cur;
 
+	retry_other_af_rr:
+		if (prefer_ipv6_nexthop)
+			wanted_af = rpool->ipv6_nexthop_af;
 		if (rpool->cur->addr.type == PF_ADDR_TABLE) {
 			if (!pfr_pool_get(rpool->cur->addr.p.tbl,
 			    &rpool->tblidx, &rpool->counter, wanted_af,
@@ -728,46 +782,55 @@ pf_map_addr(sa_family_t saf, struct pf_krule *r, struct pf_addr *saddr,
 			    &rpool->tblidx, &rpool->counter, wanted_af,
 			    pf_islinklocal, true))
 				goto get_addr;
-		} else if (pf_match_addr(0, raddr, rmask, &rpool->counter,
-		    wanted_af))
+		} else if (rpool->cur->af == wanted_af &&
+		    pf_match_addr(0, raddr, rmask, &rpool->counter, wanted_af))
 			goto get_addr;
-
+		if (prefer_ipv6_nexthop &&
+		    (*naf) == AF_INET && wanted_af == AF_INET6) {
+			/* Reset table index when changing wanted AF. */
+			rpool->tblidx = -1;
+			rpool->ipv6_nexthop_af = AF_INET;
+			goto retry_other_af_rr;
+		}
 	try_next:
+		/* Reset prefer-ipv6-nexthop search to IPv6 when iterating pools. */
+		rpool->ipv6_nexthop_af = AF_INET6;
 		if (TAILQ_NEXT(rpool->cur, entries) == NULL)
 			rpool->cur = TAILQ_FIRST(&rpool->list);
 		else
 			rpool->cur = TAILQ_NEXT(rpool->cur, entries);
+	try_next_ipv6_nexthop_rr:
+		/* Reset table index when iterating pools or changing wanted AF. */
 		rpool->tblidx = -1;
+		if (prefer_ipv6_nexthop)
+			wanted_af = rpool->ipv6_nexthop_af;
 		if (rpool->cur->addr.type == PF_ADDR_TABLE) {
-			if (pfr_pool_get(rpool->cur->addr.p.tbl,
+			if (!pfr_pool_get(rpool->cur->addr.p.tbl,
 			    &rpool->tblidx, &rpool->counter, wanted_af, NULL,
-			    true)) {
-				/* table contains no address of type 'wanted_af' */
-				if (rpool->cur != acur)
-					goto try_next;
-				reason = PFRES_MAPFAILED;
-				goto done_pool_mtx;
-			}
+			    true))
+				goto get_addr;
 		} else if (rpool->cur->addr.type == PF_ADDR_DYNIFTL) {
-			if (pfr_pool_get(rpool->cur->addr.p.dyn->pfid_kt,
-			    &rpool->tblidx, &rpool->counter, wanted_af,
-			    pf_islinklocal, true)) {
-				/* interface has no address of type 'wanted_af' */
-				if (rpool->cur != acur)
-					goto try_next;
-				reason = PFRES_MAPFAILED;
-				goto done_pool_mtx;
-			}
+			if (!pfr_pool_get(rpool->cur->addr.p.dyn->pfid_kt,
+			    &rpool->tblidx, &rpool->counter, wanted_af, pf_islinklocal,
+			    true))
+				goto get_addr;
 		} else {
-			raddr = &rpool->cur->addr.v.a.addr;
-			rmask = &rpool->cur->addr.v.a.mask;
-			if (rpool->cur->af && rpool->cur->af != wanted_af) {
-				reason = PFRES_MAPFAILED;
-				goto done_pool_mtx;
+			if (rpool->cur->af == wanted_af) {
+				raddr = &rpool->cur->addr.v.a.addr;
+				rmask = &rpool->cur->addr.v.a.mask;
+				pf_addrcpy(&rpool->counter, raddr, wanted_af);
+				goto get_addr;
 			}
-			pf_addrcpy(&rpool->counter, raddr, wanted_af);
 		}
-
+		if (prefer_ipv6_nexthop &&
+		    (*naf) == AF_INET && wanted_af == AF_INET6) {
+			rpool->ipv6_nexthop_af = AF_INET;
+			goto try_next_ipv6_nexthop_rr;
+		}
+		if (rpool->cur != acur)
+			goto try_next;
+		reason = PFRES_MAPFAILED;
+		goto done_pool_mtx;
 	get_addr:
 		pf_addrcpy(naddr, &rpool->counter, wanted_af);
 		if (init_addr != NULL && PF_AZERO(init_addr, wanted_af))
@@ -777,8 +840,15 @@ pf_map_addr(sa_family_t saf, struct pf_krule *r, struct pf_addr *saddr,
 	    }
 	}
 
+	if (wanted_af == 0) {
+		reason = PFRES_MAPFAILED;
+		goto done_pool_mtx;
+	}
+
 	if (nkif)
 		*nkif = rpool->cur->kif;
+
+	(*naf) = wanted_af;
 
 done_pool_mtx:
 	mtx_unlock(&rpool->mtx);

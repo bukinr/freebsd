@@ -94,6 +94,7 @@ enum random_entropy_source {
 	RANDOM_PURE_GLXSB,
 	RANDOM_PURE_HIFN,
 	RANDOM_PURE_RDRAND,
+	RANDOM_PURE_RDSEED,
 	RANDOM_PURE_NEHEMIAH,
 	RANDOM_PURE_RNDTEST,
 	RANDOM_PURE_VIRTIO,
@@ -141,9 +142,6 @@ random_harvest_direct(const void *entropy, u_int size, enum random_entropy_sourc
 	if (hc_source_mask & (1 << origin))
 		random_harvest_direct_(entropy, size, origin);
 }
-
-void random_harvest_register_source(enum random_entropy_source);
-void random_harvest_deregister_source(enum random_entropy_source);
 
 #if defined(RANDOM_ENABLE_UMA)
 #define random_harvest_fast_uma(a, b, c)	random_harvest_fast(a, b, c)

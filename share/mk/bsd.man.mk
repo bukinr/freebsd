@@ -21,6 +21,9 @@
 # MAN		The manual pages to be installed. For sections see
 #		variable ${SECTIONS}
 #
+# MANSRC.${MAN:T} Name of source file for an individual manual page.
+#		Defaults to the manual page name.
+#
 # MCOMPRESS_CMD	Program to compress man pages. Output is to
 #		stdout. [${COMPRESS_CMD}]
 #
@@ -94,6 +97,14 @@ manlinksinstall: .PHONY
 
 all-man:
 
+# Take groups from both MANGROUPS and MANGROUPS.yes, to allow syntax like
+# MANGROUPS.${MK_FOO}=FOO.  Sort and uniq the list of groups in case of
+# duplicates.
+.if defined(MANGROUPS) || defined(MANGROUPS.yes)
+MANGROUPS:=${MANGROUPS} ${MANGROUPS.yes}
+MANGROUPS:=${MANGROUPS:O:u}
+.endif
+
 .for __group in ${MANGROUPS}
 
 realmaninstall: realmaninstall-${__group}
@@ -102,19 +113,20 @@ manlinksinstall: manlinksinstall-${__group}
 ${__group}OWN?=		${MANOWN}
 ${__group}GRP?=		${MANGRP}
 ${__group}MODE?=	${MANMODE}
+${__group}PACKAGE?=	${PACKAGE:Uutilities}
 
 # Tag processing is only done for NO_ROOT installs.
 .if defined(NO_ROOT)
 
 .if !defined(${__group}TAGS) || ! ${${__group}TAGS:Mpackage=*}
-.if ${MK_MANSPLITPKG} == "no"
-${__group}TAGS+=	package=${${__group}PACKAGE:U${PACKAGE:Uutilities}}
+.if ${MK_MANSPLITPKG} == "no" || ${${__group}PACKAGE:M*-man}
+${__group}TAGS+=	package=${${__group}PACKAGE}
 .else
-${__group}TAGS+=	package=${${__group}PACKAGE:U${PACKAGE:Uutilities}}-man
+${__group}TAGS+=	package=${${__group}PACKAGE}-man
 .endif
 .endif
 
-${__group}TAG_ARGS=	-T ${${__group}TAGS:[*]:S/ /,/g}
+${__group}TAG_ARGS=	-T ${${__group}TAGS:ts,:[*]}
 .endif	# defined(NO_ROOT)
 
 ${__group}INSTALL?=	${INSTALL} ${${__group}TAG_ARGS} \
@@ -141,13 +153,13 @@ CLEANFILES+=	${${__group}:T:S/$/${CATEXT}${FILTEXTENSION}/g}
 # filenames contain colons.
 .for __target in ${__page:T:S/:/\:/g:S/$/${FILTEXTENSION}/g}
 all-man: ${__target}
-${__target}: ${__page}
+${__target}: ${MANSRC.${__page:T}:U${__page}}
 	${MANFILTER} < ${.ALLSRC} > ${.TARGET}
 .endfor
 .if defined(MANBUILDCAT) && !empty(MANBUILDCAT)
 .for __target in ${__page:T:S/:/\:/g:S/$/${CATEXT}${FILTEXTENSION}/g}
 all-man: ${__target}
-${__target}: ${__page}
+${__target}: ${MANSRC.${__page:T}:U${__page}}
 	${MANFILTER} < ${.ALLSRC} | ${MANDOC_CMD} > ${.TARGET}
 .endfor
 .endif
@@ -160,12 +172,23 @@ CLEANFILES+=	${${__group}:T:S/$/${CATEXT}/g}
 .for __page in ${${__group}}
 .for __target in ${__page:T:S/:/\:/g:S/$/${CATEXT}/g}
 all-man: ${__target}
-${__target}: ${__page}
+${__target}: ${MANSRC.${__page:T}:U${__page}}
 	${MANDOC_CMD} ${.ALLSRC} > ${.TARGET}
 .endfor
 .endfor
 .else
-all-man: ${${__group}}
+.for __page in ${${__group}}
+.if defined(MANSRC.${__page:T})
+.for __target in ${__page:T:S/:/\:/g}
+all-man: ${__target}
+CLEANFILES+=	${__target}
+${__target}: ${MANSRC.${__page:T}}
+	${CP} ${.ALLSRC} ${.TARGET}
+.endfor
+.else
+all-man: ${__page}
+.endif
+.endfor
 .endif
 .endif
 .endif	# defined(MANFILTER)
@@ -180,7 +203,7 @@ CLEANFILES+=	${${__group}:T:S/$/${CATEXT}${MCOMPRESS_EXT}/g}
 .for __page in ${${__group}}
 .for __target in ${__page:T:S/:/\:/g:S/$/${MCOMPRESS_EXT}/}
 all-man: ${__target}
-${__target}: ${__page}
+${__target}: ${MANSRC.${__page:T}:U${__page}}
 .if defined(MANFILTER)
 	${MANFILTER} < ${.ALLSRC} | ${MCOMPRESS_CMD} > ${.TARGET}
 .else
@@ -190,7 +213,7 @@ ${__target}: ${__page}
 .if defined(MANBUILDCAT) && !empty(MANBUILDCAT)
 .for __target in ${__page:T:S/:/\:/g:S/$/${CATEXT}${MCOMPRESS_EXT}/}
 all-man: ${__target}
-${__target}: ${__page}
+${__target}: ${MANSRC.${__page:T}:U${__page}}
 .if defined(MANFILTER)
 	${MANFILTER} < ${.ALLSRC} | ${MANDOC_CMD} | ${MCOMPRESS_CMD} > ${.TARGET}
 .else
@@ -238,7 +261,10 @@ stage_links.mlinks.${__group}: ${_mansets.${__group}:@s@stage_files.${__group}.$
 
 realmaninstall-${__group}:
 .if defined(${__group}) && !empty(${__group})
-realmaninstall-${__group}: ${${__group}}
+.for __page in ${${__group}}
+__mansrc.${__group}+=	${MANSRC.${__page:T}:U${__page}}
+.endfor
+realmaninstall-${__group}: ${__mansrc.${__group}}
 .if ${MK_MANCOMPRESS} == "no"
 .if defined(MANFILTER)
 .for __page in ${${__group}}
@@ -288,11 +314,11 @@ manlinksinstall-${__group}:
 .endif
 .endfor
 
-manlint:
+manlint: .PHONY checkmanlinks
 .if defined(${__group}) && !empty(${__group})
 .for __page in ${${__group}}
-manlint: ${__page}lint
-${__page}lint: ${__page}
+manlint: ${__page:S/:/\:/g}lint
+${__page:S/:/\:/g}lint: .PHONY ${MANSRC.${__page:T}:U${__page}}
 .if defined(MANFILTER)
 	${MANFILTER} < ${.ALLSRC} | ${MANDOC_CMD} -Tlint
 .else
@@ -300,5 +326,19 @@ ${__page}lint: ${__page}
 .endif
 .endfor
 .endif
+
+checkmanlinks: .PHONY
+.if defined(${__group}LINKS)
+checkmanlinks: checkmanlinks-${__group}
+checkmanlinks-${__group}: .PHONY
+.for __page __link in ${${__group}LINKS}
+checkmanlinks-${__group}: checkmanlinks-${__group}-${__link}
+checkmanlinks-${__group}-${__link}: .PHONY ${__page}
+	@if ! egrep -q "^(\.\\\\\" )?\.Nm ${__link:R}( ,)?$$" ${.ALLSRC}; then \
+		echo "${__group}LINKS: '.Nm ${__link:R}' not found in ${__page}"; \
+		exit 1; \
+	fi >&2
+.endfor # __page __link in ${${__group}LINKS}
+.endif # defined(${__group}LINKS)
 
 .endfor	# __group in ${MANGROUPS}
