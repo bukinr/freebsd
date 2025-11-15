@@ -471,7 +471,7 @@ SUBDIR+=	${_DIR}
 # by calling 'makedb' in share/man.  This is only relevant for
 # install/distribute so they build the whatis file after every manpage is
 # installed.
-.if make(installworld) || make(install)
+.if make(installworld) || make(install) || make(distributeworld) || make(distribute)
 SUBDIR+=.WAIT
 .endif
 SUBDIR+=etc
@@ -2824,7 +2824,7 @@ ${_bt}-link-${_tool}: .PHONY
 	if [ ! -e "$${source_path}" ] ; then \
 		echo "Cannot find host tool '${_tool}'"; false; \
 	fi; \
-	cp -pf "$${source_path}" "${WORLDTMP}/legacy/bin/${_tool}"
+	install -p "$${source_path}" "${WORLDTMP}/legacy/bin/${_tool}"
 ${_bt}-links: ${_bt}-link-${_tool}
 .endfor
 

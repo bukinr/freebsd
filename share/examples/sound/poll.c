@@ -1,6 +1,7 @@
-/*-
- * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting
- * All rights reserved.
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2025 Goran Mekić
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,40 +25,46 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <sys/sysctl.h>
+#include <sys/poll.h>
 
-#include <err.h>
-#include <stdio.h>
+#include "oss.h"
 
-#include "../../../sys/dev/hifn/hifn7751var.h"
-
-/*
- * Little program to dump the statistics block for the hifn driver.
- */
 int
 main(int argc, char *argv[])
 {
-	struct hifn_stats stats;
-	size_t slen;
+	struct config config = {
+		.device = "/dev/dsp",
+		.mode = O_RDWR,
+		.format = AFMT_S32_NE,
+		.sample_rate = 48000,
+	};
+	struct pollfd pfds[1];
+	int rc, bytes;
 
-	slen = sizeof (stats);
-	if (sysctlbyname("hw.hifn.stats", &stats, &slen, NULL, 0) < 0)
-		err(1, "kern.hifn.stats");
+	oss_init(&config);
+	bytes = config.buffer_info.bytes;
 
-	printf("input %llu bytes %u packets\n",
-		stats.hst_ibytes, stats.hst_ipackets);
-	printf("output %llu bytes %u packets\n",
-		stats.hst_obytes, stats.hst_opackets);
-	printf("invalid %u nomem %u abort %u\n",
-		stats.hst_invalid, stats.hst_nomem, stats.hst_abort);
-	printf("noirq %u unaligned %u\n",
-		stats.hst_noirq, stats.hst_unaligned);
-	printf("totbatch %u maxbatch %u\n",
-		stats.hst_totbatch, stats.hst_maxbatch);
-	printf("nomem: map %u load %u mbuf %u mcl %u cr %u sd %u\n",
-		stats.hst_nomem_map, stats.hst_nomem_load,
-		stats.hst_nomem_mbuf, stats.hst_nomem_mcl,
-		stats.hst_nomem_cr, stats.hst_nomem_sd);
-	return 0;
+	for (;;) {
+		pfds[0].fd = config.fd;
+		pfds[0].events = POLLOUT;
+		if (poll(pfds, sizeof(pfds) / sizeof(struct pollfd), -1) < 0)
+			err(1, "poll");
+		if (pfds[0].revents != 0) {
+			if ((rc = read(config.fd, config.buf, bytes)) < bytes) {
+				warn("Requested %d bytes, but read %d!\n",
+				    bytes, rc);
+				break;
+			}
+			if ((rc = write(config.fd, config.buf, bytes)) < bytes) {
+				err(1, "Requested %d bytes, but wrote %d!\n",
+				    bytes, rc);
+				break;
+			}
+		}
+	}
+
+	free(config.buf);
+	close(config.fd);
+
+	return (0);
 }

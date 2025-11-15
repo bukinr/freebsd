@@ -1065,8 +1065,10 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	 *     than duplicate it under a different name.
 	 */
 	error = vfs_buildopts(optuio, &opts);
-	if (error)
+	if (error) {
+		opts = NULL;
 		goto done_free;
+	}
 
 	cuflags = flags & (JAIL_CREATE | JAIL_UPDATE);
 	if (!cuflags) {
@@ -2331,7 +2333,8 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		(void)kern_close(td, jfd_out);
 	if (g_path != NULL)
 		free(g_path, M_TEMP);
-	vfs_freeopts(opts);
+	if (opts != NULL)
+		vfs_freeopts(opts);
 	prison_free(mypr);
 	return (error);
 }
@@ -3043,12 +3046,19 @@ do_jail_attach(struct thread *td, struct prison *pr, int drflags)
 	PROC_LOCK(p);
 	oldcred = crcopysafe(p, newcred);
 	newcred->cr_prison = pr;
-	proc_set_cred(p, newcred);
-	setsugid(p);
 #ifdef RACCT
 	racct_proc_ucred_changed(p, oldcred, newcred);
+#endif
+#ifdef RCTL
 	crhold(newcred);
 #endif
+	/*
+	 * Takes over 'newcred''s reference, so 'newcred' must not be used
+	 * besides this point except on RCTL where we took an additional
+	 * reference above.
+	 */
+	proc_set_cred(p, newcred);
+	setsugid(p);
 	PROC_UNLOCK(p);
 #ifdef RCTL
 	rctl_proc_ucred_changed(p, newcred);

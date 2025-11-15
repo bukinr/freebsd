@@ -212,6 +212,13 @@ vm_extra_install_packages() {
 			    -r ${DESTDIR} \
 			    install -y -r ${PKG_REPO_NAME} $pkg
 		done
+		INSTALL_AS_USER=yes \
+		${PKG_CMD} \
+		    -o ABI=${PKG_ABI} \
+		    -o REPOS_DIR=${PKG_REPOS_DIR} \
+		    -o PKG_DBDIR=${DESTDIR}/var/db/pkg \
+		    -r ${DESTDIR} \
+		    autoremove
 		metalog_add_data ./var/db/pkg/local.sqlite
 	else
 		if [ -n "${WITHOUT_QEMU}" ]; then
@@ -224,6 +231,8 @@ vm_extra_install_packages() {
 			chroot ${DESTDIR} ${EMULATOR} env ASSUME_ALWAYS_YES=yes \
 				/usr/sbin/pkg install -y ${p}
 		done
+		chroot ${DESTDIR} ${EMULATOR} env ASSUME_ALWAYS_YES=yes \
+		    /usr/sbin/pkg autoremove
 	fi
 
 	return 0
@@ -440,7 +449,11 @@ vm_create_disk() {
 		# Create an ESP
 		espfilename=$(mktemp /tmp/efiboot.XXXXXX)
 		make_esp_file ${espfilename} ${fat32min} ${BOOTFILES}/efi/loader_lua/loader_lua.efi
-		BOOTPARTS="${BOOTPARTS} -p efi/efiboot0:=${espfilename}"
+		espsuffix=""
+		if [ -z "${BOOTPARTS}" ]; then
+			espsuffix="${BOOTPARTSOFFSET}"
+		fi
+		BOOTPARTS="${BOOTPARTS} -p efi/efiboot0:=${espfilename}${espsuffix}"
 
 		# Add this to fstab
 		mkdir -p ${DESTDIR}/boot/efi

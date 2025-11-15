@@ -135,7 +135,6 @@ SUBDIR=	\
 	gpio \
 	${_gve} \
 	hid \
-	hifn \
 	${_hpt27xx} \
 	${_hptiop} \
 	${_hptmv} \
@@ -384,6 +383,7 @@ SUBDIR=	\
 	smbfs \
 	snp \
 	sound \
+	${_spe} \
 	${_speaker} \
 	spi \
 	${_splash} \
@@ -677,6 +677,10 @@ _ice_ddp=	ice_ddp
 _irdma=		irdma
 .endif
 .endif
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64"
+_spe=		spe
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm" || \
