@@ -908,7 +908,7 @@ again:
 
 	size = sizeof(struct nvme_hmb_desc) * ctrlr->hmb_nchunks;
 	err = bus_dma_tag_create(bus_get_dma_tag(ctrlr->dev),
-	    ctrlr->quirks & QUIRK_CRUCIAL_ALIGNMENT ? PAGE_SIZE : 16,
+	    ctrlr->quirks & QUIRK_HMB_PAGE_ALIGNED ? PAGE_SIZE : 16,
 	    0, BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR, NULL, NULL,
 	    size, 1, size, 0, NULL, NULL, &ctrlr->hmb_desc_tag);
 	if (err != 0) {
