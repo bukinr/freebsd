@@ -224,11 +224,12 @@ include		"std.starfive"
 
 # Uncomment for memory disk
 options 	MD_ROOT
-options 	MD_ROOT_SIZE=8192
+options 	MD_ROOT_SIZE=10240
 #makeoptions	MFS_IMAGE=/home/br/dev/freebsd/mdroot-small.img
 makeoptions	MFS_IMAGE=/home/br/dev/freebsd/mdroot.img
-options 	ROOTDEVNAME=\"ufs:/dev/md0\"
+#options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 #options 	ROOTDEVNAME=\"ufs:/dev/mmcsd0s3\"
+options 	ROOTDEVNAME=\"ufs:/dev/nvd0\"
 
 #options 	FDT
 #options 	FDT_DTB_STATIC
@@ -236,5 +237,5 @@ options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 #makeoptions	MODULES_OVERRIDE=""
 
 device		xlnx_pcib
-#include	"std.nodebug"
-#ident		GENERIC-NODEBUG
+include		"std.nodebug"
+ident		GENERIC-NODEBUG
