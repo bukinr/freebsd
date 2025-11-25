@@ -401,7 +401,6 @@ axidma_rxfinish_onebuf(struct axidma_softc *sc, int len)
 {
 	struct mbuf *m, *newmbuf;
 	struct axidma_bufmap *bmap;
-	//uint8_t *dst, *src;
 	int error;
 
 dprintf("%s\n", __func__);
@@ -597,8 +596,8 @@ axidma_attach(device_t dev)
 	xref = OF_xref_from_node(node);
 	OF_device_register_xref(xref, dev);
 
-	sc->rxbuf_align = PAGE_SIZE;//16;
-	sc->txbuf_align = PAGE_SIZE;//16;
+	sc->rxbuf_align = 16;
+	sc->txbuf_align = 16;
 
 	/*
 	* Set up TX descriptor ring, descriptors, and dma maps.
