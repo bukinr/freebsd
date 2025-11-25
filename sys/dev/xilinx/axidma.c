@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2019-2025 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -30,7 +30,10 @@
  * SUCH DAMAGE.
  */
 
-/* Xilinx AXI DMA controller driver. */
+/*
+ * Xilinx AXI DMA controller driver.
+ * This is part of Xilinx AXI Ethernet (xae) driver.
+ */
 
 #include <sys/cdefs.h>
 #include "opt_platform.h"
