@@ -73,6 +73,9 @@ struct xae_softc {
 
 	/* Counters */
 	uint64_t		counters[XAE_MAX_COUNTERS];
+
+	/* Axistream-connected. */
+	device_t		dma_dev;
 };
 
 #endif	/* _DEV_XILINX_IF_XAEVAR_H_ */

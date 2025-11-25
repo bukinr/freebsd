@@ -36,13 +36,23 @@
 #include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/mbuf.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/rman.h>
+#include <sys/socket.h>
 
 #include <machine/bus.h>
+
+#include <net/bpf.h>
+#include <net/if.h>
+#include <net/ethernet.h>
+#include <net/if_dl.h>
+#include <net/if_media.h>
+#include <net/if_types.h>
+#include <net/if_var.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -58,6 +68,7 @@
 #include <dev/xilinx/axidma.h>
 
 #include "xdma_if.h"
+#include "axidma_if.h"
 
 #define	READ4(_sc, _reg)	\
 	bus_space_read_4(_sc->bst, _sc->bsh, _reg)
@@ -68,6 +79,14 @@
 #define	WRITE8(_sc, _reg, _val)	\
 	bus_space_write_8(_sc->bst, _sc->bsh, _reg, _val)
 
+#define	AXIDMA_LOCK(sc)			mtx_lock(&(sc)->mtx)
+#define	AXIDMA_UNLOCK(sc)		mtx_unlock(&(sc)->mtx)
+#define	AXIDMA_ASSERT_LOCKED(sc)	mtx_assert(&(sc)->mtx, MA_OWNED)
+#define	AXIDMA_ASSERT_UNLOCKED(sc)	mtx_assert(&(sc)->mtx, MA_NOTOWNED)
+
+#define	CHAN_TX	0
+#define	CHAN_RX	1
+
 #define AXIDMA_DEBUG
 #undef AXIDMA_DEBUG
 
@@ -77,7 +96,22 @@
 #define dprintf(fmt, ...)
 #endif
 
+#define	FEC_DESC_RING_ALIGN		64
+
+/*
+ * Driver data and defines.
+ */
+#define	RX_DESC_COUNT	64
+#define	RX_DESC_SIZE	(sizeof(struct axidma_desc) * RX_DESC_COUNT)
+#define	TX_DESC_COUNT	64
+#define	TX_DESC_SIZE	(sizeof(struct axidma_desc) * TX_DESC_COUNT)
+
 extern struct bus_space memmap_bus;
+
+struct axidma_bufmap {
+	struct mbuf	*mbuf;
+	bus_dmamap_t	map;
+};
 
 struct axidma_channel {
 	struct axidma_softc	*sc;
@@ -105,6 +139,30 @@ struct axidma_softc {
 	void			*ih[2];
 	struct axidma_desc	desc;
 	struct axidma_channel	channels[AXIDMA_NCHANNELS];
+
+	struct mtx		mtx;
+	if_t			ifp;
+
+	int			rxbuf_align;
+	int			txbuf_align;
+
+	bus_dma_tag_t		rxdesc_tag;
+	bus_dmamap_t		rxdesc_map;
+	struct axidma_desc	*rxdesc_ring;
+	bus_addr_t		rxdesc_ring_paddr;
+	bus_dma_tag_t		rxbuf_tag;
+	struct axidma_bufmap	rxbuf_map[RX_DESC_COUNT];
+	uint32_t		rx_idx;
+
+	bus_dma_tag_t		txdesc_tag;
+	bus_dmamap_t		txdesc_map;
+	struct axidma_desc	*txdesc_ring;
+	bus_addr_t		txdesc_ring_paddr;
+	bus_dma_tag_t		txbuf_tag;
+	struct axidma_bufmap	txbuf_map[TX_DESC_COUNT];
+	uint32_t		tx_idx_head;
+	uint32_t		tx_idx_tail;
+	int			txcount;
 };
 
 static struct resource_spec axidma_spec[] = {
@@ -125,6 +183,29 @@ static struct ofw_compat_data compat_data[] = {
 static int axidma_probe(device_t dev);
 static int axidma_attach(device_t dev);
 static int axidma_detach(device_t dev);
+
+static inline uint32_t
+next_rxidx(struct axidma_softc *sc, uint32_t curidx)
+{
+
+	return ((curidx == RX_DESC_COUNT - 1) ? 0 : curidx + 1);
+}
+
+static inline uint32_t
+next_txidx(struct axidma_softc *sc, uint32_t curidx)
+{
+
+	return ((curidx == TX_DESC_COUNT - 1) ? 0 : curidx + 1);
+}
+
+static void
+axidma_get1paddr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
+{
+
+	if (error != 0)
+		return;
+	*(bus_addr_t *)arg = segs[0].ds_addr;
+}
 
 static inline uint32_t
 axidma_next_desc(struct axidma_channel *chan, uint32_t curidx)
@@ -190,32 +271,429 @@ axidma_intr(struct axidma_softc *sc,
 	xdma_callback(chan->xchan, &status);
 }
 
+inline static uint32_t
+axidma_setup_txdesc(struct axidma_softc *sc, int idx, bus_addr_t paddr, 
+    uint32_t len)
+{
+	struct axidma_desc *desc;
+	uint32_t nidx;
+	//uint32_t next;
+	uint32_t flags;
+
+	nidx = next_txidx(sc, idx);
+
+	desc = &sc->txdesc_ring[idx];
+
+	/* Addr/len 0 means we're clearing the descriptor after xmit done. */
+	if (paddr == 0 || len == 0) {
+		flags = 0;
+		--sc->txcount;
+	} else {
+		//flags = 0;//FEC_TXDESC_READY | FEC_TXDESC_L | FEC_TXDESC_TC;
+		flags = BD_CONTROL_TXSOF | BD_CONTROL_TXEOF;
+		++sc->txcount;
+	}
+	if (nidx == 0) {
+		//flags |= 0;//FEC_TXDESC_WRAP;
+	}
+
+	/*
+	* The hardware requires 32-bit physical addresses.  We set up the dma
+	* tag to indicate that, so the cast to uint32_t should never lose
+	* significant bits.
+	*/
+	//sc->txdesc_ring[idx].buf_paddr = (uint32_t)paddr;
+	//sc->txdesc_ring[idx].flags_len = flags | len; /* Must be set last! */
+
+	desc->next = sc->txdesc_ring_paddr + sizeof(struct axidma_desc) * nidx;
+	desc->phys = paddr;
+	desc->status = 0;
+	desc->control = len | flags;
+
+	return (nidx);
+}
+
+static int
+axidma_setup_txbuf(struct axidma_softc *sc, int idx, struct mbuf **mp)
+{
+	struct bus_dma_segment seg;
+	struct mbuf *m;
+	int error;
+	int nsegs;
+
+dprintf("%s\n", __func__);
+
+	if ((m = m_defrag(*mp, M_NOWAIT)) == NULL)
+		return (ENOMEM);
+
+	*mp = m;
+
+	error = bus_dmamap_load_mbuf_sg(sc->txbuf_tag, sc->txbuf_map[idx].map,
+	    m, &seg, &nsegs, 0);
+	if (error != 0)
+		return (ENOMEM);
+
+	bus_dmamap_sync(sc->txbuf_tag, sc->txbuf_map[idx].map,
+	    BUS_DMASYNC_PREWRITE);
+
+	sc->txbuf_map[idx].mbuf = m;
+	axidma_setup_txdesc(sc, idx, seg.ds_addr, seg.ds_len);
+
+	return (0);
+}
+
+static void
+axidma_txstart_locked(struct axidma_softc *sc)
+{
+	struct mbuf *m;
+	int enqueued;
+	int tmp;
+	if_t ifp;
+
+dprintf("%s\n", __func__);
+
+	AXIDMA_ASSERT_LOCKED(sc);
+
+#if 0
+	if (!sc->link_is_up)
+		return;
+#endif
+
+	ifp = sc->ifp;
+
+	if (if_getdrvflags(ifp) & IFF_DRV_OACTIVE)
+		return;
+
+	enqueued = 0;
+
+	for (;;) {
+		if (sc->txcount == (TX_DESC_COUNT - 1)) {
+			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
+			break;
+		}
+		m = if_dequeue(ifp);
+		if (m == NULL)
+			break;
+		if (axidma_setup_txbuf(sc, sc->tx_idx_head, &m) != 0) {
+			if_sendq_prepend(ifp, m);
+			break;
+		}
+		BPF_MTAP(ifp, m);
+		tmp = sc->tx_idx_head;
+		sc->tx_idx_head = next_txidx(sc, sc->tx_idx_head);
+		++enqueued;
+	}
+
+	if (enqueued != 0) {
+		bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
+		    BUS_DMASYNC_PREWRITE);
+		//WR4(sc, FEC_TDAR_REG, FEC_TDAR_TDAR);
+		//bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
+		//    BUS_DMASYNC_POSTWRITE);
+		//sc->tx_watchdog_count = WATCHDOG_TIMEOUT_SECS;
+
+		uint32_t addr;
+		addr = sc->txdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
+dprintf("%s: new tail desc %x\n", __func__, addr);
+		WRITE8(sc, AXI_TAILDESC(CHAN_TX), addr);
+	}
+}
+
+static void
+axidma_txfinish_locked(struct axidma_softc *sc)
+{
+	struct axidma_desc *desc;
+	struct axidma_bufmap *bmap;
+	boolean_t retired_buffer;
+	if_t ifp;
+
+	AXIDMA_ASSERT_LOCKED(sc);
+
+	/* XXX Can't set PRE|POST right now, but we need both. */
+	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map, BUS_DMASYNC_POSTREAD);
+	ifp = sc->ifp;
+	retired_buffer = false;
+	while (sc->tx_idx_tail != sc->tx_idx_head) {
+		desc = &sc->txdesc_ring[sc->tx_idx_tail];
+		//if (desc->flags_len & FEC_TXDESC_READY)
+		//	break;
+		if ((desc->status & BD_STATUS_CMPLT) == 0)
+			break;
+		retired_buffer = true;
+		bmap = &sc->txbuf_map[sc->tx_idx_tail];
+		bus_dmamap_sync(sc->txbuf_tag, bmap->map, 
+		   BUS_DMASYNC_POSTWRITE);
+		bus_dmamap_unload(sc->txbuf_tag, bmap->map);
+		m_freem(bmap->mbuf);
+		bmap->mbuf = NULL;
+		axidma_setup_txdesc(sc, sc->tx_idx_tail, 0, 0);
+		sc->tx_idx_tail = next_txidx(sc, sc->tx_idx_tail);
+	}
+
+	/*
+	* If we retired any buffers, there will be open tx slots available in
+	* the descriptor ring, go try to start some new output.
+	*/
+	if (retired_buffer) {
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
+		axidma_txstart_locked(sc);
+	}
+
+	/* If there are no buffers outstanding, muzzle the watchdog. */
+	if (sc->tx_idx_tail == sc->tx_idx_head) {
+		//sc->tx_watchdog_count = 0;
+	}
+}
+
+inline static uint32_t
+axidma_setup_rxdesc(struct axidma_softc *sc, int idx, bus_addr_t paddr)
+{
+	struct axidma_desc *desc;
+	uint32_t nidx;
+
+	/*
+	 * The hardware requires 32-bit physical addresses.  We set up the dma
+	 * tag to indicate that, so the cast to uint32_t should never lose
+	 * significant bits.
+	 */
+	nidx = next_rxidx(sc, idx);
+
+	desc = &sc->rxdesc_ring[idx];
+
+	//sc->rxdesc_ring[idx].buf_paddr = (uint32_t)paddr;
+	//sc->rxdesc_ring[idx].flags_len = FEC_RXDESC_EMPTY | 
+	//	((nidx == 0) ? FEC_RXDESC_WRAP : 0);
+
+	desc->next = sc->rxdesc_ring_paddr + sizeof(struct axidma_desc) * nidx;
+	desc->phys = paddr;
+	desc->status = 0;
+	desc->control = MCLBYTES | BD_CONTROL_TXSOF | BD_CONTROL_TXEOF;
+
+	return (nidx);
+}
+
+static struct mbuf *
+axidma_alloc_mbufcl(struct axidma_softc *sc)
+{
+	struct mbuf *m;
+
+	m = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
+	if (m != NULL)
+		m->m_pkthdr.len = m->m_len = m->m_ext.ext_size;
+
+	return (m);
+}
+
+static int
+axidma_setup_rxbuf(struct axidma_softc *sc, int idx, struct mbuf * m)
+{
+	int error, nsegs;
+	struct bus_dma_segment seg;
+
+#if 0
+	if (!(sc->fecflags & FECFLAG_RACC)) {
+		/*
+		* The RACC[SHIFT16] feature is not available.  So, we need to
+		* leave at least ETHER_ALIGN bytes free at the beginning of the
+		* buffer to allow the data to be re-aligned after receiving it
+		* (by copying it backwards ETHER_ALIGN bytes in the same
+		* buffer).  We also have to ensure that the beginning of the
+		* buffer is aligned to the hardware's requirements.
+		*/
+		m_adj(m, roundup(ETHER_ALIGN, sc->rxbuf_align));
+	}
+#endif
+
+	error = bus_dmamap_load_mbuf_sg(sc->rxbuf_tag, sc->rxbuf_map[idx].map,
+	   m, &seg, &nsegs, 0);
+	if (error != 0) {
+		return (error);
+	}
+
+	bus_dmamap_sync(sc->rxbuf_tag, sc->rxbuf_map[idx].map,
+	   BUS_DMASYNC_PREREAD);
+
+	sc->rxbuf_map[idx].mbuf = m;
+	axidma_setup_rxdesc(sc, idx, seg.ds_addr);
+	
+	return (0);
+}
+
+static void
+axidma_rxfinish_onebuf(struct axidma_softc *sc, int len)
+{
+	struct mbuf *m, *newmbuf;
+	struct axidma_bufmap *bmap;
+	//uint8_t *dst, *src;
+	int error;
+
+dprintf("%s\n", __func__);
+	/*
+	*  First try to get a new mbuf to plug into this slot in the rx ring.
+	*  If that fails, drop the current packet and recycle the current
+	*  mbuf, which is still mapped and loaded.
+	*/
+	if ((newmbuf = axidma_alloc_mbufcl(sc)) == NULL) {
+		if_inc_counter(sc->ifp, IFCOUNTER_IQDROPS, 1);
+		axidma_setup_rxdesc(sc, sc->rx_idx, 
+		    sc->rxdesc_ring[sc->rx_idx].phys);
+		return;
+	}
+
+	AXIDMA_UNLOCK(sc);
+
+	bmap = &sc->rxbuf_map[sc->rx_idx];
+	//len -= ETHER_CRC_LEN;
+	bus_dmamap_sync(sc->rxbuf_tag, bmap->map, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_unload(sc->rxbuf_tag, bmap->map);
+	m = bmap->mbuf;
+	bmap->mbuf = NULL;
+	m->m_len = len;
+	m->m_pkthdr.len = len;
+	m->m_pkthdr.rcvif = sc->ifp;
+
+	/*
+	* Align the protocol headers in the receive buffer on a 32-bit
+	* boundary.  Newer hardware does the alignment for us.  On hardware
+	* that doesn't support this feature, we have to copy-align the data.
+	*
+	*  XXX for older hardware, could we speed this up by copying just the
+	*  protocol headers into their own small mbuf then chaining the cluster
+	*  to it? That way we'd only need to copy like 64 bytes or whatever the
+	*  biggest header is, instead of the whole 1530ish-byte frame.
+	*/
+#if 0
+	if (sc->fecflags & FECFLAG_RACC) {
+		m->m_data = mtod(m, uint8_t *) + 2;
+	} else {
+		src = mtod(m, uint8_t *);
+		dst = src - ETHER_ALIGN;
+		bcopy(src, dst, len);
+		m->m_data = dst;
+	}
+#endif
+	if_input(sc->ifp, m);
+
+	AXIDMA_LOCK(sc);
+
+	if ((error = axidma_setup_rxbuf(sc, sc->rx_idx, newmbuf)) != 0) {
+		device_printf(sc->dev, "axidma_setup_rxbuf error %d\n", error);
+		/* XXX Now what?  We've got a hole in the rx ring. */
+	}
+}
+
+static void
+axidma_rxfinish_locked(struct axidma_softc *sc)
+{
+	boolean_t produced_empty_buffer;
+	struct axidma_desc *desc;
+	int len;
+	int tmp;
+
+dprintf("%s\n", __func__);
+
+	AXIDMA_ASSERT_LOCKED(sc);
+
+	/* XXX Can't set PRE|POST right now, but we need both. */
+	//bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map, BUS_DMASYNC_POSTREAD);
+	produced_empty_buffer = false;
+	for (;;) {
+		desc = &sc->rxdesc_ring[sc->rx_idx];
+		//if (desc->flags_len & FEC_RXDESC_EMPTY)
+		//	break;
+		if ((desc->status & BD_STATUS_CMPLT) == 0)
+			break;
+		produced_empty_buffer = true;
+		//len = (desc->flags_len & FEC_RXDESC_LEN_MASK);
+		len = desc->status & BD_CONTROL_LEN_M;
+#if 0
+		if (len < 64) {
+			/*
+			 * Just recycle the descriptor and continue.           .
+			 */
+			axidma_setup_rxdesc(sc, sc->rx_idx,
+			    sc->rxdesc_ring[sc->rx_idx].phys);
+		} else if ((desc->flags_len & FEC_RXDESC_L) == 0) {
+			/*
+			* The entire frame is not in this buffer.  Impossible.
+			* Recycle the descriptor and continue.
+			*
+			* XXX what's the right way to handle this? Probably we
+			* should stop/init the hardware because this should
+			* just really never happen when we have buffers bigger
+			* than the maximum frame size.
+			*/
+			device_printf(sc->dev, 
+			   "fec_rxfinish: received frame without LAST bit set");
+			axidma_setup_rxdesc(sc, sc->rx_idx, 
+			   sc->rxdesc_ring[sc->rx_idx].buf_paddr);
+		} else if (desc->flags_len & FEC_RXDESC_ERROR_BITS) {
+			/*
+			*  Something went wrong with receiving the frame, we
+			*  don't care what (the hardware has counted the error
+			*  in the stats registers already), we just reuse the
+			*  same mbuf, which is still dma-mapped, by resetting
+			*  the rx descriptor.
+			*/
+			axidma_setup_rxdesc(sc, sc->rx_idx, 
+			   sc->rxdesc_ring[sc->rx_idx].buf_paddr);
+		} else {
+#endif
+			/*
+			*  Normal case: a good frame all in one buffer.
+			*/
+			axidma_rxfinish_onebuf(sc, len);
+		//}
+		tmp = sc->rx_idx;
+		sc->rx_idx = next_rxidx(sc, sc->rx_idx);
+	}
+
+	if (produced_empty_buffer) {
+		bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
+		    BUS_DMASYNC_PREWRITE);
+		//WR4(sc, FEC_RDAR_REG, FEC_RDAR_RDAR);
+		//bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
+		//    BUS_DMASYNC_POSTWRITE);
+
+		uint32_t addr;
+		addr = sc->rxdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
+dprintf("%s: new tail desc %x\n", __func__, addr);
+		WRITE8(sc, AXI_TAILDESC(CHAN_RX), addr);
+	}
+}
+
 static void
 axidma_intr_rx(void *arg)
 {
 	struct axidma_softc *sc;
-	struct axidma_channel *chan;
-
-	dprintf("%s\n", __func__);
+	uint32_t pending;
 
 	sc = arg;
-	chan = &sc->channels[AXIDMA_RX_CHAN];
 
-	axidma_intr(sc, chan);
+	AXIDMA_LOCK(sc);
+	pending = READ4(sc, AXI_DMASR(AXIDMA_RX_CHAN));
+dprintf("%s: pending %x\n", __func__, pending);
+	WRITE4(sc, AXI_DMASR(AXIDMA_RX_CHAN), pending);
+	axidma_rxfinish_locked(sc);
+	AXIDMA_UNLOCK(sc);
 }
 
 static void
 axidma_intr_tx(void *arg)
 {
 	struct axidma_softc *sc;
-	struct axidma_channel *chan;
-
-	dprintf("%s\n", __func__);
+	uint32_t pending;
 
 	sc = arg;
-	chan = &sc->channels[AXIDMA_TX_CHAN];
 
-	axidma_intr(sc, chan);
+	AXIDMA_LOCK(sc);
+	pending = READ4(sc, AXI_DMASR(AXIDMA_TX_CHAN));
+dprintf("%s: pending %x\n", __func__, pending);
+	WRITE4(sc, AXI_DMASR(AXIDMA_TX_CHAN), pending);
+	axidma_txfinish_locked(sc);
+	AXIDMA_UNLOCK(sc);
 }
 
 static int
@@ -264,10 +742,19 @@ axidma_attach(device_t dev)
 {
 	struct axidma_softc *sc;
 	phandle_t xref, node;
+	struct mbuf *m;
+	int error;
 	int err;
+	int idx;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+
+	mtx_init(&sc->mtx, device_get_nameunit(sc->dev),
+	    MTX_NETWORK_LOCK, MTX_DEF);
+	sc->rx_idx = 0;
+	sc->tx_idx_head = sc->tx_idx_tail = 0;
+	sc->txcount = 0;
 
 	if (bus_alloc_resources(dev, axidma_spec, sc->res)) {
 		device_printf(dev, "could not allocate resources.\n");
@@ -298,6 +785,189 @@ axidma_attach(device_t dev)
 	xref = OF_xref_from_node(node);
 	OF_device_register_xref(xref, dev);
 
+	sc->rxbuf_align = PAGE_SIZE;//16;
+	sc->txbuf_align = PAGE_SIZE;//16;
+
+	/*
+	* Set up TX descriptor ring, descriptors, and dma maps.
+	*/
+	error = bus_dma_tag_create(
+	   bus_get_dma_tag(dev),	/* Parent tag. */
+	  	//FEC_DESC_RING_ALIGN, 0,	/* alignment, boundary */
+	   PAGE_SIZE, 0,	/* alignment, boundary */
+	   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	   BUS_SPACE_MAXADDR,		/* highaddr */
+	   NULL, NULL,			/* filter, filterarg */
+	   TX_DESC_SIZE, 1, 		/* maxsize, nsegments */
+	   TX_DESC_SIZE,		/* maxsegsize */
+	   0,				/* flags */
+	   NULL, NULL,			/* lockfunc, lockarg */
+	   &sc->txdesc_tag);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not create TX ring DMA tag.\n");
+		goto out;
+	}
+
+	error = bus_dmamem_alloc(sc->txdesc_tag, (void**)&sc->txdesc_ring,
+	   BUS_DMA_COHERENT | BUS_DMA_WAITOK | BUS_DMA_ZERO, &sc->txdesc_map);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not allocate TX descriptor ring.\n");
+		goto out;
+	}
+
+	error = bus_dmamap_load(sc->txdesc_tag, sc->txdesc_map, sc->txdesc_ring,
+	   TX_DESC_SIZE, axidma_get1paddr, &sc->txdesc_ring_paddr, 0);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not load TX descriptor ring map.\n");
+		goto out;
+	}
+
+	error = bus_dma_tag_create(
+	   bus_get_dma_tag(dev),	/* Parent tag. */
+	   sc->txbuf_align, 0,		/* alignment, boundary */
+	   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	   BUS_SPACE_MAXADDR,		/* highaddr */
+	   NULL, NULL,			/* filter, filterarg */
+	   MCLBYTES, 1, 		/* maxsize, nsegments */
+	   MCLBYTES,			/* maxsegsize */
+	   0,				/* flags */
+	   NULL, NULL,			/* lockfunc, lockarg */
+	   &sc->txbuf_tag);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not create TX ring DMA tag.\n");
+		goto out;
+	}
+
+	struct axidma_desc *desc;
+	for (idx = 0; idx < TX_DESC_COUNT; ++idx) {
+		desc = &sc->txdesc_ring[idx];
+		bzero(desc, sizeof(struct axidma_desc));
+	}
+
+	for (idx = 0; idx < TX_DESC_COUNT; ++idx) {
+		error = bus_dmamap_create(sc->txbuf_tag, 0,
+		   &sc->txbuf_map[idx].map);
+		if (error != 0) {
+			device_printf(sc->dev,
+			   "could not create TX buffer DMA map.\n");
+			goto out;
+		}
+		axidma_setup_txdesc(sc, idx, 0, 0);
+	}
+
+	/*
+	* Set up RX descriptor ring, descriptors, dma maps, and mbufs.
+	*/
+	error = bus_dma_tag_create(
+	   bus_get_dma_tag(dev),	/* Parent tag. */
+	   FEC_DESC_RING_ALIGN, 0,	/* alignment, boundary */
+	   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	   BUS_SPACE_MAXADDR,		/* highaddr */
+	   NULL, NULL,			/* filter, filterarg */
+	   RX_DESC_SIZE, 1, 		/* maxsize, nsegments */
+	   RX_DESC_SIZE,		/* maxsegsize */
+	   0,				/* flags */
+	   NULL, NULL,			/* lockfunc, lockarg */
+	   &sc->rxdesc_tag);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not create RX ring DMA tag.\n");
+		goto out;
+	}
+
+	error = bus_dmamem_alloc(sc->rxdesc_tag, (void **)&sc->rxdesc_ring, 
+	   BUS_DMA_COHERENT | BUS_DMA_WAITOK | BUS_DMA_ZERO, &sc->rxdesc_map);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not allocate RX descriptor ring.\n");
+		goto out;
+	}
+
+	error = bus_dmamap_load(sc->rxdesc_tag, sc->rxdesc_map, sc->rxdesc_ring,
+	   RX_DESC_SIZE, axidma_get1paddr, &sc->rxdesc_ring_paddr, 0);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not load RX descriptor ring map.\n");
+		goto out;
+	}
+
+	error = bus_dma_tag_create(
+	   bus_get_dma_tag(dev),	/* Parent tag. */
+	   1, 0,			/* alignment, boundary */
+	   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	   BUS_SPACE_MAXADDR,		/* highaddr */
+	   NULL, NULL,			/* filter, filterarg */
+	   MCLBYTES, 1, 		/* maxsize, nsegments */
+	   MCLBYTES,			/* maxsegsize */
+	   0,				/* flags */
+	   NULL, NULL,			/* lockfunc, lockarg */
+	   &sc->rxbuf_tag);
+	if (error != 0) {
+		device_printf(sc->dev,
+		   "could not create RX buf DMA tag.\n");
+		goto out;
+	}
+
+	for (idx = 0; idx < RX_DESC_COUNT; ++idx) {
+		desc = &sc->rxdesc_ring[idx];
+		bzero(desc, sizeof(struct axidma_desc));
+	}
+
+	for (idx = 0; idx < RX_DESC_COUNT; ++idx) {
+		error = bus_dmamap_create(sc->rxbuf_tag, 0,
+		   &sc->rxbuf_map[idx].map);
+		if (error != 0) {
+			device_printf(sc->dev,
+			   "could not create RX buffer DMA map.\n");
+			goto out;
+		}
+		if ((m = axidma_alloc_mbufcl(sc)) == NULL) {
+			device_printf(dev, "Could not alloc mbuf\n");
+			error = ENOMEM;
+			goto out;
+		}
+		if ((error = axidma_setup_rxbuf(sc, idx, m)) != 0) {
+			device_printf(sc->dev,
+			   "could not create new RX buffer.\n");
+			goto out;
+		}
+	}
+
+	uint32_t reg;
+
+	if (axidma_reset(sc, CHAN_TX) != 0)
+		return (-1);
+	if (axidma_reset(sc, CHAN_RX) != 0)
+		return (-1);
+
+dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
+	WRITE8(sc, AXI_CURDESC(CHAN_TX), sc->txdesc_ring_paddr);
+	reg = READ4(sc, AXI_DMACR(CHAN_TX));
+	reg |= DMACR_IOC_IRQEN | DMACR_DLY_IRQEN | DMACR_ERR_IRQEN;
+	WRITE4(sc, AXI_DMACR(CHAN_TX), reg);
+	reg |= DMACR_RS;
+	//WRITE4(sc, AXI_DMACR(CHAN_TX), reg);
+
+	WRITE8(sc, AXI_CURDESC(CHAN_RX), sc->rxdesc_ring_paddr);
+	reg = READ4(sc, AXI_DMACR(CHAN_RX));
+	reg |= DMACR_IOC_IRQEN | DMACR_DLY_IRQEN | DMACR_ERR_IRQEN;
+	WRITE4(sc, AXI_DMACR(CHAN_RX), reg);
+	reg |= DMACR_RS;
+	//WRITE4(sc, AXI_DMACR(CHAN_RX), reg);
+
+	return (0);
+
+	uint32_t addr;
+	addr = sc->rxdesc_ring_paddr +
+	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
+dprintf("%s: new RX tail desc %x\n", __func__, addr);
+	WRITE8(sc, AXI_TAILDESC(CHAN_RX), addr);
+
+out:
 	return (0);
 }
 
@@ -354,7 +1024,7 @@ axidma_desc_alloc(struct axidma_softc *sc, struct xdma_channel *xchan,
 	chan->descs_phys = malloc(nsegments * sizeof(bus_dma_segment_t),
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	chan->mem_size = desc_size * nsegments;
-printf("%s: size %lx\n", __func__, chan->mem_size);
+dprintf("%s: size %lx\n", __func__, chan->mem_size);
 	if (vmem_alloc(xchan->vmem, chan->mem_size, M_FIRSTFIT | M_NOWAIT,
 	    &chan->mem_paddr)) {
 		device_printf(sc->dev, "Failed to allocate memory.\n");
@@ -609,6 +1279,38 @@ axidma_ofw_md_data(device_t dev, pcell_t *cells, int ncells, void **ptr)
 }
 #endif
 
+static int
+axidma_txstart(device_t dev, if_t ifp)
+{
+	struct axidma_softc *sc;
+	uint32_t reg;
+
+	sc = device_get_softc(dev); //if_getsoftc(ifp);
+	sc->ifp = ifp;
+
+dprintf("%s\n", __func__);
+
+	reg = READ4(sc, AXI_DMACR(CHAN_TX));
+	reg |= DMACR_RS;
+	WRITE4(sc, AXI_DMACR(CHAN_TX), reg);
+
+	reg = READ4(sc, AXI_DMACR(CHAN_RX));
+	reg |= DMACR_RS;
+	WRITE4(sc, AXI_DMACR(CHAN_RX), reg);
+
+	uint32_t addr;
+	addr = sc->rxdesc_ring_paddr +
+	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
+dprintf("%s: new RX tail desc %x\n", __func__, addr);
+	WRITE8(sc, AXI_TAILDESC(CHAN_RX), addr);
+
+	AXIDMA_LOCK(sc);
+	axidma_txstart_locked(sc);
+	AXIDMA_UNLOCK(sc);
+
+	return (0);
+}
+
 static device_method_t axidma_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,			axidma_probe),
@@ -624,6 +1326,8 @@ static device_method_t axidma_methods[] = {
 	DEVMETHOD(xdma_channel_capacity,	axidma_channel_capacity),
 	DEVMETHOD(xdma_channel_prep_sg,		axidma_channel_prep_sg),
 	DEVMETHOD(xdma_channel_submit_sg,	axidma_channel_submit_sg),
+
+	DEVMETHOD(axidma_txstart,		axidma_txstart),
 
 #ifdef FDT
 	DEVMETHOD(xdma_ofw_md_data,		axidma_ofw_md_data),

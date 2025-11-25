@@ -67,6 +67,7 @@
 #include <dev/xilinx/axidma.h>
 
 #include "miibus_if.h"
+#include "axidma_if.h"
 
 #define	READ4(_sc, _reg) \
 	bus_read_4((_sc)->res[0], _reg)
@@ -411,7 +412,7 @@ xae_tick(void *arg)
 {
 	struct xae_softc *sc;
 	if_t ifp;
-	int link_was_up;
+	//int link_was_up;
 
 	sc = arg;
 
@@ -426,10 +427,10 @@ xae_tick(void *arg)
 	xae_harvest_stats(sc);
 
 	/* Check the media status. */
-	link_was_up = sc->link_is_up;
+	//link_was_up = sc->link_is_up;
 	mii_tick(sc->mii_softc);
-	if (sc->link_is_up && !link_was_up)
-		xae_transmit_locked(sc->ifp);
+	//if (sc->link_is_up && !link_was_up)
+	//	xae_transmit_locked(sc->ifp);
 
 	/* Schedule another check one second from now. */
 	callout_reset(&sc->xae_callout, hz, xae_tick, sc);
@@ -792,7 +793,6 @@ static int
 get_xdma_axistream(struct xae_softc *sc)
 {
 	struct axidma_fdt_data *data;
-	device_t dma_dev;
 	phandle_t node;
 	pcell_t prop;
 	size_t len;
@@ -804,13 +804,15 @@ get_xdma_axistream(struct xae_softc *sc)
 		    "%s: Couldn't get axistream-connected prop.\n", __func__);
 		return (ENXIO);
 	}
-	dma_dev = OF_device_from_xref(prop);
-	if (dma_dev == NULL) {
+	sc->dma_dev = OF_device_from_xref(prop);
+	if (sc->dma_dev == NULL) {
 		device_printf(sc->dev, "Could not get DMA device by xref.\n");
 		return (ENXIO);
 	}
 
-	sc->xdma_tx = xdma_get(sc->dev, dma_dev);
+	return (0);
+
+	sc->xdma_tx = xdma_get(sc->dev, sc->dma_dev);
 	if (sc->xdma_tx == NULL) {
 		device_printf(sc->dev, "Could not find DMA controller.\n");
 		return (ENXIO);
@@ -820,7 +822,7 @@ get_xdma_axistream(struct xae_softc *sc)
 	data->id = AXIDMA_TX_CHAN;
 	sc->xdma_tx->data = data;
 
-	sc->xdma_rx = xdma_get(sc->dev, dma_dev);
+	sc->xdma_rx = xdma_get(sc->dev, sc->dma_dev);
 	if (sc->xdma_rx == NULL) {
 		device_printf(sc->dev, "Could not find DMA controller.\n");
 		return (ENXIO);
@@ -926,6 +928,18 @@ setup_xdma(struct xae_softc *sc)
 	return (0);
 }
 
+static void
+xae_txstart(if_t ifp)
+{
+	struct xae_softc *sc;
+
+	sc = if_getsoftc(ifp);
+
+	dprintf("%s\n", __func__);
+
+	AXIDMA_TXSTART(sc->dma_dev, ifp);
+}
+
 static int
 xae_probe(device_t dev)
 {
@@ -954,10 +968,14 @@ xae_attach(device_t dev)
 	sc->dev = dev;
 	node = ofw_bus_get_node(dev);
 
+#if 0
 	if (setup_xdma(sc) != 0) {
 		device_printf(dev, "Could not setup xDMA.\n");
 		return (ENXIO);
 	}
+#else
+	get_xdma_axistream(sc);
+#endif
 
 	mtx_init(&sc->mtx, device_get_nameunit(sc->dev),
 	    MTX_NETWORK_LOCK, MTX_DEF);
@@ -1009,9 +1027,10 @@ xae_attach(device_t dev)
 	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
 	if_setcapabilities(ifp, IFCAP_VLAN_MTU);
 	if_setcapenable(ifp, if_getcapabilities(ifp));
-	if_settransmitfn(ifp, xae_transmit);
+	//if_settransmitfn(ifp, xae_transmit);
 	if_setqflushfn(ifp, xae_qflush);
 	if_setioctlfn(ifp, xae_ioctl);
+	if_setstartfn(ifp, xae_txstart);
 	if_setinitfn(ifp, xae_init);
 	if_setsendqlen(ifp, TX_DESC_COUNT - 1);
 	if_setsendqready(ifp);
@@ -1038,8 +1057,10 @@ xae_attach(device_t dev)
 	ether_ifattach(ifp, sc->macaddr);
 	sc->is_attached = true;
 
+#if 0
 	xae_rx_enqueue(sc, NUM_RX_MBUF);
 	xdma_queue_submit(sc->xchan_rx);
+#endif
 
 	return (0);
 }
