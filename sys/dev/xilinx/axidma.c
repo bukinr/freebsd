@@ -596,8 +596,8 @@ axidma_attach(device_t dev)
 	xref = OF_xref_from_node(node);
 	OF_device_register_xref(xref, dev);
 
-	sc->rxbuf_align = 16;
-	sc->txbuf_align = 16;
+	sc->rxbuf_align = PAGE_SIZE;
+	sc->txbuf_align = PAGE_SIZE;
 
 	/*
 	* Set up TX descriptor ring, descriptors, and dma maps.
