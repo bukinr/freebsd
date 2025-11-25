@@ -85,9 +85,6 @@
 #define	AXIDMA_ASSERT_LOCKED(sc)	mtx_assert(&(sc)->mtx, MA_OWNED)
 #define	AXIDMA_ASSERT_UNLOCKED(sc)	mtx_assert(&(sc)->mtx, MA_NOTOWNED)
 
-#define	CHAN_TX	0
-#define	CHAN_RX	1
-
 #define AXIDMA_DEBUG
 #undef AXIDMA_DEBUG
 
@@ -97,7 +94,7 @@
 #define dprintf(fmt, ...)
 #endif
 
-#define	FEC_DESC_RING_ALIGN		64
+#define	AXI_DESC_RING_ALIGN		64
 
 /*
  * Driver data and defines.
@@ -114,31 +111,12 @@ struct axidma_bufmap {
 	bus_dmamap_t	map;
 };
 
-struct axidma_channel {
-	struct axidma_softc	*sc;
-	bool			used;
-	int			idx_head;
-	int			idx_tail;
-
-	struct axidma_desc	**descs;
-	vm_paddr_t		*descs_phys;
-	uint32_t		descs_num;
-
-	vm_size_t		mem_size;
-	vm_offset_t		mem_paddr;
-	vm_offset_t		mem_vaddr;
-
-	uint32_t		descs_used_count;
-};
-
 struct axidma_softc {
 	device_t		dev;
 	struct resource		*res[3];
 	bus_space_tag_t		bst;
 	bus_space_handle_t	bsh;
 	void			*ih[2];
-	struct axidma_desc	desc;
-	struct axidma_channel	channels[AXIDMA_NCHANNELS];
 
 	struct mtx		mtx;
 	if_t			ifp;
@@ -205,13 +183,6 @@ axidma_get1paddr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 	if (error != 0)
 		return;
 	*(bus_addr_t *)arg = segs[0].ds_addr;
-}
-
-static inline uint32_t
-axidma_next_desc(struct axidma_channel *chan, uint32_t curidx)
-{
-
-	return ((curidx + 1) % chan->descs_num);
 }
 
 inline static uint32_t
@@ -338,7 +309,7 @@ dprintf("%s\n", __func__);
 		uint32_t addr;
 		addr = sc->txdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
 dprintf("%s: new tail desc %x\n", __func__, addr);
-		WRITE8(sc, AXI_TAILDESC(CHAN_TX), addr);
+		WRITE8(sc, AXI_TAILDESC(AXIDMA_TX_CHAN), addr);
 	}
 }
 
@@ -603,7 +574,7 @@ dprintf("%s\n", __func__);
 		uint32_t addr;
 		addr = sc->rxdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
 dprintf("%s: new tail desc %x\n", __func__, addr);
-		WRITE8(sc, AXI_TAILDESC(CHAN_RX), addr);
+		WRITE8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 	}
 }
 
@@ -736,8 +707,7 @@ axidma_attach(device_t dev)
 	*/
 	error = bus_dma_tag_create(
 	   bus_get_dma_tag(dev),	/* Parent tag. */
-	  	//FEC_DESC_RING_ALIGN, 0,	/* alignment, boundary */
-	   PAGE_SIZE, 0,	/* alignment, boundary */
+	   AXI_DESC_RING_ALIGN, 0,	/* alignment, boundary */
 	   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 	   BUS_SPACE_MAXADDR,		/* highaddr */
 	   NULL, NULL,			/* filter, filterarg */
@@ -807,7 +777,7 @@ axidma_attach(device_t dev)
 	*/
 	error = bus_dma_tag_create(
 	   bus_get_dma_tag(dev),	/* Parent tag. */
-	   FEC_DESC_RING_ALIGN, 0,	/* alignment, boundary */
+	   AXI_DESC_RING_ALIGN, 0,	/* alignment, boundary */
 	   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 	   BUS_SPACE_MAXADDR,		/* highaddr */
 	   NULL, NULL,			/* filter, filterarg */
@@ -882,25 +852,25 @@ axidma_attach(device_t dev)
 
 	uint32_t reg;
 
-	if (axidma_reset(sc, CHAN_TX) != 0)
+	if (axidma_reset(sc, AXIDMA_TX_CHAN) != 0)
 		return (-1);
-	if (axidma_reset(sc, CHAN_RX) != 0)
+	if (axidma_reset(sc, AXIDMA_RX_CHAN) != 0)
 		return (-1);
 
 dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
-	WRITE8(sc, AXI_CURDESC(CHAN_TX), sc->txdesc_ring_paddr);
-	reg = READ4(sc, AXI_DMACR(CHAN_TX));
+	WRITE8(sc, AXI_CURDESC(AXIDMA_TX_CHAN), sc->txdesc_ring_paddr);
+	reg = READ4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
 	reg |= DMACR_IOC_IRQEN | DMACR_DLY_IRQEN | DMACR_ERR_IRQEN;
-	WRITE4(sc, AXI_DMACR(CHAN_TX), reg);
+	WRITE4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
 	reg |= DMACR_RS;
-	//WRITE4(sc, AXI_DMACR(CHAN_TX), reg);
+	//WRITE4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
 
-	WRITE8(sc, AXI_CURDESC(CHAN_RX), sc->rxdesc_ring_paddr);
-	reg = READ4(sc, AXI_DMACR(CHAN_RX));
+	WRITE8(sc, AXI_CURDESC(AXIDMA_RX_CHAN), sc->rxdesc_ring_paddr);
+	reg = READ4(sc, AXI_DMACR(AXIDMA_RX_CHAN));
 	reg |= DMACR_IOC_IRQEN | DMACR_DLY_IRQEN | DMACR_ERR_IRQEN;
-	WRITE4(sc, AXI_DMACR(CHAN_RX), reg);
+	WRITE4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
 	reg |= DMACR_RS;
-	//WRITE4(sc, AXI_DMACR(CHAN_RX), reg);
+	//WRITE4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
 
 	return (0);
 
@@ -908,7 +878,7 @@ dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
 	addr = sc->rxdesc_ring_paddr +
 	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
 dprintf("%s: new RX tail desc %x\n", __func__, addr);
-	WRITE8(sc, AXI_TAILDESC(CHAN_RX), addr);
+	WRITE8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 
 out:
 	return (0);
@@ -939,19 +909,19 @@ axidma_txstart(device_t dev, if_t ifp)
 
 dprintf("%s\n", __func__);
 
-	reg = READ4(sc, AXI_DMACR(CHAN_TX));
+	reg = READ4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
 	reg |= DMACR_RS;
-	WRITE4(sc, AXI_DMACR(CHAN_TX), reg);
+	WRITE4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
 
-	reg = READ4(sc, AXI_DMACR(CHAN_RX));
+	reg = READ4(sc, AXI_DMACR(AXIDMA_RX_CHAN));
 	reg |= DMACR_RS;
-	WRITE4(sc, AXI_DMACR(CHAN_RX), reg);
+	WRITE4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
 
 	uint32_t addr;
 	addr = sc->rxdesc_ring_paddr +
 	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
 dprintf("%s: new RX tail desc %x\n", __func__, addr);
-	WRITE8(sc, AXI_TAILDESC(CHAN_RX), addr);
+	WRITE8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 
 	AXIDMA_LOCK(sc);
 	axidma_txstart_locked(sc);

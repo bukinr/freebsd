@@ -84,21 +84,9 @@
 #define	XAE_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
 #define	XAE_ASSERT_UNLOCKED(sc)		mtx_assert(&(sc)->mtx, MA_NOTOWNED)
 
-#define XAE_DEBUG
-#undef XAE_DEBUG
-
-#ifdef XAE_DEBUG
-#define dprintf(fmt, ...)  printf(fmt, ##__VA_ARGS__)
-#else
 #define dprintf(fmt, ...)
-#endif
 
-#define	RX_QUEUE_SIZE		16
-#define	TX_QUEUE_SIZE		16
-#define	NUM_RX_MBUF		16
-#define	BUFRING_SIZE		8192
 #define	MDIO_CLK_DIV_DEFAULT	29
-#define	BUF_NPAGES		64
 
 #define	PHY1_RD(sc, _r)		\
 	xae_miibus_read_reg(sc->dev, 1, _r)
