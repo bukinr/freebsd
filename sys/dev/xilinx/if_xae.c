@@ -133,27 +133,6 @@ static void xae_stop_locked(struct xae_softc *sc);
 static void xae_setup_rxfilter(struct xae_softc *sc);
 
 static int
-xae_rx_enqueue(struct xae_softc *sc, uint32_t n)
-{
-	struct mbuf *m;
-	int i;
-
-	for (i = 0; i < n; i++) {
-		m = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
-		if (m == NULL) {
-			device_printf(sc->dev,
-			    "%s: Can't alloc rx mbuf\n", __func__);
-			return (-1);
-		}
-
-		m->m_pkthdr.len = m->m_len = m->m_ext.ext_size;
-		xdma_enqueue_mbuf(sc->xchan_rx, &m, 0, 4, 4, XDMA_DEV_TO_MEM);
-	}
-
-	return (0);
-}
-
-static int
 xae_get_phyaddr(phandle_t node, int *phy_addr)
 {
 	phandle_t phy_node;
@@ -174,165 +153,9 @@ xae_get_phyaddr(phandle_t node, int *phy_addr)
 	return (0);
 }
 
-static int
-xae_xdma_tx_intr(void *arg, xdma_transfer_status_t *status)
-{
-	xdma_transfer_status_t st;
-	struct xae_softc *sc;
-	if_t ifp;
-	struct mbuf *m;
-	int err;
-
-	sc = arg;
-
-	XAE_LOCK(sc);
-
-	ifp = sc->ifp;
-
-	for (;;) {
-		err = xdma_dequeue_mbuf(sc->xchan_tx, &m, &st);
-		if (err != 0) {
-			break;
-		}
-
-		if (st.error != 0) {
-			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-		}
-
-		m_freem(m);
-	}
-
-	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
-
-	XAE_UNLOCK(sc);
-
-	return (0);
-}
-
-static int
-xae_xdma_rx_intr(void *arg, xdma_transfer_status_t *status)
-{
-	xdma_transfer_status_t st;
-	struct xae_softc *sc;
-	if_t ifp;
-	struct mbuf *m;
-	int err;
-	uint32_t cnt_processed;
-
-	sc = arg;
-
-	dprintf("%s\n", __func__);
-
-	XAE_LOCK(sc);
-
-	ifp = sc->ifp;
-
-	cnt_processed = 0;
-	for (;;) {
-		err = xdma_dequeue_mbuf(sc->xchan_rx, &m, &st);
-		if (err != 0) {
-			break;
-		}
-		cnt_processed++;
-
-		if (st.error != 0) {
-			if_inc_counter(ifp, IFCOUNTER_IERRORS, 1);
-			m_freem(m);
-			continue;
-		}
-
-		m->m_pkthdr.len = m->m_len = st.transferred;
-		m->m_pkthdr.rcvif = ifp;
-		XAE_UNLOCK(sc);
-		if_input(ifp, m);
-		XAE_LOCK(sc);
-	}
-
-	xae_rx_enqueue(sc, cnt_processed);
-
-	XAE_UNLOCK(sc);
-
-	return (0);
-}
-
 static void
 xae_qflush(if_t ifp)
 {
-}
-
-static int
-xae_transmit_locked(if_t ifp)
-{
-	struct xae_softc *sc;
-	struct mbuf *m;
-	struct buf_ring *br;
-	int error;
-	int enq;
-
-	dprintf("%s\n", __func__);
-
-	sc = if_getsoftc(ifp);
-	br = sc->br;
-
-	enq = 0;
-
-	while ((m = drbr_peek(ifp, br)) != NULL) {
-		error = xdma_enqueue_mbuf(sc->xchan_tx,
-		    &m, 0, 4, 4, XDMA_MEM_TO_DEV);
-		if (error != 0) {
-			/* No space in request queue available yet. */
-			drbr_putback(ifp, br, m);
-			break;
-		}
-
-		drbr_advance(ifp, br);
-
-		enq++;
-
-		/* If anyone is interested give them a copy. */
-		ETHER_BPF_MTAP(ifp, m);
-        }
-
-	if (enq > 0)
-		xdma_queue_submit(sc->xchan_tx);
-
-	return (0);
-}
-
-static int
-xae_transmit(if_t ifp, struct mbuf *m)
-{
-	struct xae_softc *sc;
-	int error;
-
-	dprintf("%s\n", __func__);
-
-	sc = if_getsoftc(ifp);
-
-	XAE_LOCK(sc);
-
-	error = drbr_enqueue(ifp, sc->br, m);
-	if (error) {
-		XAE_UNLOCK(sc);
-		return (error);
-	}
-
-	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
-	    IFF_DRV_RUNNING) {
-		XAE_UNLOCK(sc);
-		return (0);
-	}
-
-	if (!sc->link_is_up) {
-		XAE_UNLOCK(sc);
-		return (0);
-	}
-
-	error = xae_transmit_locked(ifp);
-
-	XAE_UNLOCK(sc);
-
-	return (error);
 }
 
 static void
@@ -773,26 +596,8 @@ xae_phy_fixup(struct xae_softc *sc)
 }
 
 static int
-get_xdma_std(struct xae_softc *sc)
+get_axistream(struct xae_softc *sc)
 {
-
-	sc->xdma_tx = xdma_ofw_get(sc->dev, "tx");
-	if (sc->xdma_tx == NULL)
-		return (ENXIO);
-
-	sc->xdma_rx = xdma_ofw_get(sc->dev, "rx");
-	if (sc->xdma_rx == NULL) {
-		xdma_put(sc->xdma_tx);
-		return (ENXIO);
-	}
-
-	return (0);
-}
-
-static int
-get_xdma_axistream(struct xae_softc *sc)
-{
-	struct axidma_fdt_data *data;
 	phandle_t node;
 	pcell_t prop;
 	size_t len;
@@ -809,121 +614,6 @@ get_xdma_axistream(struct xae_softc *sc)
 		device_printf(sc->dev, "Could not get DMA device by xref.\n");
 		return (ENXIO);
 	}
-
-	return (0);
-
-	sc->xdma_tx = xdma_get(sc->dev, sc->dma_dev);
-	if (sc->xdma_tx == NULL) {
-		device_printf(sc->dev, "Could not find DMA controller.\n");
-		return (ENXIO);
-	}
-	data = malloc(sizeof(struct axidma_fdt_data),
-	    M_DEVBUF, (M_WAITOK | M_ZERO));
-	data->id = AXIDMA_TX_CHAN;
-	sc->xdma_tx->data = data;
-
-	sc->xdma_rx = xdma_get(sc->dev, sc->dma_dev);
-	if (sc->xdma_rx == NULL) {
-		device_printf(sc->dev, "Could not find DMA controller.\n");
-		return (ENXIO);
-	}
-	data = malloc(sizeof(struct axidma_fdt_data),
-	    M_DEVBUF, (M_WAITOK | M_ZERO));
-	data->id = AXIDMA_RX_CHAN;
-	sc->xdma_rx->data = data;
-
-	return (0);
-}
-
-static int
-setup_xdma(struct xae_softc *sc)
-{
-	device_t dev;
-	vmem_t *vmem;
-	vm_paddr_t phys;
-	vm_page_t m;
-	int error;
-
-	dev = sc->dev;
-
-	/* Get xDMA controller */   
-	error = get_xdma_std(sc);
-
-	if (error) {
-		device_printf(sc->dev,
-		    "Fallback to axistream-connected property\n");
-		error = get_xdma_axistream(sc);
-	}
-
-	if (error) {
-		device_printf(dev, "Could not find xDMA controllers.\n");
-		return (ENXIO);
-	}
-
-	/* Alloc xDMA TX virtual channel. */
-	sc->xchan_tx = xdma_channel_alloc(sc->xdma_tx, 0);
-	if (sc->xchan_tx == NULL) {
-		device_printf(dev, "Can't alloc virtual DMA TX channel.\n");
-		return (ENXIO);
-	}
-
-	/* Setup interrupt handler. */
-	error = xdma_setup_intr(sc->xchan_tx, 0,
-	    xae_xdma_tx_intr, sc, &sc->ih_tx);
-	if (error) {
-		device_printf(sc->dev,
-		    "Can't setup xDMA TX interrupt handler.\n");
-		return (ENXIO);
-	}
-
-	/* Alloc xDMA RX virtual channel. */
-	sc->xchan_rx = xdma_channel_alloc(sc->xdma_rx, 0);
-	if (sc->xchan_rx == NULL) {
-		device_printf(dev, "Can't alloc virtual DMA RX channel.\n");
-		return (ENXIO);
-	}
-
-	/* Setup interrupt handler. */
-	error = xdma_setup_intr(sc->xchan_rx, XDMA_INTR_NET,
-	    xae_xdma_rx_intr, sc, &sc->ih_rx);
-	if (error) {
-		device_printf(sc->dev,
-		    "Can't setup xDMA RX interrupt handler.\n");
-		return (ENXIO);
-	}
-
-	/* Setup bounce buffer */
-	vmem = xdma_get_memory(dev);
-	if (!vmem) {
-		m = vm_page_alloc_noobj_contig(VM_ALLOC_WIRED | VM_ALLOC_ZERO,
-		    BUF_NPAGES, 0, BUS_SPACE_MAXADDR_32BIT, PAGE_SIZE, 0,
-		    VM_MEMATTR_DEFAULT);
-		phys = VM_PAGE_TO_PHYS(m);
-		vmem = vmem_create("xdma vmem", 0, 0, PAGE_SIZE, PAGE_SIZE,
-		    M_BESTFIT | M_WAITOK);
-		vmem_add(vmem, phys, BUF_NPAGES * PAGE_SIZE, 0);
-	}
-
-	xchan_set_memory(sc->xchan_tx, vmem);
-	xchan_set_memory(sc->xchan_rx, vmem);
-
-	xdma_prep_sg(sc->xchan_tx,
-	    TX_QUEUE_SIZE,	/* xchan requests queue size */
-	    MCLBYTES,	/* maxsegsize */
-	    8,		/* maxnsegs */
-	    16,		/* alignment */
-	    0,		/* boundary */
-	    BUS_SPACE_MAXADDR_32BIT,
-	    BUS_SPACE_MAXADDR);
-
-	xdma_prep_sg(sc->xchan_rx,
-	    RX_QUEUE_SIZE,	/* xchan requests queue size */
-	    MCLBYTES,	/* maxsegsize */
-	    1,		/* maxnsegs */
-	    16,		/* alignment */
-	    0,		/* boundary */
-	    BUS_SPACE_MAXADDR_32BIT,
-	    BUS_SPACE_MAXADDR);
 
 	return (0);
 }
@@ -968,14 +658,7 @@ xae_attach(device_t dev)
 	sc->dev = dev;
 	node = ofw_bus_get_node(dev);
 
-#if 0
-	if (setup_xdma(sc) != 0) {
-		device_printf(dev, "Could not setup xDMA.\n");
-		return (ENXIO);
-	}
-#else
-	get_xdma_axistream(sc);
-#endif
+	get_axistream(sc);
 
 	mtx_init(&sc->mtx, device_get_nameunit(sc->dev),
 	    MTX_NETWORK_LOCK, MTX_DEF);
@@ -1027,7 +710,6 @@ xae_attach(device_t dev)
 	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
 	if_setcapabilities(ifp, IFCAP_VLAN_MTU);
 	if_setcapenable(ifp, if_getcapabilities(ifp));
-	//if_settransmitfn(ifp, xae_transmit);
 	if_setqflushfn(ifp, xae_qflush);
 	if_setioctlfn(ifp, xae_ioctl);
 	if_setstartfn(ifp, xae_txstart);
@@ -1056,11 +738,6 @@ xae_attach(device_t dev)
 	/* All ready to run, attach the ethernet interface. */
 	ether_ifattach(ifp, sc->macaddr);
 	sc->is_attached = true;
-
-#if 0
-	xae_rx_enqueue(sc, NUM_RX_MBUF);
-	xdma_queue_submit(sc->xchan_rx);
-#endif
 
 	return (0);
 }
@@ -1097,11 +774,6 @@ xae_detach(device_t dev)
 	bus_teardown_intr(dev, sc->res[1], sc->intr_cookie);
 
 	bus_release_resources(dev, xae_spec, sc->res);
-
-	xdma_channel_free(sc->xchan_tx);
-	xdma_channel_free(sc->xchan_rx);
-	xdma_put(sc->xdma_tx);
-	xdma_put(sc->xdma_rx);
 
 	return (0);
 }
