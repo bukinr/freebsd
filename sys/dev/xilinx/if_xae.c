@@ -663,11 +663,6 @@ xae_attach(device_t dev)
 	mtx_init(&sc->mtx, device_get_nameunit(sc->dev),
 	    MTX_NETWORK_LOCK, MTX_DEF);
 
-	sc->br = buf_ring_alloc(BUFRING_SIZE, M_DEVBUF,
-	    M_NOWAIT, &sc->mtx);
-	if (sc->br == NULL)
-		return (ENOMEM);
-
 	if (bus_alloc_resources(dev, xae_spec, sc->res)) {
 		device_printf(dev, "could not allocate resources\n");
 		return (ENXIO);

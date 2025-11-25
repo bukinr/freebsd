@@ -33,8 +33,6 @@
 #ifndef	_DEV_XILINX_IF_XAEVAR_H_
 #define	_DEV_XILINX_IF_XAEVAR_H_
 
-#include <dev/xdma/xdma.h>
-
 /*
  * Driver data and defines.
  */
@@ -58,18 +56,6 @@ struct xae_softc {
 	boolean_t		is_attached;
 	boolean_t		is_detaching;
 	int			phy_addr;
-
-	/* xDMA TX */
-	xdma_controller_t	*xdma_tx;
-	xdma_channel_t		*xchan_tx;
-	void			*ih_tx;
-
-	/* xDMA RX */
-	xdma_controller_t	*xdma_rx;
-	xdma_channel_t		*xchan_rx;
-	void			*ih_rx;
-
-	struct buf_ring		*br;
 
 	/* Counters */
 	uint64_t		counters[XAE_MAX_COUNTERS];
