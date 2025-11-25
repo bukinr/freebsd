@@ -33,6 +33,9 @@
 #ifndef _DEV_XILINX_AXIDMA_H_
 #define _DEV_XILINX_AXIDMA_H_
 
+#define	AXIDMA_TX_CHAN		0
+#define	AXIDMA_RX_CHAN		1
+
 #define	AXI_DMACR(n)		(0x00 + 0x30 * (n)) /* DMA Control register */
 #define	 DMACR_RS		(1 << 0) /* Run / Stop. */
 #define	 DMACR_RESET		(1 << 2) /* Soft reset the AXI DMA core. */
@@ -58,9 +61,6 @@
 #define	AXI_TAILDESC_MSB(n)	(0x14 + 0x30 * (n)) /* Tail Descriptor Pointer. Upper 32 bits of address. */
 #define	AXI_SG_CTL		0x2C /* Scatter/Gather User and Cache */
 
-#define	AXIDMA_TX_CHAN		0
-#define	AXIDMA_RX_CHAN		1
-
 struct axidma_desc {
 	uint32_t next;
 	uint32_t reserved1;
@@ -83,10 +83,6 @@ struct axidma_desc {
 	uint32_t app3;
 	uint32_t app4;
 	uint32_t reserved[3];
-};
-
-struct axidma_fdt_data {
-	int id;
 };
 
 #endif /* !_DEV_XILINX_AXIDMA_H_ */

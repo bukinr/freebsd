@@ -158,10 +158,6 @@ static struct ofw_compat_data compat_data[] = {
 	{ NULL,			HWTYPE_NONE },
 };
 
-static int axidma_probe(device_t dev);
-static int axidma_attach(device_t dev);
-static int axidma_detach(device_t dev);
-
 static inline uint32_t
 next_rxidx(struct axidma_softc *sc, uint32_t curidx)
 {
