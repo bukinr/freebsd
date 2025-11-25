@@ -191,7 +191,6 @@ axidma_setup_txdesc(struct axidma_softc *sc, int idx, bus_addr_t paddr,
 {
 	struct axidma_desc *desc;
 	uint32_t nidx;
-	//uint32_t next;
 	uint32_t flags;
 
 	nidx = next_txidx(sc, idx);
@@ -203,21 +202,9 @@ axidma_setup_txdesc(struct axidma_softc *sc, int idx, bus_addr_t paddr,
 		flags = 0;
 		--sc->txcount;
 	} else {
-		//flags = 0;//FEC_TXDESC_READY | FEC_TXDESC_L | FEC_TXDESC_TC;
 		flags = BD_CONTROL_TXSOF | BD_CONTROL_TXEOF;
 		++sc->txcount;
 	}
-	if (nidx == 0) {
-		//flags |= 0;//FEC_TXDESC_WRAP;
-	}
-
-	/*
-	* The hardware requires 32-bit physical addresses.  We set up the dma
-	* tag to indicate that, so the cast to uint32_t should never lose
-	* significant bits.
-	*/
-	//sc->txdesc_ring[idx].buf_paddr = (uint32_t)paddr;
-	//sc->txdesc_ring[idx].flags_len = flags | len; /* Must be set last! */
 
 	desc->next = sc->txdesc_ring_paddr + sizeof(struct axidma_desc) * nidx;
 	desc->phys = paddr;
@@ -261,6 +248,7 @@ axidma_txstart_locked(struct axidma_softc *sc)
 {
 	struct mbuf *m;
 	int enqueued;
+	uint32_t addr;
 	int tmp;
 	if_t ifp;
 
@@ -301,14 +289,9 @@ dprintf("%s\n", __func__);
 	if (enqueued != 0) {
 		bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
 		    BUS_DMASYNC_PREWRITE);
-		//WR4(sc, FEC_TDAR_REG, FEC_TDAR_TDAR);
-		//bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
-		//    BUS_DMASYNC_POSTWRITE);
-		//sc->tx_watchdog_count = WATCHDOG_TIMEOUT_SECS;
 
-		uint32_t addr;
 		addr = sc->txdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
-dprintf("%s: new tail desc %x\n", __func__, addr);
+		dprintf("%s: new tail desc %x\n", __func__, addr);
 		WRITE8(sc, AXI_TAILDESC(AXIDMA_TX_CHAN), addr);
 	}
 }
@@ -330,8 +313,6 @@ axidma_txfinish_locked(struct axidma_softc *sc)
 	retired_buffer = false;
 	while (sc->tx_idx_tail != sc->tx_idx_head) {
 		desc = &sc->txdesc_ring[sc->tx_idx_tail];
-		//if (desc->flags_len & FEC_TXDESC_READY)
-		//	break;
 		if ((desc->status & BD_STATUS_CMPLT) == 0)
 			break;
 		retired_buffer = true;
@@ -374,11 +355,6 @@ axidma_setup_rxdesc(struct axidma_softc *sc, int idx, bus_addr_t paddr)
 	nidx = next_rxidx(sc, idx);
 
 	desc = &sc->rxdesc_ring[idx];
-
-	//sc->rxdesc_ring[idx].buf_paddr = (uint32_t)paddr;
-	//sc->rxdesc_ring[idx].flags_len = FEC_RXDESC_EMPTY | 
-	//	((nidx == 0) ? FEC_RXDESC_WRAP : 0);
-
 	desc->next = sc->rxdesc_ring_paddr + sizeof(struct axidma_desc) * nidx;
 	desc->phys = paddr;
 	desc->status = 0;
@@ -404,20 +380,6 @@ axidma_setup_rxbuf(struct axidma_softc *sc, int idx, struct mbuf * m)
 {
 	int error, nsegs;
 	struct bus_dma_segment seg;
-
-#if 0
-	if (!(sc->fecflags & FECFLAG_RACC)) {
-		/*
-		* The RACC[SHIFT16] feature is not available.  So, we need to
-		* leave at least ETHER_ALIGN bytes free at the beginning of the
-		* buffer to allow the data to be re-aligned after receiving it
-		* (by copying it backwards ETHER_ALIGN bytes in the same
-		* buffer).  We also have to ensure that the beginning of the
-		* buffer is aligned to the hardware's requirements.
-		*/
-		m_adj(m, roundup(ETHER_ALIGN, sc->rxbuf_align));
-	}
-#endif
 
 	error = bus_dmamap_load_mbuf_sg(sc->rxbuf_tag, sc->rxbuf_map[idx].map,
 	   m, &seg, &nsegs, 0);
@@ -458,7 +420,6 @@ dprintf("%s\n", __func__);
 	AXIDMA_UNLOCK(sc);
 
 	bmap = &sc->rxbuf_map[sc->rx_idx];
-	//len -= ETHER_CRC_LEN;
 	bus_dmamap_sync(sc->rxbuf_tag, bmap->map, BUS_DMASYNC_POSTREAD);
 	bus_dmamap_unload(sc->rxbuf_tag, bmap->map);
 	m = bmap->mbuf;
@@ -467,26 +428,6 @@ dprintf("%s\n", __func__);
 	m->m_pkthdr.len = len;
 	m->m_pkthdr.rcvif = sc->ifp;
 
-	/*
-	* Align the protocol headers in the receive buffer on a 32-bit
-	* boundary.  Newer hardware does the alignment for us.  On hardware
-	* that doesn't support this feature, we have to copy-align the data.
-	*
-	*  XXX for older hardware, could we speed this up by copying just the
-	*  protocol headers into their own small mbuf then chaining the cluster
-	*  to it? That way we'd only need to copy like 64 bytes or whatever the
-	*  biggest header is, instead of the whole 1530ish-byte frame.
-	*/
-#if 0
-	if (sc->fecflags & FECFLAG_RACC) {
-		m->m_data = mtod(m, uint8_t *) + 2;
-	} else {
-		src = mtod(m, uint8_t *);
-		dst = src - ETHER_ALIGN;
-		bcopy(src, dst, len);
-		m->m_data = dst;
-	}
-#endif
 	if_input(sc->ifp, m);
 
 	AXIDMA_LOCK(sc);
@@ -502,6 +443,7 @@ axidma_rxfinish_locked(struct axidma_softc *sc)
 {
 	boolean_t produced_empty_buffer;
 	struct axidma_desc *desc;
+	uint32_t addr;
 	int len;
 	int tmp;
 
@@ -515,51 +457,11 @@ dprintf("%s\n", __func__);
 	produced_empty_buffer = false;
 	for (;;) {
 		desc = &sc->rxdesc_ring[sc->rx_idx];
-		//if (desc->flags_len & FEC_RXDESC_EMPTY)
-		//	break;
 		if ((desc->status & BD_STATUS_CMPLT) == 0)
 			break;
 		produced_empty_buffer = true;
-		//len = (desc->flags_len & FEC_RXDESC_LEN_MASK);
 		len = desc->status & BD_CONTROL_LEN_M;
-#if 0
-		if (len < 64) {
-			/*
-			 * Just recycle the descriptor and continue.           .
-			 */
-			axidma_setup_rxdesc(sc, sc->rx_idx,
-			    sc->rxdesc_ring[sc->rx_idx].phys);
-		} else if ((desc->flags_len & FEC_RXDESC_L) == 0) {
-			/*
-			* The entire frame is not in this buffer.  Impossible.
-			* Recycle the descriptor and continue.
-			*
-			* XXX what's the right way to handle this? Probably we
-			* should stop/init the hardware because this should
-			* just really never happen when we have buffers bigger
-			* than the maximum frame size.
-			*/
-			device_printf(sc->dev, 
-			   "fec_rxfinish: received frame without LAST bit set");
-			axidma_setup_rxdesc(sc, sc->rx_idx, 
-			   sc->rxdesc_ring[sc->rx_idx].buf_paddr);
-		} else if (desc->flags_len & FEC_RXDESC_ERROR_BITS) {
-			/*
-			*  Something went wrong with receiving the frame, we
-			*  don't care what (the hardware has counted the error
-			*  in the stats registers already), we just reuse the
-			*  same mbuf, which is still dma-mapped, by resetting
-			*  the rx descriptor.
-			*/
-			axidma_setup_rxdesc(sc, sc->rx_idx, 
-			   sc->rxdesc_ring[sc->rx_idx].buf_paddr);
-		} else {
-#endif
-			/*
-			*  Normal case: a good frame all in one buffer.
-			*/
-			axidma_rxfinish_onebuf(sc, len);
-		//}
+		axidma_rxfinish_onebuf(sc, len);
 		tmp = sc->rx_idx;
 		sc->rx_idx = next_rxidx(sc, sc->rx_idx);
 	}
@@ -567,13 +469,9 @@ dprintf("%s\n", __func__);
 	if (produced_empty_buffer) {
 		bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
 		    BUS_DMASYNC_PREWRITE);
-		//WR4(sc, FEC_RDAR_REG, FEC_RDAR_RDAR);
-		//bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
-		//    BUS_DMASYNC_POSTWRITE);
 
-		uint32_t addr;
 		addr = sc->rxdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
-dprintf("%s: new tail desc %x\n", __func__, addr);
+		dprintf("%s: new tail desc %x\n", __func__, addr);
 		WRITE8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 	}
 }
