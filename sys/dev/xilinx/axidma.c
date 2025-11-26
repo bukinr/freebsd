@@ -38,7 +38,6 @@
 #include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/mbuf.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -126,24 +125,6 @@ axidma_attach(device_t dev)
 	/* CSR memory interface */
 	sc->bst = rman_get_bustag(sc->res[0]);
 	sc->bsh = rman_get_bushandle(sc->res[0]);
-
-#if 0
-	/* Setup interrupt handler */
-	err = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC | INTR_MPSAFE,
-	    NULL, axidma_intr_tx, sc, &sc->ih[0]);
-	if (err) {
-		device_printf(dev, "Unable to alloc interrupt resource.\n");
-		return (ENXIO);
-	}
-
-	/* Setup interrupt handler */
-	err = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC | INTR_MPSAFE,
-	    NULL, axidma_intr_rx, sc, &sc->ih[1]);
-	if (err) {
-		device_printf(dev, "Unable to alloc interrupt resource.\n");
-		return (ENXIO);
-	}
-#endif
 
 	node = ofw_bus_get_node(dev);
 	xref = OF_xref_from_node(node);

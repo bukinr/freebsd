@@ -30,13 +30,7 @@
 
 #include "opt_platform.h"
 
-#include <sys/malloc.h>
-#include <sys/mbuf.h>
-#include <sys/socket.h>
-
 #include <machine/bus.h>
-
-#include <net/if.h>
 
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>

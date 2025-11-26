@@ -285,7 +285,7 @@ axidma_txfinish_locked(struct xae_softc *sc)
 			break;
 		retired_buffer = true;
 		bmap = &sc->txbuf_map[sc->tx_idx_tail];
-		bus_dmamap_sync(sc->txbuf_tag, bmap->map, 
+		bus_dmamap_sync(sc->txbuf_tag, bmap->map,
 		   BUS_DMASYNC_POSTWRITE);
 		bus_dmamap_unload(sc->txbuf_tag, bmap->map);
 		m_freem(bmap->mbuf);
@@ -351,16 +351,15 @@ axidma_setup_rxbuf(struct xae_softc *sc, int idx, struct mbuf * m)
 
 	error = bus_dmamap_load_mbuf_sg(sc->rxbuf_tag, sc->rxbuf_map[idx].map,
 	   m, &seg, &nsegs, 0);
-	if (error != 0) {
+	if (error != 0)
 		return (error);
-	}
 
 	bus_dmamap_sync(sc->rxbuf_tag, sc->rxbuf_map[idx].map,
 	   BUS_DMASYNC_PREREAD);
 
 	sc->rxbuf_map[idx].mbuf = m;
 	axidma_setup_rxdesc(sc, idx, seg.ds_addr);
-	
+
 	return (0);
 }
 
@@ -373,13 +372,13 @@ axidma_rxfinish_onebuf(struct xae_softc *sc, int len)
 
 dprintf("%s\n", __func__);
 	/*
-	*  First try to get a new mbuf to plug into this slot in the rx ring.
-	*  If that fails, drop the current packet and recycle the current
-	*  mbuf, which is still mapped and loaded.
-	*/
+	 * First try to get a new mbuf to plug into this slot in the rx ring.
+	 * If that fails, drop the current packet and recycle the current
+	 * mbuf, which is still mapped and loaded.
+	 */
 	if ((newmbuf = axidma_alloc_mbufcl(sc)) == NULL) {
 		if_inc_counter(sc->ifp, IFCOUNTER_IQDROPS, 1);
-		axidma_setup_rxdesc(sc, sc->rx_idx, 
+		axidma_setup_rxdesc(sc, sc->rx_idx,
 		    sc->rxdesc_ring[sc->rx_idx].phys);
 		return;
 	}
