@@ -71,13 +71,13 @@
 
 #include "axidma_if.h"
 
-#define	READ4(_sc, _reg)	\
+#define	AXIDMA_RD4(_sc, _reg)	\
 	bus_space_read_4(_sc->bst, _sc->bsh, _reg)
-#define	WRITE4(_sc, _reg, _val)	\
+#define	AXIDMA_WR4(_sc, _reg, _val)	\
 	bus_space_write_4(_sc->bst, _sc->bsh, _reg, _val)
-#define	READ8(_sc, _reg)	\
+#define	AXIDMA_RD8(_sc, _reg)	\
 	bus_space_read_8(_sc->bst, _sc->bsh, _reg)
-#define	WRITE8(_sc, _reg, _val)	\
+#define	AXIDMA_WR8(_sc, _reg, _val)	\
 	bus_space_write_8(_sc->bst, _sc->bsh, _reg, _val)
 
 #define	AXIDMA_LOCK(sc)			mtx_lock(&(sc)->mtx)
@@ -288,7 +288,7 @@ dprintf("%s\n", __func__);
 
 		addr = sc->txdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
 		dprintf("%s: new tail desc %x\n", __func__, addr);
-		WRITE8(sc, AXI_TAILDESC(AXIDMA_TX_CHAN), addr);
+		AXIDMA_WR8(sc, AXI_TAILDESC(AXIDMA_TX_CHAN), addr);
 	}
 }
 
@@ -467,7 +467,7 @@ dprintf("%s\n", __func__);
 
 		addr = sc->rxdesc_ring_paddr + tmp * sizeof(struct axidma_desc);
 		dprintf("%s: new tail desc %x\n", __func__, addr);
-		WRITE8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
+		AXIDMA_WR8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 	}
 }
 
@@ -480,9 +480,9 @@ axidma_intr_rx(void *arg)
 	sc = arg;
 
 	AXIDMA_LOCK(sc);
-	pending = READ4(sc, AXI_DMASR(AXIDMA_RX_CHAN));
+	pending = AXIDMA_RD4(sc, AXI_DMASR(AXIDMA_RX_CHAN));
 dprintf("%s: pending %x\n", __func__, pending);
-	WRITE4(sc, AXI_DMASR(AXIDMA_RX_CHAN), pending);
+	AXIDMA_WR4(sc, AXI_DMASR(AXIDMA_RX_CHAN), pending);
 	axidma_rxfinish_locked(sc);
 	AXIDMA_UNLOCK(sc);
 }
@@ -496,9 +496,9 @@ axidma_intr_tx(void *arg)
 	sc = arg;
 
 	AXIDMA_LOCK(sc);
-	pending = READ4(sc, AXI_DMASR(AXIDMA_TX_CHAN));
+	pending = AXIDMA_RD4(sc, AXI_DMASR(AXIDMA_TX_CHAN));
 dprintf("%s: pending %x\n", __func__, pending);
-	WRITE4(sc, AXI_DMASR(AXIDMA_TX_CHAN), pending);
+	AXIDMA_WR4(sc, AXI_DMASR(AXIDMA_TX_CHAN), pending);
 	axidma_txfinish_locked(sc);
 	AXIDMA_UNLOCK(sc);
 }
@@ -508,11 +508,11 @@ axidma_reset(struct axidma_softc *sc, int chan_id)
 {
 	int timeout;
 
-	WRITE4(sc, AXI_DMACR(chan_id), DMACR_RESET);
+	AXIDMA_WR4(sc, AXI_DMACR(chan_id), DMACR_RESET);
 
 	timeout = 100;
 	do {
-		if ((READ4(sc, AXI_DMACR(chan_id)) & DMACR_RESET) == 0)
+		if ((AXIDMA_RD4(sc, AXI_DMACR(chan_id)) & DMACR_RESET) == 0)
 			break;
 	} while (timeout--);
 
@@ -522,7 +522,7 @@ axidma_reset(struct axidma_softc *sc, int chan_id)
 		return (-1);
 
 	dprintf("%s: read control after reset: %x\n",
-	    __func__, READ4(sc, AXI_DMACR(chan_id)));
+	    __func__, AXIDMA_RD4(sc, AXI_DMACR(chan_id)));
 
 	return (0);
 }
@@ -751,19 +751,19 @@ axidma_attach(device_t dev)
 		return (-1);
 
 dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
-	WRITE8(sc, AXI_CURDESC(AXIDMA_TX_CHAN), sc->txdesc_ring_paddr);
-	reg = READ4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
+	AXIDMA_WR8(sc, AXI_CURDESC(AXIDMA_TX_CHAN), sc->txdesc_ring_paddr);
+	reg = AXIDMA_RD4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
 	reg |= DMACR_IOC_IRQEN | DMACR_DLY_IRQEN | DMACR_ERR_IRQEN;
-	WRITE4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
+	AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
 	reg |= DMACR_RS;
-	//WRITE4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
+	//AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
 
-	WRITE8(sc, AXI_CURDESC(AXIDMA_RX_CHAN), sc->rxdesc_ring_paddr);
-	reg = READ4(sc, AXI_DMACR(AXIDMA_RX_CHAN));
+	AXIDMA_WR8(sc, AXI_CURDESC(AXIDMA_RX_CHAN), sc->rxdesc_ring_paddr);
+	reg = AXIDMA_RD4(sc, AXI_DMACR(AXIDMA_RX_CHAN));
 	reg |= DMACR_IOC_IRQEN | DMACR_DLY_IRQEN | DMACR_ERR_IRQEN;
-	WRITE4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
+	AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
 	reg |= DMACR_RS;
-	//WRITE4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
+	//AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
 
 	return (0);
 
@@ -771,7 +771,7 @@ dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
 	addr = sc->rxdesc_ring_paddr +
 	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
 dprintf("%s: new RX tail desc %x\n", __func__, addr);
-	WRITE8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
+	AXIDMA_WR8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 
 out:
 	return (0);
@@ -802,19 +802,19 @@ axidma_txstart(device_t dev, if_t ifp)
 
 dprintf("%s\n", __func__);
 
-	reg = READ4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
+	reg = AXIDMA_RD4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
 	reg |= DMACR_RS;
-	WRITE4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
+	AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
 
-	reg = READ4(sc, AXI_DMACR(AXIDMA_RX_CHAN));
+	reg = AXIDMA_RD4(sc, AXI_DMACR(AXIDMA_RX_CHAN));
 	reg |= DMACR_RS;
-	WRITE4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
+	AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
 
 	uint32_t addr;
 	addr = sc->rxdesc_ring_paddr +
 	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
 dprintf("%s: new RX tail desc %x\n", __func__, addr);
-	WRITE8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
+	AXIDMA_WR8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 
 	AXIDMA_LOCK(sc);
 	axidma_txstart_locked(sc);
