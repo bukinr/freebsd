@@ -274,8 +274,8 @@ xae_txfinish_locked(struct xae_softc *sc)
 
 	XAE_ASSERT_LOCKED(sc);
 
-	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
-	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map, BUS_DMASYNC_POSTREAD);
 	ifp = sc->ifp;
 	retired_buffer = false;
 	while (sc->tx_idx_tail != sc->tx_idx_head) {
@@ -294,9 +294,9 @@ xae_txfinish_locked(struct xae_softc *sc)
 	}
 
 	/*
-	* If we retired any buffers, there will be open tx slots available in
-	* the descriptor ring, go try to start some new output.
-	*/
+	 * If we retired any buffers, there will be open tx slots available in
+	 * the descriptor ring, go try to start some new output.
+	 */
 	if (retired_buffer) {
 		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 		xae_txstart_locked(sc);
@@ -412,8 +412,8 @@ xae_rxfinish_locked(struct xae_softc *sc)
 
 	XAE_ASSERT_LOCKED(sc);
 
-	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
-	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map, BUS_DMASYNC_POSTREAD);
 	produced_empty_buffer = false;
 	for (;;) {
 		desc = &sc->rxdesc_ring[sc->rx_idx];
