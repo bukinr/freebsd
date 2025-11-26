@@ -34,21 +34,14 @@
  * Xilinx AXI DMA controller driver.
  */
 
-#include <sys/cdefs.h>
 #include "opt_platform.h"
-#include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/conf.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/rman.h>
 
 #include <machine/bus.h>
-
-#include <vm/vm.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_page.h>
 
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
