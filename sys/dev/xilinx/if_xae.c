@@ -145,7 +145,7 @@ next_txidx(struct xae_softc *sc, uint32_t curidx)
 }
 
 static void
-axidma_get1paddr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
+xae_get1paddr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 {
 
 	if (error != 0)
@@ -154,7 +154,7 @@ axidma_get1paddr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 }
 
 inline static uint32_t
-axidma_setup_txdesc(struct xae_softc *sc, int idx, bus_addr_t paddr, 
+xae_setup_txdesc(struct xae_softc *sc, int idx, bus_addr_t paddr, 
     uint32_t len)
 {
 	struct axidma_desc *desc;
@@ -183,7 +183,7 @@ axidma_setup_txdesc(struct xae_softc *sc, int idx, bus_addr_t paddr,
 }
 
 static int
-axidma_setup_txbuf(struct xae_softc *sc, int idx, struct mbuf **mp)
+xae_setup_txbuf(struct xae_softc *sc, int idx, struct mbuf **mp)
 {
 	struct bus_dma_segment seg;
 	struct mbuf *m;
@@ -206,13 +206,13 @@ dprintf("%s\n", __func__);
 	    BUS_DMASYNC_PREWRITE);
 
 	sc->txbuf_map[idx].mbuf = m;
-	axidma_setup_txdesc(sc, idx, seg.ds_addr, seg.ds_len);
+	xae_setup_txdesc(sc, idx, seg.ds_addr, seg.ds_len);
 
 	return (0);
 }
 
 static void
-axidma_txstart_locked(struct xae_softc *sc)
+xae_txstart_locked(struct xae_softc *sc)
 {
 	struct mbuf *m;
 	int enqueued;
@@ -244,7 +244,7 @@ dprintf("%s\n", __func__);
 		m = if_dequeue(ifp);
 		if (m == NULL)
 			break;
-		if (axidma_setup_txbuf(sc, sc->tx_idx_head, &m) != 0) {
+		if (xae_setup_txbuf(sc, sc->tx_idx_head, &m) != 0) {
 			if_sendq_prepend(ifp, m);
 			break;
 		}
@@ -265,10 +265,10 @@ dprintf("%s\n", __func__);
 }
 
 static void
-axidma_txfinish_locked(struct xae_softc *sc)
+xae_txfinish_locked(struct xae_softc *sc)
 {
 	struct axidma_desc *desc;
-	struct axidma_bufmap *bmap;
+	struct xae_bufmap *bmap;
 	boolean_t retired_buffer;
 	if_t ifp;
 
@@ -290,7 +290,7 @@ axidma_txfinish_locked(struct xae_softc *sc)
 		bus_dmamap_unload(sc->txbuf_tag, bmap->map);
 		m_freem(bmap->mbuf);
 		bmap->mbuf = NULL;
-		axidma_setup_txdesc(sc, sc->tx_idx_tail, 0, 0);
+		xae_setup_txdesc(sc, sc->tx_idx_tail, 0, 0);
 		sc->tx_idx_tail = next_txidx(sc, sc->tx_idx_tail);
 	}
 
@@ -300,7 +300,7 @@ axidma_txfinish_locked(struct xae_softc *sc)
 	*/
 	if (retired_buffer) {
 		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
-		axidma_txstart_locked(sc);
+		xae_txstart_locked(sc);
 	}
 
 	/* If there are no buffers outstanding, muzzle the watchdog. */
@@ -310,7 +310,7 @@ axidma_txfinish_locked(struct xae_softc *sc)
 }
 
 inline static uint32_t
-axidma_setup_rxdesc(struct xae_softc *sc, int idx, bus_addr_t paddr)
+xae_setup_rxdesc(struct xae_softc *sc, int idx, bus_addr_t paddr)
 {
 	struct axidma_desc *desc;
 	uint32_t nidx;
@@ -332,7 +332,7 @@ axidma_setup_rxdesc(struct xae_softc *sc, int idx, bus_addr_t paddr)
 }
 
 static struct mbuf *
-axidma_alloc_mbufcl(struct xae_softc *sc)
+xae_alloc_mbufcl(struct xae_softc *sc)
 {
 	struct mbuf *m;
 
@@ -344,7 +344,7 @@ axidma_alloc_mbufcl(struct xae_softc *sc)
 }
 
 static int
-axidma_setup_rxbuf(struct xae_softc *sc, int idx, struct mbuf * m)
+xae_setup_rxbuf(struct xae_softc *sc, int idx, struct mbuf * m)
 {
 	int error, nsegs;
 	struct bus_dma_segment seg;
@@ -358,16 +358,16 @@ axidma_setup_rxbuf(struct xae_softc *sc, int idx, struct mbuf * m)
 	   BUS_DMASYNC_PREREAD);
 
 	sc->rxbuf_map[idx].mbuf = m;
-	axidma_setup_rxdesc(sc, idx, seg.ds_addr);
+	xae_setup_rxdesc(sc, idx, seg.ds_addr);
 
 	return (0);
 }
 
 static void
-axidma_rxfinish_onebuf(struct xae_softc *sc, int len)
+xae_rxfinish_onebuf(struct xae_softc *sc, int len)
 {
 	struct mbuf *m, *newmbuf;
-	struct axidma_bufmap *bmap;
+	struct xae_bufmap *bmap;
 	int error;
 
 dprintf("%s\n", __func__);
@@ -376,9 +376,9 @@ dprintf("%s\n", __func__);
 	 * If that fails, drop the current packet and recycle the current
 	 * mbuf, which is still mapped and loaded.
 	 */
-	if ((newmbuf = axidma_alloc_mbufcl(sc)) == NULL) {
+	if ((newmbuf = xae_alloc_mbufcl(sc)) == NULL) {
 		if_inc_counter(sc->ifp, IFCOUNTER_IQDROPS, 1);
-		axidma_setup_rxdesc(sc, sc->rx_idx,
+		xae_setup_rxdesc(sc, sc->rx_idx,
 		    sc->rxdesc_ring[sc->rx_idx].phys);
 		return;
 	}
@@ -398,14 +398,14 @@ dprintf("%s\n", __func__);
 
 	XAE_LOCK(sc);
 
-	if ((error = axidma_setup_rxbuf(sc, sc->rx_idx, newmbuf)) != 0) {
-		device_printf(sc->dev, "axidma_setup_rxbuf error %d\n", error);
+	if ((error = xae_setup_rxbuf(sc, sc->rx_idx, newmbuf)) != 0) {
+		device_printf(sc->dev, "xae_setup_rxbuf error %d\n", error);
 		/* XXX Now what?  We've got a hole in the rx ring. */
 	}
 }
 
 static void
-axidma_rxfinish_locked(struct xae_softc *sc)
+xae_rxfinish_locked(struct xae_softc *sc)
 {
 	boolean_t produced_empty_buffer;
 	struct axidma_desc *desc;
@@ -427,7 +427,7 @@ dprintf("%s\n", __func__);
 			break;
 		produced_empty_buffer = true;
 		len = desc->status & BD_CONTROL_LEN_M;
-		axidma_rxfinish_onebuf(sc, len);
+		xae_rxfinish_onebuf(sc, len);
 		tmp = sc->rx_idx;
 		sc->rx_idx = next_rxidx(sc, sc->rx_idx);
 	}
@@ -443,7 +443,7 @@ dprintf("%s\n", __func__);
 }
 
 static void
-axidma_intr_rx(void *arg)
+xae_intr_rx(void *arg)
 {
 	struct xae_softc *sc;
 	uint32_t pending;
@@ -454,12 +454,12 @@ axidma_intr_rx(void *arg)
 	pending = AXIDMA_RD4(sc, AXI_DMASR(AXIDMA_RX_CHAN));
 dprintf("%s: pending %x\n", __func__, pending);
 	AXIDMA_WR4(sc, AXI_DMASR(AXIDMA_RX_CHAN), pending);
-	axidma_rxfinish_locked(sc);
+	xae_rxfinish_locked(sc);
 	XAE_UNLOCK(sc);
 }
 
 static void
-axidma_intr_tx(void *arg)
+xae_intr_tx(void *arg)
 {
 	struct xae_softc *sc;
 	uint32_t pending;
@@ -470,7 +470,7 @@ axidma_intr_tx(void *arg)
 	pending = AXIDMA_RD4(sc, AXI_DMASR(AXIDMA_TX_CHAN));
 dprintf("%s: pending %x\n", __func__, pending);
 	AXIDMA_WR4(sc, AXI_DMASR(AXIDMA_TX_CHAN), pending);
-	axidma_txfinish_locked(sc);
+	xae_txfinish_locked(sc);
 	XAE_UNLOCK(sc);
 }
 
@@ -664,7 +664,7 @@ xae_tick(void *arg)
 	link_was_up = sc->link_is_up;
 	mii_tick(sc->mii_softc);
 	if (sc->link_is_up && !link_was_up)
-		axidma_txstart_locked(sc);
+		xae_txstart_locked(sc);
 
 	/* Schedule another check one second from now. */
 	callout_reset(&sc->xae_callout, hz, xae_tick, sc);
@@ -987,7 +987,7 @@ dprintf("%s: new RX tail desc %x\n", __func__, addr);
 #endif
 
 	XAE_LOCK(sc);
-	axidma_txstart_locked(sc);
+	xae_txstart_locked(sc);
 	XAE_UNLOCK(sc);
 }
 
@@ -1033,7 +1033,7 @@ xae_setup_dma(struct xae_softc *sc)
 	}
 
 	error = bus_dmamap_load(sc->txdesc_tag, sc->txdesc_map, sc->txdesc_ring,
-	   TX_DESC_SIZE, axidma_get1paddr, &sc->txdesc_ring_paddr, 0);
+	   TX_DESC_SIZE, xae_get1paddr, &sc->txdesc_ring_paddr, 0);
 	if (error != 0) {
 		device_printf(sc->dev,
 		   "could not load TX descriptor ring map.\n");
@@ -1070,7 +1070,7 @@ xae_setup_dma(struct xae_softc *sc)
 			   "could not create TX buffer DMA map.\n");
 			goto out;
 		}
-		axidma_setup_txdesc(sc, idx, 0, 0);
+		xae_setup_txdesc(sc, idx, 0, 0);
 	}
 
 	/*
@@ -1101,7 +1101,7 @@ xae_setup_dma(struct xae_softc *sc)
 	}
 
 	error = bus_dmamap_load(sc->rxdesc_tag, sc->rxdesc_map, sc->rxdesc_ring,
-	   RX_DESC_SIZE, axidma_get1paddr, &sc->rxdesc_ring_paddr, 0);
+	   RX_DESC_SIZE, xae_get1paddr, &sc->rxdesc_ring_paddr, 0);
 	if (error != 0) {
 		device_printf(sc->dev,
 		   "could not load RX descriptor ring map.\n");
@@ -1138,12 +1138,12 @@ xae_setup_dma(struct xae_softc *sc)
 			   "could not create RX buffer DMA map.\n");
 			goto out;
 		}
-		if ((m = axidma_alloc_mbufcl(sc)) == NULL) {
+		if ((m = xae_alloc_mbufcl(sc)) == NULL) {
 			device_printf(sc->dev, "Could not alloc mbuf\n");
 			error = ENOMEM;
 			goto out;
 		}
-		if ((error = axidma_setup_rxbuf(sc, idx, m)) != 0) {
+		if ((error = xae_setup_rxbuf(sc, idx, m)) != 0) {
 			device_printf(sc->dev,
 			   "could not create new RX buffer.\n");
 			goto out;
@@ -1154,9 +1154,9 @@ xae_setup_dma(struct xae_softc *sc)
 		return (-1);
 	if (AXIDMA_RESET(sc->dma_dev, AXIDMA_RX_CHAN) != 0)
 		return (-1);
-	if (AXIDMA_SETUP_CB(sc->dma_dev, AXIDMA_TX_CHAN, axidma_intr_tx, sc))
+	if (AXIDMA_SETUP_CB(sc->dma_dev, AXIDMA_TX_CHAN, xae_intr_tx, sc))
 		return (-1);
-	if (AXIDMA_SETUP_CB(sc->dma_dev, AXIDMA_RX_CHAN, axidma_intr_rx, sc))
+	if (AXIDMA_SETUP_CB(sc->dma_dev, AXIDMA_RX_CHAN, xae_intr_rx, sc))
 		return (-1);
 
 dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);

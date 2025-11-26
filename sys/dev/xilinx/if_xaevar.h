@@ -33,7 +33,7 @@
 #ifndef	_DEV_XILINX_IF_XAEVAR_H_
 #define	_DEV_XILINX_IF_XAEVAR_H_
 
-struct axidma_bufmap {
+struct xae_bufmap {
 	struct mbuf	*mbuf;
 	bus_dmamap_t	map;
 };
@@ -78,7 +78,7 @@ struct xae_softc {
 	struct axidma_desc	*rxdesc_ring;
 	bus_addr_t		rxdesc_ring_paddr;
 	bus_dma_tag_t		rxbuf_tag;
-	struct axidma_bufmap	rxbuf_map[RX_DESC_COUNT];
+	struct xae_bufmap	rxbuf_map[RX_DESC_COUNT];
 	uint32_t		rx_idx;
 
 	bus_dma_tag_t		txdesc_tag;
@@ -86,7 +86,7 @@ struct xae_softc {
 	struct axidma_desc	*txdesc_ring;
 	bus_addr_t		txdesc_ring_paddr;
 	bus_dma_tag_t		txbuf_tag;
-	struct axidma_bufmap	txbuf_map[TX_DESC_COUNT];
+	struct xae_bufmap	txbuf_map[TX_DESC_COUNT];
 	uint32_t		tx_idx_head;
 	uint32_t		tx_idx_tail;
 	int			txcount;
