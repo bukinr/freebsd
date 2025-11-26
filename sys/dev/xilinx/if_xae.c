@@ -995,8 +995,7 @@ xae_setup_dma(struct xae_softc *sc)
 	   NULL, NULL,			/* lockfunc, lockarg */
 	   &sc->txdesc_tag);
 	if (error != 0) {
-		device_printf(sc->dev,
-		   "could not create TX ring DMA tag.\n");
+		device_printf(sc->dev, "could not create TX ring DMA tag.\n");
 		goto out;
 	}
 
