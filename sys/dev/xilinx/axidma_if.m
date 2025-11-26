@@ -46,7 +46,35 @@
 
 INTERFACE axidma;
 
-METHOD int txstart {
+HEADER {
+	typedef void (*axidma_cb_t)(void *arg);
+};
+
+METHOD int reset {
 	device_t		dev;
-	if_t			ifp;
+	int			chan_id;
+};
+
+METHOD int read4 {
+	device_t		dev;
+	bus_addr_t		reg;
+};
+
+METHOD void write4 {
+	device_t		dev;
+	bus_addr_t		reg;
+	uint32_t		val;
+};
+
+METHOD void write8 {
+	device_t		dev;
+	bus_addr_t		reg;
+	uint64_t		val;
+};
+
+METHOD int setup_cb {
+	device_t		dev;
+	int			chan_id;
+	axidma_cb_t		cb;
+	void			*arg;
 };

@@ -33,11 +33,18 @@
 #ifndef	_DEV_XILINX_IF_XAEVAR_H_
 #define	_DEV_XILINX_IF_XAEVAR_H_
 
+struct axidma_bufmap {
+	struct mbuf	*mbuf;
+	bus_dmamap_t	map;
+};
+
 /*
  * Driver data and defines.
  */
-#define	RX_DESC_COUNT	1024
-#define	TX_DESC_COUNT	1024
+#define	RX_DESC_COUNT	64
+#define	RX_DESC_SIZE	(sizeof(struct axidma_desc) * RX_DESC_COUNT)
+#define	TX_DESC_COUNT	64
+#define	TX_DESC_SIZE	(sizeof(struct axidma_desc) * TX_DESC_COUNT)
 
 struct xae_softc {
 	struct resource		*res[2];
@@ -62,6 +69,27 @@ struct xae_softc {
 
 	/* Axistream-connected. */
 	device_t		dma_dev;
+
+	int			rxbuf_align;
+	int			txbuf_align;
+
+	bus_dma_tag_t		rxdesc_tag;
+	bus_dmamap_t		rxdesc_map;
+	struct axidma_desc	*rxdesc_ring;
+	bus_addr_t		rxdesc_ring_paddr;
+	bus_dma_tag_t		rxbuf_tag;
+	struct axidma_bufmap	rxbuf_map[RX_DESC_COUNT];
+	uint32_t		rx_idx;
+
+	bus_dma_tag_t		txdesc_tag;
+	bus_dmamap_t		txdesc_map;
+	struct axidma_desc	*txdesc_ring;
+	bus_addr_t		txdesc_ring_paddr;
+	bus_dma_tag_t		txbuf_tag;
+	struct axidma_bufmap	txbuf_map[TX_DESC_COUNT];
+	uint32_t		tx_idx_head;
+	uint32_t		tx_idx_tail;
+	int			txcount;
 };
 
 #endif	/* _DEV_XILINX_IF_XAEVAR_H_ */
