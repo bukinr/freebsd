@@ -190,7 +190,7 @@ xae_setup_txbuf(struct xae_softc *sc, int idx, struct mbuf **mp)
 	int error;
 	int nsegs;
 
-dprintf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	if ((m = m_defrag(*mp, M_NOWAIT)) == NULL)
 		return (ENOMEM);
@@ -220,7 +220,7 @@ xae_txstart_locked(struct xae_softc *sc)
 	int tmp;
 	if_t ifp;
 
-dprintf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	XAE_ASSERT_LOCKED(sc);
 
@@ -274,9 +274,8 @@ xae_txfinish_locked(struct xae_softc *sc)
 
 	XAE_ASSERT_LOCKED(sc);
 
-	/* XXX Can't set PRE|POST right now, but we need both. */
-	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map, BUS_DMASYNC_PREREAD);
-	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(sc->txdesc_tag, sc->txdesc_map,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_POSTREAD);
 	ifp = sc->ifp;
 	retired_buffer = false;
 	while (sc->tx_idx_tail != sc->tx_idx_head) {
@@ -301,11 +300,6 @@ xae_txfinish_locked(struct xae_softc *sc)
 	if (retired_buffer) {
 		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 		xae_txstart_locked(sc);
-	}
-
-	/* If there are no buffers outstanding, muzzle the watchdog. */
-	if (sc->tx_idx_tail == sc->tx_idx_head) {
-		//sc->tx_watchdog_count = 0;
 	}
 }
 
@@ -370,7 +364,8 @@ xae_rxfinish_onebuf(struct xae_softc *sc, int len)
 	struct xae_bufmap *bmap;
 	int error;
 
-dprintf("%s\n", __func__);
+	dprintf("%s\n", __func__);
+
 	/*
 	 * First try to get a new mbuf to plug into this slot in the rx ring.
 	 * If that fails, drop the current packet and recycle the current
@@ -413,13 +408,12 @@ xae_rxfinish_locked(struct xae_softc *sc)
 	int len;
 	int tmp;
 
-dprintf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	XAE_ASSERT_LOCKED(sc);
 
-	/* XXX Can't set PRE|POST right now, but we need both. */
-	//bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map, BUS_DMASYNC_PREREAD);
-	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(sc->rxdesc_tag, sc->rxdesc_map,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_POSTREAD);
 	produced_empty_buffer = false;
 	for (;;) {
 		desc = &sc->rxdesc_ring[sc->rx_idx];
@@ -452,7 +446,7 @@ xae_intr_rx(void *arg)
 
 	XAE_LOCK(sc);
 	pending = AXIDMA_RD4(sc, AXI_DMASR(AXIDMA_RX_CHAN));
-dprintf("%s: pending %x\n", __func__, pending);
+	dprintf("%s: pending %x\n", __func__, pending);
 	AXIDMA_WR4(sc, AXI_DMASR(AXIDMA_RX_CHAN), pending);
 	xae_rxfinish_locked(sc);
 	XAE_UNLOCK(sc);
@@ -468,7 +462,7 @@ xae_intr_tx(void *arg)
 
 	XAE_LOCK(sc);
 	pending = AXIDMA_RD4(sc, AXI_DMASR(AXIDMA_TX_CHAN));
-dprintf("%s: pending %x\n", __func__, pending);
+	dprintf("%s: pending %x\n", __func__, pending);
 	AXIDMA_WR4(sc, AXI_DMASR(AXIDMA_TX_CHAN), pending);
 	xae_txfinish_locked(sc);
 	XAE_UNLOCK(sc);
@@ -967,24 +961,7 @@ xae_txstart(if_t ifp)
 
 	sc = if_getsoftc(ifp);
 
-dprintf("%s\n", __func__);
-
-#if 0
-	uint32_t addr;
-	uint32_t reg;
-	reg = AXIDMA_RD4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
-	reg |= DMACR_RS;
-	AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_TX_CHAN), reg);
-
-	reg = AXIDMA_RD4(sc, AXI_DMACR(AXIDMA_RX_CHAN));
-	reg |= DMACR_RS;
-	AXIDMA_WR4(sc, AXI_DMACR(AXIDMA_RX_CHAN), reg);
-
-	addr = sc->rxdesc_ring_paddr +
-	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
-dprintf("%s: new RX tail desc %x\n", __func__, addr);
-	AXIDMA_WR8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
-#endif
+	dprintf("%s\n", __func__);
 
 	XAE_LOCK(sc);
 	xae_txstart_locked(sc);
@@ -1159,7 +1136,7 @@ xae_setup_dma(struct xae_softc *sc)
 	if (AXIDMA_SETUP_CB(sc->dma_dev, AXIDMA_RX_CHAN, xae_intr_rx, sc))
 		return (-1);
 
-dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
+	dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
 	AXIDMA_WR8(sc, AXI_CURDESC(AXIDMA_TX_CHAN), sc->txdesc_ring_paddr);
 	reg = AXIDMA_RD4(sc, AXI_DMACR(AXIDMA_TX_CHAN));
 	reg |= DMACR_IOC_IRQEN | DMACR_DLY_IRQEN | DMACR_ERR_IRQEN;
@@ -1176,7 +1153,7 @@ dprintf("%s: tx desc base %lx\n", __func__, sc->txdesc_ring_paddr);
 
 	addr = sc->rxdesc_ring_paddr +
 	    (RX_DESC_COUNT - 1) * sizeof(struct axidma_desc);
-dprintf("%s: new RX tail desc %x\n", __func__, addr);
+	dprintf("%s: new RX tail desc %x\n", __func__, addr);
 	AXIDMA_WR8(sc, AXI_TAILDESC(AXIDMA_RX_CHAN), addr);
 
 	return (0);
