@@ -134,21 +134,6 @@ axidma_attach(device_t dev)
 }
 
 static int
-axidma_detach(device_t dev)
-{
-	struct axidma_softc *sc;
-	int i;
-
-	sc = device_get_softc(dev);
-
-	for (i = 0; i < AXIDMA_MAX_CHANNELS; i++)
-		bus_teardown_intr(dev, sc->res[1 + i], sc->ih[i]);
-	bus_release_resources(dev, axidma_spec, sc->res);
-
-	return (0);
-}
-
-static int
 axidma_reset(device_t dev, int chan_id)
 {
 	struct axidma_softc *sc;
@@ -207,11 +192,10 @@ static device_method_t axidma_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,			axidma_probe),
 	DEVMETHOD(device_attach,		axidma_attach),
-	DEVMETHOD(device_detach,		axidma_detach),
 
-	DEVMETHOD(axidma_setup_cb,		axidma_setup_cb),
 	DEVMETHOD(axidma_reset,			axidma_reset),
 	DEVMETHOD(axidma_memres,		axidma_memres),
+	DEVMETHOD(axidma_setup_cb,		axidma_setup_cb),
 
 	DEVMETHOD_END
 };
