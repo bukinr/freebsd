@@ -69,6 +69,7 @@ struct xae_softc {
 
 	/* Axistream-connected. */
 	device_t		dma_dev;
+	struct resource		*dma_res;
 
 	int			rxbuf_align;
 	int			txbuf_align;

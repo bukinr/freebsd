@@ -176,34 +176,14 @@ axidma_reset(device_t dev, int chan_id)
 	return (0);
 }
 
-static int
-axidma_read4(device_t dev, bus_addr_t reg)
+static struct resource *
+axidma_memres(device_t dev)
 {
 	struct axidma_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	return (AXIDMA_RD4(sc, reg));
-}
-
-static void
-axidma_write4(device_t dev, bus_addr_t reg, uint32_t val)
-{
-	struct axidma_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	AXIDMA_WR4(sc, reg, val);
-}
-
-static void
-axidma_write8(device_t dev, bus_addr_t reg, uint64_t val)
-{
-	struct axidma_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	AXIDMA_WR8(sc, reg, val);
+	return (sc->res[0]);
 }
 
 static int
@@ -231,9 +211,7 @@ static device_method_t axidma_methods[] = {
 
 	DEVMETHOD(axidma_setup_cb,		axidma_setup_cb),
 	DEVMETHOD(axidma_reset,			axidma_reset),
-	DEVMETHOD(axidma_read4,			axidma_read4),
-	DEVMETHOD(axidma_write4,		axidma_write4),
-	DEVMETHOD(axidma_write8,		axidma_write8),
+	DEVMETHOD(axidma_memres,		axidma_memres),
 
 	DEVMETHOD_END
 };

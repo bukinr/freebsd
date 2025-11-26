@@ -80,11 +80,11 @@
 	bus_write_8((_sc)->res[0], _reg, _val)
 
 #define	AXIDMA_RD4(_sc, _reg) \
-	AXIDMA_READ4((_sc)->dma_dev, _reg)
+	bus_read_4((_sc)->dma_res, _reg)
 #define	AXIDMA_WR4(_sc, _reg, _val) \
-	AXIDMA_WRITE4((_sc)->dma_dev, _reg, _val)
+	bus_write_4((_sc)->dma_res, _reg, _val)
 #define	AXIDMA_WR8(_sc, _reg, _val) \
-	AXIDMA_WRITE8((_sc)->dma_dev, _reg, _val)
+	bus_write_8((_sc)->dma_res, _reg, _val)
 
 #define	XAE_LOCK(sc)			mtx_lock(&(sc)->mtx)
 #define	XAE_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
@@ -948,6 +948,7 @@ get_axistream(struct xae_softc *sc)
 		device_printf(sc->dev, "Could not get DMA device by xref.\n");
 		return (ENXIO);
 	}
+	sc->dma_res = AXIDMA_MEMRES(sc->dma_dev);
 
 	return (0);
 }

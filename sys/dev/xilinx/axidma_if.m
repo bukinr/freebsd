@@ -49,21 +49,8 @@ METHOD int reset {
 	int			chan_id;
 };
 
-METHOD int read4 {
+METHOD struct resource * memres {
 	device_t		dev;
-	bus_addr_t		reg;
-};
-
-METHOD void write4 {
-	device_t		dev;
-	bus_addr_t		reg;
-	uint32_t		val;
-};
-
-METHOD void write8 {
-	device_t		dev;
-	bus_addr_t		reg;
-	uint64_t		val;
 };
 
 METHOD int setup_cb {
