@@ -224,10 +224,8 @@ xae_txstart_locked(struct xae_softc *sc)
 
 	XAE_ASSERT_LOCKED(sc);
 
-#if 0
 	if (!sc->link_is_up)
 		return;
-#endif
 
 	ifp = sc->ifp;
 
